@@ -1,0 +1,25 @@
+{
+    "name": "cpptips-client",
+    "description": "c++语言插件客户端",
+    "author": "widyhu",
+    "license": "MIT",
+    "version": "0.0.1",
+    "publisher": "vscode",
+    "repository": {
+        "type": "git",
+        "url": ""
+    },
+    "engines": {
+        "vscode": "^1.33.0"
+    },
+    "scripts": {
+        "update-vscode": "vscode-install",
+        "postinstall": "vscode-install"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^5.2.1"
+    },
+    "devDependencies": {
+        "vscode": "^1.1.35"
+    }
+}

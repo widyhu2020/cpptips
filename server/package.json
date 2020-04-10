@@ -1,0 +1,21 @@
+{
+    "name": "cpptips-server",
+    "description": "c++语法解释和提示服务器.",
+    "version": "1.0.0",
+    "author": "widyhu",
+    "license": "MIT",
+    "engines": {
+        "node": "*"
+    },
+    "repository": {
+        "type": "git",
+        "url": ""
+    },
+    "dependencies": {
+        "vscode-languageserver": "^5.2.1"
+    },
+    "devDependencies": {
+        "@types/mkdirp": "^1.0.0"
+    },
+    "scripts": {}
+}

@@ -1,0 +1,153 @@
+{
+	"name": "cpptips",
+	"displayName": "cpptips",
+	"description": "cppticps",
+	"version": "0.1.9",
+	"icon": "resources/cpp.png",
+	"engines": {
+		"vscode": "^1.43.0"
+	},
+	"categories": [],
+	"publisher": "widyhu",
+	"activationEvents": [
+		"onLanguage:cpp",
+		"onLanguage:protobuf"
+	],
+	"main": "./client/out/extension.js",
+	"contributes": {
+		"configuration": {
+			"type": "object",
+			"title": "c++语言插件",
+			"properties": {
+				"cpptips.needLoadLinkDir": {
+					"type": "array",
+					"default": ["/comm", "/mmcomm", "/platform"],
+					"description": "默认情况下软连接不加载索引，加入需要加载的白名单中！"
+				},
+				"cpptips.ignorDir":{
+					"type": "array",
+					"default": [
+						"/comm_include/",
+						"/ilinkgateway/",
+						"/mmadgateway/",
+						"/mmaegateway/",
+						"/mmdatagateway/",
+						"/mmgamegateway/",
+						"/mmbizgateway/",
+						"/mmgateway/",
+						"/mmlifegateway/",
+						"/mmocbizgateway/",
+						"/mmocgateway/",
+						"/mmossgateway/",
+						"/mmreader/",
+						"/mmsearchgateway/",
+						"/mmspamgateway/",
+						"/mmtools/",
+						"/mmuxgateway/",
+						"/phxgateway/",
+						"/prgateway/",
+						"/proxy/",
+						"/prservice/",
+						"/qqmail/",
+						"/blade-bin/",
+						"/3rd/",
+						"/3dept/",
+						"/basic/",
+						"/bin-out/"],
+					"description": "明确不创建索引的目录！非正则匹配"
+				},
+				"cpptips.ignoreFileAndDir": {
+					"type": "array",
+					"default": [
+						"^[.~]{1,1}.{1,128}$",
+						"^.*_tools_pb\\.(cpp|h)$",
+						"^.*testimpl_pb\\.(cpp|h)$",
+						"^.*\\.pb\\.(cc|h)$",
+						"^(sk_|sm_)[a-z0-9_.]{1,128}$",
+						"^mm3rd$",
+						"^lib32$",
+						"^lib64$",
+						"^lib64_debug$",
+						"^lib64_release$",
+						"^lib32_debug$",
+						"^lib32_release$",
+						"^debug$",
+						"^release$",
+						"^win32$",
+						"^bin$"
+					],
+					"description": "需要忽略的文件的名称或者正则表达式"
+				}
+			}
+		},
+		"commands": [],
+		"languages": [
+			{
+				"id": "payprotobuf",
+				"extensions": [
+					".proto"
+				],
+				"aliases": [
+					"proto"
+				]
+			},
+			{
+				"id": "cpp",
+				"extensions": [
+					".cpp",
+					".c",
+					".h"
+				],
+				"aliases": [
+					"cpp",
+					"Cpp",
+					"c++"
+				],
+				"configuration": "./config/cpp-language-configuration.json"
+			}
+		],
+		"colors": [
+			{
+			  "id": "superstatus.cpptips",
+			  "description": "状态栏颜色.",
+			  "defaults": {
+				"dark": "#e9b302ee",
+				"light": "#e9b302ee",
+				"highContrast": "#5100e6",
+				"statusBarItem.activeBackground": "#00AA00"
+			  }
+			}
+		  ],
+		"iconThemes": [
+            {
+                "id": "statuBar",
+                "label": "状态栏图标",
+                "path": "./resources/128.png"
+            }
+        ]
+
+	},
+	"scripts": {
+		"vscode:prepublish": "sh build.sh",
+		"rebuild": "sh build.sh",
+		"compile": "tsc -b",
+		"watch": "tsc -b -w",
+		"preinstall" : "",
+		"install":"sh install.sh",
+		"test": "sh ./scripts/e2e.sh"
+	},
+	"devDependencies": {
+		"@types/mocha": "^5.2.7",
+		"@types/node": "^12.11.7",
+		"electron-rebuild": "^1.10.0",
+		"tslint": "^5.16.0",
+		"typescript": "^3.7.5",
+		"npm-run-all": "^4.1.5"
+	},
+	"dependencies": {
+		"@types/lodash": "^4.14.149",
+		"better-sqlite3": "^6.0.1",
+		"events": "^3.1.0",
+		"unzipper": "^0.10.10"
+	}
+}
