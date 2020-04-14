@@ -9,6 +9,7 @@ const vscode_1 = require("vscode");
 const vscode_languageclient_1 = require("vscode-languageclient");
 let client;
 let myStatusBarItem;
+let showUpdataBarItem;
 function activate(context) {
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
@@ -45,50 +46,48 @@ function activate(context) {
         }
     };
     // Create the language client and start the client.
-    client = new vscode_languageclient_1.LanguageClient('languageServerExample', 'Language Server Example', serverOptions, clientOptions);
+    client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions);
     client.onReady().then(() => {
         //注册回调事件
         client.onNotification("show_include_process", (data) => {
             myStatusBarItem.show();
-            //myStatusBarItem.color = "red";
-            myStatusBarItem.color;
             if (data.length != 3) {
-                myStatusBarItem.text = "$(statuBar) 头文件索引加载中..";
+                myStatusBarItem.text = `$(loading) 头文件索引加载中..`;
                 return;
             }
             let process = data[0];
             let total = data[1];
             let index = data[2];
             //更新状态栏
-            myStatusBarItem.text = "$(statuBar) 头文件索引分析中：当前进度" + process + "%，总共：" + total + "，当前处理：" + index;
+            myStatusBarItem.text = `$(loading) 头文件索引分析中：当前进度` + process + "%，总共：" + total + "，当前处理：" + index;
         });
         client.onNotification("show_source_process", (data) => {
             myStatusBarItem.show();
             //myStatusBarItem.color = "white";
             if (data.length != 3) {
-                myStatusBarItem.text = "$(statuBar) 源文件分析中..";
+                myStatusBarItem.text = `$(loading) 源文件分析中..`;
                 return;
             }
             let process = data[0];
             let total = data[1];
             let index = data[2];
             //更新状态栏
-            myStatusBarItem.text = "$(statuBar) 源文件分析中：当前进度" + process + "%，总共：" + total + "，当前处理：" + index;
+            myStatusBarItem.text = `$(loading) 源文件分析中：当前进度` + process + "%，总共：" + total + "，当前处理：" + index;
         });
         client.onNotification("begin_scan", (data) => {
             myStatusBarItem.show();
             //myStatusBarItem.color = "red";
-            myStatusBarItem.text = "$(statuBar) 工作空间源文件扫描中...";
+            myStatusBarItem.text = `$(loading) 工作空间源文件扫描中...`;
         });
         client.onNotification("end_scan", (data) => {
             myStatusBarItem.hide();
-            myStatusBarItem.text = "$(statuBar) 工作空间源文件扫描完成";
+            myStatusBarItem.text = `$(check) 工作空间源文件扫描完成`;
         });
         client.onNotification("scan_ing", (data) => {
             if (data.length <= 0) {
                 return;
             }
-            myStatusBarItem.text = "正在加载目录：" + data[0];
+            myStatusBarItem.text = `$(loading) 正在加载目录：` + data[0];
         });
         client.onNotification("close_show_process", (data) => {
             //关闭状态栏
@@ -102,6 +101,18 @@ function activate(context) {
             }
             vscode_1.window.showInformationMessage(message[0]);
         });
+        //更新提醒
+        client.onNotification("show_update", (message) => {
+            if (message.length <= 0 || showUpdataBarItem.text != "") {
+                //无效通知
+                return;
+            }
+            //更新提示只提示因1次
+            vscode_1.window.showInformationMessage(message[0]);
+            showUpdataBarItem.text = `$(repo-sync)Cpptips:重启获取最新版本`;
+            showUpdataBarItem.tooltip = message[0];
+            showUpdataBarItem.show();
+        });
     });
     //创建状态栏，用于更新加载索引进度
     const errorColor = new vscode_1.ThemeColor('superstatus.cpptips');
@@ -109,6 +120,9 @@ function activate(context) {
     myStatusBarItem.text = "";
     myStatusBarItem.color = errorColor;
     myStatusBarItem.show();
+    showUpdataBarItem = vscode_1.window.createStatusBarItem(vscode_1.StatusBarAlignment.Left, 3);
+    showUpdataBarItem.text = "";
+    showUpdataBarItem.color = "red";
     // Start the client. This will also launch the server
     context.subscriptions.push(client.start());
 }

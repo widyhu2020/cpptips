@@ -15,7 +15,7 @@ import {
 
 let client: LanguageClient;
 let myStatusBarItem: StatusBarItem;
-
+let showUpdataBarItem: StatusBarItem;
 
 export function activate(context: ExtensionContext) {
     // The server is implemented in node
@@ -59,8 +59,8 @@ export function activate(context: ExtensionContext) {
 
     // Create the language client and start the client.
     client = new LanguageClient(
-        'languageServerExample',
-        'Language Server Example',
+        'CpptipslanguageServer',
+        'Cpptips Language Server',
         serverOptions,
         clientOptions
     );
@@ -69,10 +69,8 @@ export function activate(context: ExtensionContext) {
         //注册回调事件
         client.onNotification("show_include_process", (data: Array<number>) => {
             myStatusBarItem.show();
-            //myStatusBarItem.color = "red";
-            myStatusBarItem.color
             if (data.length != 3) {
-                myStatusBarItem.text = "$(statuBar) 头文件索引加载中..";
+                myStatusBarItem.text = `$(loading) 头文件索引加载中..`;
                 return;
             }
 
@@ -80,14 +78,14 @@ export function activate(context: ExtensionContext) {
             let total = data[1];
             let index = data[2];
             //更新状态栏
-            myStatusBarItem.text = "$(statuBar) 头文件索引分析中：当前进度" + process + "%，总共：" + total + "，当前处理：" + index;
+            myStatusBarItem.text = `$(loading) 头文件索引分析中：当前进度` + process + "%，总共：" + total + "，当前处理：" + index;
         });
 
         client.onNotification("show_source_process", (data: Array<number>) => {
             myStatusBarItem.show();
             //myStatusBarItem.color = "white";
             if (data.length != 3) {
-                myStatusBarItem.text = "$(statuBar) 源文件分析中..";
+                myStatusBarItem.text = `$(loading) 源文件分析中..`;
                 return;
             }
 
@@ -95,25 +93,25 @@ export function activate(context: ExtensionContext) {
             let total = data[1];
             let index = data[2];
             //更新状态栏
-            myStatusBarItem.text = "$(statuBar) 源文件分析中：当前进度" + process + "%，总共：" + total + "，当前处理：" + index;
+            myStatusBarItem.text = `$(loading) 源文件分析中：当前进度` + process + "%，总共：" + total + "，当前处理：" + index;
         });
 
         client.onNotification("begin_scan", (data: Array<number>) => {
             myStatusBarItem.show();
             //myStatusBarItem.color = "red";
-            myStatusBarItem.text = "$(statuBar) 工作空间源文件扫描中...";
+            myStatusBarItem.text = `$(loading) 工作空间源文件扫描中...`;
         });
 
         client.onNotification("end_scan", (data: Array<number>) => {
             myStatusBarItem.hide();
-            myStatusBarItem.text = "$(statuBar) 工作空间源文件扫描完成";
+            myStatusBarItem.text = `$(check) 工作空间源文件扫描完成`;
         });
 
         client.onNotification("scan_ing", (data:Array<string>) =>{
             if(data.length <= 0) {
                 return;
             }
-            myStatusBarItem.text = "正在加载目录：" + data[0];
+            myStatusBarItem.text = `$(loading) 正在加载目录：` + data[0];
         });
 
         client.onNotification("close_show_process", (data: Array<number>) => {
@@ -129,6 +127,20 @@ export function activate(context: ExtensionContext) {
             }
             window.showInformationMessage(message[0]);
         });
+
+        //更新提醒
+        client.onNotification("show_update",(message: Array<string>) => {
+            if (message.length <= 0 || showUpdataBarItem.text != "") {
+                //无效通知
+                return;
+            }
+
+            //更新提示只提示因1次
+            window.showInformationMessage(message[0]);
+            showUpdataBarItem.text = `$(repo-sync)Cpptips:重启获取最新版本`;
+            showUpdataBarItem.tooltip = message[0];
+            showUpdataBarItem.show();
+        });
     });
 
     //创建状态栏，用于更新加载索引进度
@@ -138,6 +150,10 @@ export function activate(context: ExtensionContext) {
     myStatusBarItem.text = "";
     myStatusBarItem.color = errorColor;
     myStatusBarItem.show();
+
+    showUpdataBarItem = window.createStatusBarItem(StatusBarAlignment.Left, 3);
+    showUpdataBarItem.text = "";
+    showUpdataBarItem.color = "red";
     
     // Start the client. This will also launch the server
     context.subscriptions.push(client.start());

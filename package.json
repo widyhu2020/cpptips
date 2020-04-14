@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "cppticps",
-	"version": "0.1.9",
+	"version": "0.1.10",
 	"icon": "resources/cpp.png",
 	"engines": {
 		"vscode": "^1.43.0"
@@ -24,37 +24,25 @@
 					"default": ["/comm", "/mmcomm", "/platform"],
 					"description": "默认情况下软连接不加载索引，加入需要加载的白名单中！"
 				},
+				"cpptips.needLoadDir":{
+					"type": "array",
+					"default": [
+						"/mmpay/",
+						"/mmpaygateway/",
+						"/mmtenpay/",
+						"/comm/",
+						"/mmcomm/",
+						"/platform/",
+						"/comm2/",
+						"/appplatform/"
+					],
+					"description": "需要加载的目录，未配置进来将不会加载该目录，如果配置未空，则加载工程目录下全部文件！"
+				},
 				"cpptips.ignorDir":{
 					"type": "array",
 					"default": [
-						"/comm_include/",
-						"/ilinkgateway/",
-						"/mmadgateway/",
-						"/mmaegateway/",
-						"/mmdatagateway/",
-						"/mmgamegateway/",
-						"/mmbizgateway/",
-						"/mmgateway/",
-						"/mmlifegateway/",
-						"/mmocbizgateway/",
-						"/mmocgateway/",
-						"/mmossgateway/",
-						"/mmreader/",
-						"/mmsearchgateway/",
-						"/mmspamgateway/",
-						"/mmtools/",
-						"/mmuxgateway/",
-						"/phxgateway/",
-						"/prgateway/",
-						"/proxy/",
-						"/prservice/",
-						"/qqmail/",
-						"/blade-bin/",
-						"/3rd/",
-						"/3dept/",
-						"/basic/",
-						"/bin-out/"],
-					"description": "明确不创建索引的目录！非正则匹配"
+					],
+					"description": "明确不创建索引的目录！needLoadDir配置需要加载，但是存在子目录不需要加载时，可以使用该配置项控制，非正则匹配"
 				},
 				"cpptips.ignoreFileAndDir": {
 					"type": "array",
@@ -76,7 +64,18 @@
 						"^win32$",
 						"^bin$"
 					],
-					"description": "需要忽略的文件的名称或者正则表达式"
+					"description": "需要忽略的文件的名称或者正则表达式，该规则叠加在最后，符合该规则的文件或者文件夹都将不加载"
+				},
+				"cpptips.updateCheckIntervalTime" : {
+					"type": "integer",
+					"maximum": 2147483647,
+					"default": 1800000,
+					"description": "配置更新检查的间隔时间"
+				},
+				"cpptips.updateCheckUrl" : {
+					"type": "string",
+					"default": "http://9.134.38.144:8888",
+					"description": "配置更新检查时拉取的文件url地址"
 				}
 			}
 		},
@@ -117,29 +116,20 @@
 				"statusBarItem.activeBackground": "#00AA00"
 			  }
 			}
-		  ],
-		"iconThemes": [
-            {
-                "id": "statuBar",
-                "label": "状态栏图标",
-                "path": "./resources/128.png"
-            }
-        ]
-
+		  ]
 	},
 	"scripts": {
 		"vscode:prepublish": "sh build.sh",
-		"rebuild": "sh build.sh",
+		"rebuild": "sh rebuild.sh",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
-		"preinstall" : "",
-		"install":"sh install.sh",
-		"test": "sh ./scripts/e2e.sh"
+		"preinstall" : "./preinstall.js",
+		"install":"npm install node-gyp",
+		"test": ""
 	},
 	"devDependencies": {
 		"@types/mocha": "^5.2.7",
 		"@types/node": "^12.11.7",
-		"electron-rebuild": "^1.10.0",
 		"tslint": "^5.16.0",
 		"typescript": "^3.7.5",
 		"npm-run-all": "^4.1.5"
@@ -148,6 +138,8 @@
 		"@types/lodash": "^4.14.149",
 		"better-sqlite3": "^6.0.1",
 		"events": "^3.1.0",
-		"unzipper": "^0.10.10"
+		"unzipper": "^0.10.10",
+		"electron-rebuild": "^1.10.0",
+		"node-gyp": "^6.1.0"
 	}
 }

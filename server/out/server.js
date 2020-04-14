@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const vscode_languageserver_1 = require("vscode-languageserver");
-const codeAnalyse_1 = require("../../lib/codeAnalyse");
+const codeAnalyse_1 = require("../../libs/codeAnalyse");
 const fs = require("fs");
 let basepath = "/";
 let openFile = {};
@@ -26,54 +26,12 @@ let hasConfigurationCapability = false;
 //配置
 let documentSettings = new Map();
 const defaultSettings = {
-    needLoadLinkDir: ["\comm", "\mmcomm", "\platform"],
-    ignoreFileAndDir: [
-        "^[.~]{1,1}.{1,128}$",
-        "^.*_tools_pb\\.(cpp|h)$",
-        "^.*testimpl_pb\\.(cpp|h)$",
-        "^.*\\.pb\\.(cc|h)$",
-        "^(sk_|sm_)[a-z0-9_.]{1,128}$",
-        "^mm3rd$",
-        "^lib32$",
-        "^lib64$",
-        "^lib64_debug$",
-        "^lib64_release$",
-        "^lib32_debug$",
-        "^lib32_release$",
-        "^debug$",
-        "^release$",
-        "^win32$",
-        "^bin$"
-    ],
-    ignorDir: [
-        "/comm_include/",
-        "/ilinkgateway/",
-        "/mmadgateway/",
-        "/mmaegateway/",
-        "/mmdatagateway/",
-        "/mmgamegateway/",
-        "/mmbizgateway/",
-        "/mmgateway/",
-        "/mmlifegateway/",
-        "/mmocbizgateway/",
-        "/mmocgateway/",
-        "/mmossgateway/",
-        "/mmreader/",
-        "/mmsearchgateway/",
-        "/mmspamgateway/",
-        "/mmtools/",
-        "/mmuxgateway/",
-        "/phxgateway/",
-        "/prgateway/",
-        "/proxy/",
-        "/prservice/",
-        "/qqmail/",
-        "/blade-bin/",
-        "/3rd/",
-        "/3dept/",
-        "/basic/",
-        "/bin-out/"
-    ]
+    needLoadLinkDir: [],
+    ignoreFileAndDir: [],
+    ignorDir: [],
+    needLoadDir: [],
+    updateCheckIntervalTime: 10000,
+    updateCheckUrl: "http://9.134.38.144:8888/list.js"
 };
 let globalSettings = defaultSettings;
 //创建连接
@@ -144,7 +102,14 @@ function reloadIncludeFileCallBack(msg, showprocess, total, nowIndex, extdata) {
     processFileChange();
 }
 ;
+function updateTips(msg) {
+    //发送更新提示
+    //发送弹窗
+    let data = ["检查到cpptips有更新，请重启vscode加载最新的插件！"];
+    connection.sendNotification("show_update", [data]);
+}
 connection.onInitialize((params) => {
+    console.log(process);
     console.log("root path", params.rootPath);
     if (params.rootPath != null) {
         basepath = params.rootPath;
@@ -199,6 +164,8 @@ connection.onInitialized(() => {
         codeAnalyse_1.CodeAnalyse.getInstace().init(_config);
         //重新加载配置
         codeAnalyse_1.CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
+        //更新检查
+        codeAnalyse_1.CodeAnalyse.getInstace().updateCheck(updateTips);
     }, (err) => { console.log(err); });
 });
 //配置调整
@@ -588,13 +555,10 @@ function getDependentByCppCallBack(msg, filepath, usingnamepace, include) {
     console.log(msg);
     if (msg == "busy") {
         //插件正在分析索引，加入队列待会处理
-        console.log("插件正在分析索引，加入队列待会处理");
+        console.log("插件正在分析索引，加入队列待会处理，分析完成之后重新加载");
         dependentfiles.add(filepath);
         return;
     }
-    //console.log(usingnamepace);
-    //console.log(include);
-    //showTipMessage("文件索引构建完成！");
 }
 ;
 function analyseCppFile() {
@@ -678,11 +642,8 @@ connection.onDidChangeTextDocument((params) => {
             replaceEnd = replaceStart;
             replaceStart = _tmp;
         }
-        // let deletestr: string = context.substring(replaceStart + 1, replaceEnd + 1);
-        // console.log("deletestr", deletestr, text);
         let tmpstr = context.slice(0, replaceStart + 1) + text + context.slice(replaceEnd + 1);
         openFile[filename] = tmpstr;
-        //console.log("deletestr", openFile[filename]);
     }
 });
 //加载单个文件回调

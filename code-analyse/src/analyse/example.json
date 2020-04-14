@@ -1,0 +1,87 @@
+//数据json结构 - 查找树结构定义
+{
+    "d" : {
+        "fullname" : {
+            "s" : "namespace",                          //名称，全称，包括命名空间
+            "n" : "name1",                              //名称，不包含命名空间
+            "t" : "type",                               //类型（0:全局；1:类；2:结构体；3:枚举）
+            "p" : "template",                           //模版
+            "f" : {                                     //包含的函数
+                "function name" :[ {                          
+                    "n" : "function name",              //函数名称
+                    "T"  : 0,                            //函数类型
+                    "d" : "raw line",                   //原定义，展示
+                    "r" : {                             //返回定义
+                        "t": "type",                    //返回类型
+                        "c": "is const",                //返回const变量
+                        "p" : "is point",               //返回指针
+                        "a" : "is addr"                 //是否引用
+                    },
+                    "i" : [                             //输入参数列表
+                        {
+                            "t" : "type",               //类型
+                            "n" : "name",               //名称
+                            "v" : "default value",      //默认值
+                            "c" : "is const",           //是否常量
+                            "p" : "is point",           //是否指针
+                            "a" : "is addr"             //是否引用
+                        }
+                    ],   
+                    "c" : 0,                            //是否常量函数
+                    "s" : 0,                            //是否静态方法
+                    "l" : 0                            //访问级别
+                }]
+            },    
+            "v" : {                                    //变量列表
+                "name" : {                                
+                    "t" : "type",                       //变量类型
+                    "T" : 1,                            //函数类型
+                    "n" : "name",                       //变量名称
+                    "d" : "raw line",                   //原定义，展示
+                    "v" : "default value",              //变量默认值
+                    "c" : "is const",                   //是否const变量
+                    "p" : "is point",                   //是否指针
+                    "s" : "is static",                  //是否静态变量
+                    "l" : "user permission" ,           //访问级别
+                    "a" : "is addr",                    //是否引用
+                    "m" : "is template function"        //模版函数的模版定义
+                }
+            },
+            "e" : {
+                "name" :{
+                    "file_name" : {
+                        "n" : "name",                       //枚举的名字
+                        "T" : 2,                            //函数类型
+                        "v" : "value",                      //值
+                        "d" : "raw name",                   //原始定义
+                        "l" : "ser permission"              //权限
+                    }
+                }
+            },
+            "d": {                                      //宏定义
+                "name": [{
+                    "n": "define name",                 //宏定义的名称
+                    "v": "value",                       //值类型的宏定义
+                    "d": "raw line",                    //宏定义原格式
+                    "p": [
+                        "p2",
+                        "p2"
+                    ]                                   //宏定义参数
+                }]
+            }
+        }
+    },
+    "g" : {                                             //全局配置
+        "f" : "file name",                              //文件名称
+        "i": [ "include" ],                             //包含的头文件
+        "u" : [ "usingnamespace" ],                     //使用的命名空间
+        "d": {                                          //宏定义
+            "name" : {
+                "n": "define name",                     //宏定义的名称
+                "d": "raw line",                        //宏定义原格式
+                "p":["p2", "p2"]                        //宏定义参数
+            }     
+        }                                
+    }
+}
+
