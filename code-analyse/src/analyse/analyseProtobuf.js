@@ -318,7 +318,7 @@ class AnalyseProtobuf extends AnalyseBase{
         }
     };
 
-    //分析所有的函数
+    //分析所有的枚举
     _analyseCodeBlockProtoEnum = function (node, lines, index) {
         if (!node.ownname
             || (node.ownname
@@ -327,6 +327,28 @@ class AnalyseProtobuf extends AnalyseBase{
             return;
         }
 
+        //枚举检查函数
+        if(node.parent != null && node.ownname.type == TypeEnum.NAMESPACE) {
+            let funcname = node.ownname.name + "_IsValid";
+            let addVerRet = new MateData.VariableMet();
+            addVerRet.type = "bool";
+            addVerRet.name = "";
+            addVerRet.ispoint = 0;
+
+            let variable = [];
+            let addVerSetParams = new MateData.VariableMet();
+            addVerSetParams.type = "int";
+            addVerSetParams.name = "eEnumValue";
+            variable.push(addVerSetParams);
+
+            let addMethod = new MateData.MethodMet();
+            addMethod.name = funcname;
+            addMethod.returndata = addVerRet;
+            addMethod.params = variable;
+            addMethod.rawline = "inline bool " + funcname + "( int eEnumValue )";
+            addMethod.isinline = 1;
+            node.parent.addMethod(addMethod);
+        }
         
         let items = lines[index].split(' ');
         //去掉空格
@@ -725,7 +747,7 @@ class AnalyseProtobuf extends AnalyseBase{
         node.addMethod(addMethod);
     };
 
-    //构造获取韩素
+    //构造获取函数
     _makenHasAnalyseFiled = function (node, name, annotate) {
         //直接写入写入
         let addVerRet = new MateData.VariableMet();

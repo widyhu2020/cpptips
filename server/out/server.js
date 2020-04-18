@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const vscode_languageserver_1 = require("vscode-languageserver");
+const path = require('path');
 const codeAnalyse_1 = require("../../libs/codeAnalyse");
 const fs = require("fs");
 let basepath = "/";
@@ -114,7 +115,8 @@ connection.onInitialize((params) => {
     if (params.rootPath != null) {
         basepath = params.rootPath;
     }
-    if (basepath[basepath.length - 1] != '/') {
+    basepath = basepath.replace(/[\\]{1,2}/g, "/");
+    if (basepath[basepath.length - 1] != "/") {
         basepath = basepath + "/";
     }
     //判断是否可以读取到配置
@@ -144,7 +146,8 @@ connection.onInitialize((params) => {
 });
 connection.onInitialized(() => {
     //如果目录没有则创建目录
-    let dbpath = basepath + ".vscode/.db/";
+    let arrdbpath = [basepath, ".vscode", ".db", ""];
+    let dbpath = arrdbpath.join("/");
     if (!fs.existsSync(dbpath)) {
         fs.mkdirSync(dbpath, { recursive: true });
     }
@@ -199,18 +202,18 @@ function processFileChange() {
     console.info(setfilename);
     let files = [];
     mapfile.forEach((fileevent) => {
-        let uri = fileevent.uri;
+        let uri = decodeURIComponent(fileevent.uri);
         let pos = uri.indexOf(basepath);
         let filename = uri;
         filename = filename.slice(pos + basepath.length);
-        if (openFile[uri] && openFile[uri] != "" && fileevent.type == vscode_languageserver_1.FileChangeType.Changed) {
+        if (openFile[fileevent.uri] && openFile[fileevent.uri] != "" && fileevent.type == vscode_languageserver_1.FileChangeType.Changed) {
             try {
                 let fd = fs.openSync(basepath + filename, 'r');
                 const buffer = Buffer.alloc(1024 * 1024 * 2);
                 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, 0);
                 fs.closeSync(fd);
                 let filecontext = buffer.toString('utf8', 0, bytesRead);
-                openFile[uri] = filecontext;
+                openFile[fileevent.uri] = filecontext;
             }
             catch (error) {
                 console.error(error);
@@ -306,8 +309,9 @@ connection.onCompletion((_textDocumentPosition) => {
     }
     //重新加载文件
     let basedir = basepath;
-    let pathpos = _textDocumentPosition.textDocument.uri.indexOf(basedir);
-    let filename = _textDocumentPosition.textDocument.uri;
+    let uri = decodeURIComponent(_textDocumentPosition.textDocument.uri);
+    let pathpos = uri.indexOf(basedir);
+    let filename = uri;
     filename = filename.slice(pathpos + basedir.length);
     let line = _textDocumentPosition.position.line;
     let cpos = _textDocumentPosition.position.character;
@@ -389,9 +393,10 @@ connection.onCompletionResolve((item) => {
 });
 connection.onSignatureHelp((_document) => {
     //重新加载文件
+    let uri = decodeURIComponent(_document.textDocument.uri);
     let basedir = basepath;
-    let pathpos = _document.textDocument.uri.indexOf(basedir);
-    let filename = _document.textDocument.uri;
+    let pathpos = uri.indexOf(basedir);
+    let filename = uri;
     filename = filename.slice(pathpos + basedir.length);
     let line = _document.position.line;
     let cpos = _document.position.character;
@@ -576,19 +581,20 @@ function analyseCppFile() {
 ;
 //打开文件触发
 connection.onDidOpenTextDocument((params) => {
-    let uri = params.textDocument.uri;
+    let uri = decodeURIComponent(params.textDocument.uri);
     openFile[params.textDocument.uri] = params.textDocument.text;
     let basedir = basepath;
     let pos = uri.indexOf(basedir);
     let filepath = uri;
     filepath = filepath.slice(pos + basedir.length);
     dependentfiles.add(filepath);
+    console.log("debug:", uri, basedir, filepath);
     //异步执行
     process.nextTick(analyseCppFile);
 });
 //编辑文件触发，增量触发
 connection.onDidChangeTextDocument((params) => {
-    let filename = params.textDocument.uri;
+    let filename = decodeURIComponent(params.textDocument.uri);
     //console.log(params);
     for (let i = 0; i < params.contentChanges.length; i++) {
         const e = params.contentChanges[i];
@@ -604,7 +610,7 @@ connection.onDidChangeTextDocument((params) => {
         let spos = start.character;
         let epos = end.character;
         let text = e.text;
-        let context = openFile[filename];
+        let context = openFile[params.textDocument.uri];
         let lines = 0;
         let lendpos = -1;
         let replaceStart = -1, replaceEnd = -1;
@@ -643,7 +649,7 @@ connection.onDidChangeTextDocument((params) => {
             replaceStart = _tmp;
         }
         let tmpstr = context.slice(0, replaceStart + 1) + text + context.slice(replaceEnd + 1);
-        openFile[filename] = tmpstr;
+        openFile[params.textDocument.uri] = tmpstr;
     }
 });
 //加载单个文件回调
@@ -674,7 +680,7 @@ connection.onDidSaveTextDocument((params) => {
     // }
 });
 connection.onDefinition((params) => {
-    let filename = params.textDocument.uri;
+    let filename = decodeURIComponent(params.textDocument.uri);
     let basedir = basepath;
     let pos = filename.indexOf(basedir);
     filename = filename.slice(pos + basedir.length);
@@ -735,7 +741,7 @@ connection.onTypeDefinition((params) => {
 //鼠标停留提醒
 connection.onHover((params) => {
     //重新加载文件
-    let filename = params.textDocument.uri;
+    let filename = decodeURIComponent(params.textDocument.uri);
     let basedir = basepath;
     let pos = filename.indexOf(basedir);
     filename = filename.slice(pos + basedir.length);

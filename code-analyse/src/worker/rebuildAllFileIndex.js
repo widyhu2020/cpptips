@@ -11,6 +11,7 @@ const Analyse = require('../analyse/analyse').Analyse;
 const TypeEnum = require('../analyse/analyse').TypeEnum;
 const Traverse = require('../traversedir/traverse');
 const fs = require('fs');
+const path = require('path');
 const util = require('util');
 const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
@@ -301,7 +302,7 @@ class RebuildFileIndex {
             //之前未写入db，则写入db，并分析语法
             //分析文件，去掉类、函数等定义
             
-            let _pos = filepath.lastIndexOf('/');
+            let _pos = filepath.lastIndexOf("/");
             let filename = filepath.substring(_pos + 1);
             let data = {
                 filename: filename,
@@ -389,7 +390,7 @@ class RebuildFileIndex {
             //第一次加载
             //之前未写入db，则写入db，并分析语法
             //分析文件，去掉类、函数等定义
-            let _pos = filepath.lastIndexOf('/');
+            let _pos = filepath.lastIndexOf("/");
             let filename = filepath.substring(_pos + 1);
             let data = {
                 filename: filename,
@@ -561,7 +562,7 @@ if (cluster.isMaster) {
 
                 basepath: "/Users/widyhu/widyhu/cpp_project/",
                 dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db",
-                filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrapplyment/mmpaymchmgrapplyment4ecommerce/mmpaymchmgrapply4ecommerceauditaosvr/src/BizLicenseAudit.cpp',
+                filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/proto/mmpaymchmerchant.proto',
                 
                 filepaths: ['/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.cpp',
                             '/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.h'],

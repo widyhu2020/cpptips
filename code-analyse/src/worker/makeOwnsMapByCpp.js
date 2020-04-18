@@ -9,6 +9,7 @@
 const Analyse = require('../analyse/analyse');
 const Queue = require('../analyse/queue');
 const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const KeyWordStore = require('../store/store').KeyWordStore;
@@ -117,7 +118,7 @@ class MakeOwnsMapByCpp {
         let fshash = crypto.createHash("md5");
         fshash.update(filecontext);
         let md5 = fshash.digest('hex');
-        let pos = cppfilename.lastIndexOf('/');
+        let pos = cppfilename.lastIndexOf("/");
         let filename = cppfilename.substr(pos + 1);
         let updatetime = Math.floor(fstat.mtimeMs / 1000);
 

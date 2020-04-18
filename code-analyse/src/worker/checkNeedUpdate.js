@@ -11,6 +11,7 @@ const Analyse = require('../analyse/analyse').Analyse;
 const TypeEnum = require('../analyse/analyse').TypeEnum;
 const Traverse = require('../traversedir/traverse');
 const fs = require('fs');
+const path = require('path');
 const util = require('util');
 const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
@@ -34,12 +35,12 @@ class CheckNeedUpdate {
 
         if(this.showversion == 1) {
             that.filelist = [];
-            let path = that.basedir + "/libs/";
-            that._getListOnLocation(path, "/libs", path);
-            path = that.basedir + "/client/out/";
-            that._getListOnLocation(path, "/client/out", path);
-            path = that.basedir + "/server/out/";
-            that._getListOnLocation(path, "/server/out", path);
+            let filepath = that.basedir + "/libs/";
+            that._getListOnLocation(filepath, "/libs", filepath);
+            filepath = that.basedir + "/client/out/";
+            that._getListOnLocation(filepath, "/client/out", filepath);
+            filepath = that.basedir + "/server/out/";
+            that._getListOnLocation(filepath, "/server/out", filepath);
             that._getSignFileInfo("/package.json");
             let versionInfo = JSON.stringify(that.filelist);
             console.log(versionInfo);
@@ -70,12 +71,12 @@ class CheckNeedUpdate {
         let that = this;
         function successfunction(list){
             that.filelist = [];
-            let path = that.basedir + "/libs/";
-            that._getListOnLocation(path, "/libs", path);
-            path = that.basedir + "/client/out/";
-            that._getListOnLocation(path, "/client/out", path);
-            path = that.basedir + "/server/out/";
-            that._getListOnLocation(path, "/server/out", path);
+            let filepath = that.basedir + "/libs/";
+            that._getListOnLocation(filepath, "/libs", filepath);
+            filepath = that.basedir + "/client/out/";
+            that._getListOnLocation(filepath, "/client/out", filepath);
+            filepath = that.basedir + "/server/out/";
+            that._getListOnLocation(filepath, "/server/out", filepath);
             that._getSignFileInfo("/package.json");
 
             //构造映射
@@ -185,9 +186,10 @@ class CheckNeedUpdate {
         let that = this;
         //获取本地文件的md5文件列表
         //lib文件夹
+        
         let dirf = fs.readdirSync(dir, { 'encoding': 'utf8', 'withFileTypes': false });
         dirf.forEach(function (el, index) {
-            let filename = `${dir}/` + el;
+            let filename = `${dir}` + "/" + el;
             let dataFile = null;
             try {
                 //不判断软连接

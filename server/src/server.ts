@@ -28,9 +28,11 @@ import {
     CompletionList,
     InsertTextFormat,
 } from 'vscode-languageserver';
+const path = require('path');
 
 import { CodeAnalyse, NodeItem, ShowItem, CaConfig} from '../../libs/codeAnalyse';
 import * as fs from 'fs';
+import { URL } from 'url';
 let basepath:string = "/";
 let openFile:{[key: string]: string} = {};
 let changefile: FileEvent[] = [];
@@ -166,7 +168,8 @@ connection.onInitialize((params: InitializeParams) => {
     if (params.rootPath != null) {
         basepath = params.rootPath;
     }
-    if(basepath[basepath.length - 1] != '/') {
+    basepath = basepath.replace(/[\\]{1,2}/g, "/");
+    if(basepath[basepath.length - 1] != "/") {
         basepath = basepath + "/";
     }
 
@@ -201,7 +204,8 @@ connection.onInitialize((params: InitializeParams) => {
 
 connection.onInitialized(() => {
     //如果目录没有则创建目录
-    let dbpath = basepath + ".vscode/.db/";
+    let arrdbpath = [basepath, ".vscode", ".db", ""];
+    let dbpath = arrdbpath.join("/");
     if (!fs.existsSync(dbpath)) {
         fs.mkdirSync(dbpath, { recursive: true});
     }
@@ -264,18 +268,18 @@ function processFileChange() {
     console.info(setfilename);
     let files:string[] = [];
     mapfile.forEach((fileevent)=>{
-        let uri: string = fileevent.uri;
+        let uri: string = decodeURIComponent(fileevent.uri);
         let pos: number = uri.indexOf(basepath);
         let filename = uri;
         filename = filename.slice(pos + basepath.length);
-        if (openFile[uri] && openFile[uri] != "" && fileevent.type == FileChangeType.Changed) {
+        if (openFile[fileevent.uri] && openFile[fileevent.uri] != "" && fileevent.type == FileChangeType.Changed) {
             try {
                 let fd = fs.openSync(basepath + filename, 'r');
                 const buffer = Buffer.alloc(1024 * 1024 * 2);
                 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, 0);
                 fs.closeSync(fd);
                 let filecontext = buffer.toString('utf8', 0, bytesRead);
-                openFile[uri] = filecontext;
+                openFile[fileevent.uri] = filecontext;
             } catch (error) {
                 console.error(error);
             }
@@ -391,8 +395,9 @@ connection.onCompletion(
 
         //重新加载文件
         let basedir = basepath;
-        let pathpos: number = _textDocumentPosition.textDocument.uri.indexOf(basedir);
-        let filename = _textDocumentPosition.textDocument.uri;
+        let uri = decodeURIComponent(_textDocumentPosition.textDocument.uri);
+        let pathpos: number = uri.indexOf(basedir);
+        let filename = uri;
         filename = filename.slice(pathpos + basedir.length);
        
         let line = _textDocumentPosition.position.line;
@@ -486,9 +491,10 @@ connection.onCompletionResolve(
 
 connection.onSignatureHelp((_document: TextDocumentPositionParams): SignatureHelp | null => {
     //重新加载文件
+    let uri = decodeURIComponent(_document.textDocument.uri);
     let basedir = basepath;
-    let pathpos: number = _document.textDocument.uri.indexOf(basedir);
-    let filename = _document.textDocument.uri;
+    let pathpos: number = uri.indexOf(basedir);
+    let filename = uri;
     filename = filename.slice(pathpos + basedir.length);
 
     let line = _document.position.line;
@@ -685,7 +691,7 @@ function analyseCppFile() {
 
 //打开文件触发
 connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
-    let uri = params.textDocument.uri;
+    let uri = decodeURIComponent(params.textDocument.uri);
     openFile[params.textDocument.uri] = params.textDocument.text;
     let basedir = basepath;
     let pos: number = uri.indexOf(basedir);
@@ -693,13 +699,14 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
     filepath = filepath.slice(pos + basedir.length);
     dependentfiles.add(filepath);
 
+    console.log("debug:", uri, basedir, filepath);
     //异步执行
     process.nextTick(analyseCppFile);
 });
 
 //编辑文件触发，增量触发
 connection.onDidChangeTextDocument((params: DidChangeTextDocumentParams) => {
-    let filename = params.textDocument.uri;
+    let filename = decodeURIComponent(params.textDocument.uri);
     //console.log(params);
     for (let i:number = 0; i < params.contentChanges.length; i++) {
 
@@ -718,7 +725,7 @@ connection.onDidChangeTextDocument((params: DidChangeTextDocumentParams) => {
         let epos = end.character;
 
         let text: string = e.text;
-        let context:string = openFile[filename];
+        let context:string = openFile[params.textDocument.uri];
         let lines:number = 0;
         let lendpos:number = -1;
         let replaceStart:number = -1, replaceEnd:number = -1;
@@ -761,7 +768,7 @@ connection.onDidChangeTextDocument((params: DidChangeTextDocumentParams) => {
         }
 
         let tmpstr = context.slice(0, replaceStart + 1) + text + context.slice(replaceEnd + 1);
-        openFile[filename] = tmpstr;
+        openFile[params.textDocument.uri] = tmpstr;
     }
 });
 
@@ -796,7 +803,7 @@ connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
 
 connection.onDefinition((params: TextDocumentPositionParams): Definition | undefined | DefinitionLink[] => {
 
-    let filename = params.textDocument.uri;
+    let filename = decodeURIComponent(params.textDocument.uri);
     let basedir = basepath;
     let pos: number = filename.indexOf(basedir);
     filename = filename.slice(pos + basedir.length);
@@ -862,7 +869,7 @@ connection.onTypeDefinition((params: TextDocumentPositionParams): Definition | u
 connection.onHover(
     (params: TextDocumentPositionParams): Hover | undefined => {
         //重新加载文件
-        let filename = params.textDocument.uri;
+        let filename = decodeURIComponent(params.textDocument.uri);
         let basedir = basepath;
         let pos: number = filename.indexOf(basedir);
         filename = filename.slice(pos + basedir.length);

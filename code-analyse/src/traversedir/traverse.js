@@ -7,6 +7,7 @@
  * ------------------------------------------------------------------------------------------ */
 
 const fs = require('fs');
+const path = require('path');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const FileType = require('../store/store').FileType;
 
@@ -38,7 +39,7 @@ class Traverse {
         console.log("Traverse:", userConfig);
         console.log("isAnlyseSystemDir:", isAnlyseSystemDir);
         let regex = [];
-        this.regexStr = "^\\[.~]{1,1}[0-9a-z]{1,128}$";
+        this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
         if(this.userConfig.ignoreFileAndDir
             && this.userConfig.ignoreFileAndDir instanceof Array) {
             regex = this.userConfig.ignoreFileAndDir;
@@ -240,9 +241,9 @@ class Traverse {
     _checkIsSystem = function(filepath) {
         // /usr/local/
         // /google/protobuf/
-        if (filepath.indexOf("/usr/local/") != -1
-            || filepath.indexOf("/usr/include/") != -1
-            || filepath.indexOf("/google/protobuf/") != -1
+        if (filepath.indexOf("/usr/local/") != -1 || filepath.indexOf("\\usr\\local\\") != -1
+            || filepath.indexOf("/usr/include/") != -1 || filepath.indexOf("\\usr\\include\\") != -1
+            || filepath.indexOf("/google/protobuf/") != -1 || filepath.indexOf("\\google\\protobuf\\") != -1
             || /.*\.tcc$/g.test(filepath)){
             //如果不是usr系统目录
             //protobuf库里面已经加载过，这里直接pass
@@ -320,7 +321,7 @@ class Traverse {
         }
 
         //正则匹配忽略
-        let _pos = filepath.lastIndexOf('/');
+        let _pos = filepath.lastIndexOf("/");
         let realname = filepath.substring(_pos + 1);
         let reg = new RegExp(this.regexStr,"ig");
         let testResult = reg.test(realname);
@@ -345,7 +346,7 @@ class Traverse {
                 return total;
             }
             // 加上父级访问更深层的文件夹
-            let filename = `${dirfather}/` + el;
+            let filename = `${dirfather}` + "/" + el;
             let wkfilename = filename.replace(that.basedir, "");
             //let _pos = filename.lastIndexOf('/');
             //let realname = filename.substring(_pos + 1);
@@ -392,7 +393,10 @@ class Traverse {
                     if(showName.length > 32) {
                         let pathitems = showName.split("/");
                         if(pathitems.length > 5) {
-                            showName = "/" + pathitems[1] + "/" + pathitems[2] + "/.../" + pathitems[pathitems.length - 2] + "/" + pathitems[pathitems.length - 1];
+                            showName = "/" + pathitems[1] + "/" 
+                            + pathitems[2] + "/" + "..." + "/" 
+                            + pathitems[pathitems.length - 2] + "/" 
+                            + pathitems[pathitems.length - 1];
                         }
                     }
                     that.needStop = callbackshow(showName);
@@ -430,7 +434,7 @@ class Traverse {
             }
 
             // 加上父级访问更深层的文件夹
-            let filename = `${dirfather}/` + el;
+            let filename = `${dirfather}` + "/" + el;
             let wkfilename = filename.replace(that.basedir, "");
 
             //判断是否需要忽略的文件夹

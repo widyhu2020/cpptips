@@ -8,6 +8,7 @@
 
 const cluster = require('cluster');
 const fs = require('fs');
+const path = require('path');
 const unzipper = require("unzipper");
 const FileIndexStore = require('../store/store').FileIndexStore;
 
@@ -47,11 +48,11 @@ class UnzipSystemIncludeWorker {
     //解压系统头文件到指定目录
     unzipInclude = function (zipfile, callback) {
         let pos = zipfile.lastIndexOf("/");
-        let path = zipfile.substring(0, pos);
-        let unzipPath = path;
+        let filepath = zipfile.substring(0, pos);
+        let unzipPath = filepath;
         console.log(zipfile, unzipPath);
 
-        if (fs.existsSync(unzipPath + "/usr")) {
+        if (fs.existsSync(unzipPath + "/" + "usr")) {
             //如果文件已经存在了，直接不进行处理
             console.info("无需初始化系统头文件文件");
             callback("success");

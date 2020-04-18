@@ -12,6 +12,7 @@ const FileIndexStore = require('../store/store').FileIndexStore;
 const Completion = require('../completion/completion').Completion;
 const DefineMap = require('../definition/defineMap').DefineMap;
 const fs = require('fs');
+const path = require('path');
 
 class Definition extends Completion{
     constructor(basepath, extpath) {
@@ -226,7 +227,7 @@ class Definition extends Completion{
 
         if (info.systeminclude == 1) {
             //系统目录
-            let fileallpath = this.extpath + "/data" + info.filepath;
+            let fileallpath = this.extpath + path.sep + "data" + info.filepath;
             console.info("filepath:", fileallpath);
             return fileallpath;
         }
@@ -244,7 +245,7 @@ class Definition extends Completion{
         
         if (info.systeminclude == 1) {
             //系统目录
-            let fileallpath = this.extpath + "/data" + info.filepath;
+            let fileallpath = this.extpath + path.sep + "data" + info.filepath;
             console.info("filepath:", fileallpath);
             return fileallpath;
         }
@@ -326,7 +327,7 @@ class Definition extends Completion{
         }
 
         let result = {
-            filename: filepath,
+            filename: "file:///" + filepath,
             bline: lineinfo.l,
             bcols: bpos,
             eline: lineinfo.l,
@@ -368,7 +369,7 @@ class Definition extends Completion{
             let bpos = linecode.indexOf(_name);
             let epos = bpos + _name.length;
 
-            result.filename = sourcefilepath;
+            result.filename = "file:///" + sourcefilepath;
             result.bline = lineinfo.l;
             result.bcols = bpos;
             result.eline = lineinfo.l;

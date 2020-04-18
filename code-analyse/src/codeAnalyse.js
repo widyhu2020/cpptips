@@ -16,6 +16,7 @@ const KeyWordStore = require('./store/store').KeyWordStore;
 const DefineMap = require('./definition/defineMap').DefineMap;
 const TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 const fs = require('fs');
+const __path = require('path');
 
 class CodeAnalyse {
     //单例方法
@@ -1587,7 +1588,7 @@ class CodeAnalyse {
         }
 
         let name = lastname.n;
-        name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$/g, "");
+        name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
 
         let fileinfo = df.getDefineInWitchClass(ownnames, name, usingnamespace);
         if (fileinfo == false) {

@@ -5,161 +5,10 @@
  *      Author: widyhu
  * 
  * ------------------------------------------------------------------------------------------ */
-//重新编译原生模块
-_rebuildNatveModel = function(){
-    try{
-        const Database = require('better-sqlite3');
-    } catch(error){
-       
-        let systemname = process.platform;
-        if(systemname == "linux") {
-            //linux操作系统
-            return _rebuildNatveModelLinux();
-        }
 
-        if(systemname == "darwin") {
-            //linux操作系统
-            return _rebuildNatveModelMaxOs();
-        }
-
-        //windows处理
-        if(systemname == "win32") {
-            return _rebuildNatveModelWindows();
-        }
-    }
-};
-
-_rebuildNatveModelWindows = function(){
-    const path = require('path');
-    const fs = require('fs');
-    let scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../..');
-    let electronVersion = process.versions.electron;
-    if(!fs.existsSync(scriptpath + "\\node_modules\\.bin")) {
-        //创建目录
-        fs.mkdirSync(scriptpath + "\\node_modules\\.bin");
-    }
-    //将node-gyp拷贝过来
-    if(!fs.existsSync(scriptpath + "\\node_modules\\.bin\\node-gyp.cmd")) {
-        //拷贝
-        fs.copyFileSync(scriptpath + "\\node_modules\\node-gyp\\bin\\node-gyp.js", scriptpath + "\\node_modules\\.bin\\node-gyp.cmd");
-    }
-
-    var childprocess = require('child_process');
-    let buildcli = scriptpath + '\\node_modules\\electron-rebuild\\lib\\src\\cli.js';
-    let modelepath = scriptpath + '\\node_modules\\better-sqlite3';
-    
-    let params = [
-        "-f",
-        "-w",
-        "better-sqlite3",
-        '-v',
-        electronVersion,
-        '--module-dir',
-        modelepath
-    ];
-    //wind还未测试通过
-    //./node_modules/.bin/electron-rebuild -f -w better-sqlite3 -v 7.1.11
-    let result = childprocess.spawnSync(buildcli, params, {encoding: "utf8"});
-    console.log(result);
-    if(result.status == 0) {
-        console.log("rebuild better-sqlite3 success!");
-    }
-};
-
-_rebuildNatveModelMaxOs = function(){
-    const path = require('path');
-    const fs = require('fs');
-    let scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../..');
-    let electronVersion = process.versions.electron;
-    if(!fs.existsSync(scriptpath + "/node_modules/.bin")) {
-        //创建目录
-        fs.mkdirSync(scriptpath + "/node_modules/.bin");
-    }
-    //将node-gyp拷贝过来
-    if(!fs.existsSync(scriptpath + "/node_modules/.bin/node-gyp")) {
-        //拷贝
-        fs.copyFileSync(scriptpath + "/node_modules/node-gyp/bin/node-gyp.js", scriptpath + "/node_modules/.bin/node-gyp");
-    }
-
-    var childprocess = require('child_process');
-    let buildcli = scriptpath + '/node_modules/electron-rebuild/lib/src/cli.js';
-    let modelepath = scriptpath + '/node_modules/better-sqlite3';
-    
-    let params = [
-        "-f",
-        "-w",
-        "better-sqlite3",
-        '-v',
-        electronVersion,
-        '--module-dir',
-        modelepath
-    ];
-    //./node_modules/.bin/electron-rebuild -f -w better-sqlite3 -v 7.1.11
-    let result = childprocess.spawnSync(buildcli, params, {encoding: "utf8"});
-    console.log(result);
-    if(result.status == 0) {
-        console.log("rebuild better-sqlite3 success!");
-    }
-};
-
-_rebuildNatveModelLinux = function() {
-    const path = require('path');
-    const fs = require('fs');
-
-    let execPath = process.execPath;
-    let scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../../node_modules/better-sqlite3');
-
-    let cmd = `cd ${scriptpath} && ${execPath} ../node-gyp/bin/node-gyp.js configure && ${execPath} ../node-gyp/bin/node-gyp.js rebuild`;
-
-    scriptpath = path.resolve(scriptpath, '../integer');
-    let cmd2 = `&& cd ${scriptpath} && ${execPath} ../node-gyp/bin/node-gyp.js configure && ${execPath} ../node-gyp/bin/node-gyp.js rebuild`;
-    cmd = cmd + cmd2;
-    var childprocess = require('child_process');
-    console.log(cmd);
-    let result = childprocess.execSync(cmd, {encoding: "utf8"});
-    console.log(result);
-};
-//尝试加载原生数据库
-_rebuildNatveModel();
-
+const NativeForTestValid = require('./makeNativeModel');
 const Database = require('better-sqlite3');
-//table定义
-//1 类型[1]（1:命名空间，2:类，3:枚举，4:结构体；6:变量；7:函数；8:宏定义；9枚举项
-//2 公开程度[1]
-//3 全名称[128]
-//4 简称[64]
-//5 命名空间[64]
-//6 文件所以[5]
-//6 附加数据[249]
-//附加数据定义
-//类型为命名空间时，该字段无意义
-//类型为类时，该字段内容：
-//{t:模版定义,i:{父名称:0,父名称:1}}
-//类型为枚举时，该字段内容无意义
-//类型为结构体时，该字段内容无意义
-//类型为变量的时候，该字段内容为：
-/*{
-    t:类型,
-    s:是否静态,
-    c:是否常量,
-    p:是否指针,
-    v:值
-}*/
-//类型为函数的时候，该字段内容为：
-/*
-{
-    s:是否静态,
-    c:是否常量,
-    t:模版定义,
-    r:{t:类型,s:是否静态,c:是否常量,p:是否指针},
-    p:[{t:类型,c:是否常量,p:是否指针}]
-}
-*/
-//类型为宏定义的时候，该字段内容为：
-//{v:值,p:[参数名称]}
+const os = require('os');
 
 class KeyWordStore {
     //单例方法
@@ -903,6 +752,11 @@ class FileIndexStore {
             //console.error("input data error!", data);
             return false;
         }
+        if(os.platform() == "win32" 
+            && data['filepath'].indexOf("\\") != -1) {
+            //windows系统，需要规范化路径
+            data['filepath'] = data['filepath'].replace("\\", "/");
+        }
         //获取时间戳
         data['systeminclude'] = this.system_include;
         try {
@@ -1006,6 +860,17 @@ class FileIndexStore {
             return [];
         }
 
+        //规范化路径
+        for(let i = 0; i < infos.length; i++) {
+            let fileinfos = infos[i];
+            if(os.platform() == "win32" 
+                && fileinfos.filepath.indexOf("\\") != -1) {
+                //windows系统，需要规范化路径
+                fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                infos[i] = fileinfos;
+            }
+        }
+
         return infos;
     };
 
@@ -1040,6 +905,17 @@ class FileIndexStore {
             return false;
         }
 
+        //规范化路径
+        for(let i = 0; i < infos.length; i++) {
+            let fileinfos = infos[i];
+            if(os.platform() == "win32" 
+                && fileinfos.filepath.indexOf("\\") != -1) {
+                //windows系统，需要规范化路径
+                fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                infos[i] = fileinfos;
+            }
+        }
+
         return infos;
     };
 
@@ -1054,6 +930,12 @@ class FileIndexStore {
             return false;
         }
 
+        //规范化路径
+        if(os.platform() == "win32" 
+            && infos[0].filepath.indexOf("\\") != -1) {
+            //windows系统，需要规范化路径
+            infos[0].filepath = infos[0].filepath.replace("\\", "/");
+        }
         return infos[0];
     };
 
@@ -1069,6 +951,16 @@ class FileIndexStore {
             return [];
         }
 
+        //规范化路径
+        for(let i = 0; i < infos.length; i++) {
+            let fileinfos = infos[i];
+            if(os.platform() == "win32" 
+                && fileinfos.filepath.indexOf("\\") != -1) {
+                //windows系统，需要规范化路径
+                fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                infos[i] = fileinfos;
+            }
+        }
         return infos;
     };
 
@@ -1083,6 +975,12 @@ class FileIndexStore {
             return false;
         }
 
+        //规范化路径
+        if(os.platform() == "win32" 
+            && infos[0].filepath.indexOf("\\") != -1) {
+            //windows系统，需要规范化路径
+            infos[0].filepath = infos[0].filepath.replace("\\", "/");
+        }
         return infos[0];
     };
 
@@ -1097,6 +995,16 @@ class FileIndexStore {
             return [];
         }
 
+        //规范化路径
+        for(let i = 0; i < infos.length; i++) {
+            let fileinfos = infos[i];
+            if(os.platform() == "win32" 
+                && fileinfos.filepath.indexOf("\\") != -1) {
+                //windows系统，需要规范化路径
+                fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                infos[i] = fileinfos;
+            }
+        }
         return infos;
     };
 
