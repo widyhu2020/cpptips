@@ -23,6 +23,9 @@ class AnalyseCpp extends AnalyseBase {
         this.typedef = {};
         //只保存公共函数
         this.savepublic = false;
+
+        //代码块
+        this.lines = [];
     }
 
     //执行分析，重新实现父类的方法
@@ -30,17 +33,17 @@ class AnalyseCpp extends AnalyseBase {
         //console.time("total")
         //文档处理
         //console.time("_splitContext")
-        let lines = this._splitContext();
+        this.lines = this._splitContext();
         //console.timeEnd("_splitContext");
 
         //预处理
         //console.time("_preProcess")
-        this._preProcess(lines);
+        this._preProcess(this.lines);
         //console.timeEnd("_preProcess");
 
         //分析作用域
         //console.time("_analyseDomain")
-        this._analyseDomain(lines);
+        this._analyseDomain(this.lines);
         //console.timeEnd("_analyseDomain");
 
         //构建命名空间
@@ -50,7 +53,7 @@ class AnalyseCpp extends AnalyseBase {
 
         //生产访问权限
         //console.time("_analysePermission")
-        this._analysePermission(lines);
+        this._analysePermission(this.lines);
         //console.timeEnd("_analysePermission");
 
         //遍历树其他代码快分析函数
@@ -58,7 +61,7 @@ class AnalyseCpp extends AnalyseBase {
         this.tree.traverseBF((current) => {
             for (let i = 0; i < current.data.length; i++) {
                 //console.time("_analyseCodeBlockForFunction:" + i)
-                this._analyseCodeBlockForFunction(current, lines, current.data[i], i);
+                this._analyseCodeBlockForFunction(current, this.lines, current.data[i], i);
                 //console.timeEnd("_analyseCodeBlockForFunction:" + i);
             }
         });
@@ -70,7 +73,7 @@ class AnalyseCpp extends AnalyseBase {
             //console.log(current.domain_level, current.namespace);
             for (let i = 0; i < current.data.length; i++) {
                 //console.time("_analyseVariable:" + i)
-                this._analyseVariable(current, lines, current.data[i], i);
+                this._analyseVariable(current, this.lines, current.data[i], i);
                 //console.timeEnd("_analyseVariable:" + i);
             }
         });
@@ -82,7 +85,7 @@ class AnalyseCpp extends AnalyseBase {
             //console.log(current.domain_level, current.namespace);
             for (let i = 0; i < current.data.length; i++) {
                 //console.time("_analyseVariable:" + i)
-                this._analyseEnum(current, lines, current.data[i], i);
+                this._analyseEnum(current, this.lines, current.data[i], i);
                 //console.timeEnd("_analyseVariable:" + i);
             }
         });
@@ -234,6 +237,7 @@ class AnalyseCpp extends AnalyseBase {
             }
 
             let valable = this._judgeCodeisVariabledefine(permission, item);
+    
             permission = valable['p'];
             if (valable['v'] != null && valable['v'] != false){
                 valable['v'].forEach(e => {
@@ -467,11 +471,13 @@ class AnalyseCpp extends AnalyseBase {
             isuseadder = 0;
             nowValue = null;
         }
-
+        
         if (namedata.length > 0) {
             let rawline = item.reverse().join(" ");
             let varibles = [];
-            if (this._getCountChars(type, new Set(['<', '>']))){
+            let _number = this._getCountChars(type, new Set(['<', '>']));
+            if (_number % 2 != 0
+                || (_number > 0 && !this._checkIsTemplateType(type))){
                 return { 'v': false, 'p': permission };
             }
             for(let i = 0; i < namedata.length; i++) {
@@ -501,6 +507,31 @@ class AnalyseCpp extends AnalyseBase {
         }
 
         return { 'v': false, 'p': permission };
+    };
+
+    _checkIsTemplateType = function(type) {
+        if(type[type.length - 1] != ">") {
+            //如果最后一个不是>
+            return false;
+        }
+        
+        let stack = [];
+        for(let i = 0; i < type.length; i++) {
+            if(type[i] == "<") {
+                stack.push("<");
+                continue;
+            }
+            if(type[i] == ">") {
+                if(stack.length <= 0) {
+                    //不匹配
+                    return false;
+                }
+                stack.pop();
+                continue;
+            }
+        }
+
+        return stack.length == 0;
     };
 
     //构造命名空间范围，遍历节点计算出每个节点的作用域
@@ -759,7 +790,7 @@ class AnalyseCpp extends AnalyseBase {
             //弹出参数
             if (item[i] == ',') {
                 let popnum = 0;
-                while (!stack.isEmpty()) {
+                while (!stack.isEmpty() && popnum < 500) {
                     //弹出数据
                     let data = stack.pop();
                     //if (showlog == 1) console.log("dddd", data);
@@ -792,7 +823,7 @@ class AnalyseCpp extends AnalyseBase {
             //函数体开始
             if (item[i] == '(') {
                 let popnum = 0;
-                while (!stack.isEmpty()) {
+                while (!stack.isEmpty() && popnum < 500) {
                     //弹出数据
                     let data = stack.pop();
                     if (data == ')') {

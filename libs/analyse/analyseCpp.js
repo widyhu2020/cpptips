@@ -36,15 +36,15 @@ var AnalyseCpp = /** @class */ (function (_super) {
             //console.time("total")
             //文档处理
             //console.time("_splitContext")
-            var lines = this._splitContext();
+            this.lines = this._splitContext();
             //console.timeEnd("_splitContext");
             //预处理
             //console.time("_preProcess")
-            this._preProcess(lines);
+            this._preProcess(this.lines);
             //console.timeEnd("_preProcess");
             //分析作用域
             //console.time("_analyseDomain")
-            this._analyseDomain(lines);
+            this._analyseDomain(this.lines);
             //console.timeEnd("_analyseDomain");
             //构建命名空间
             //console.time("_makeNamespace")
@@ -52,14 +52,14 @@ var AnalyseCpp = /** @class */ (function (_super) {
             //console.timeEnd("_makeNamespace");
             //生产访问权限
             //console.time("_analysePermission")
-            this._analysePermission(lines);
+            this._analysePermission(this.lines);
             //console.timeEnd("_analysePermission");
             //遍历树其他代码快分析函数
             //console.time("_analyseCodeBlockForFunction")
             this.tree.traverseBF(function (current) {
                 for (var i = 0; i < current.data.length; i++) {
                     //console.time("_analyseCodeBlockForFunction:" + i)
-                    _this._analyseCodeBlockForFunction(current, lines, current.data[i], i);
+                    _this._analyseCodeBlockForFunction(current, _this.lines, current.data[i], i);
                     //console.timeEnd("_analyseCodeBlockForFunction:" + i);
                 }
             });
@@ -70,7 +70,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 //console.log(current.domain_level, current.namespace);
                 for (var i = 0; i < current.data.length; i++) {
                     //console.time("_analyseVariable:" + i)
-                    _this._analyseVariable(current, lines, current.data[i], i);
+                    _this._analyseVariable(current, _this.lines, current.data[i], i);
                     //console.timeEnd("_analyseVariable:" + i);
                 }
             });
@@ -81,7 +81,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 //console.log(current.domain_level, current.namespace);
                 for (var i = 0; i < current.data.length; i++) {
                     //console.time("_analyseVariable:" + i)
-                    _this._analyseEnum(current, lines, current.data[i], i);
+                    _this._analyseEnum(current, _this.lines, current.data[i], i);
                     //console.timeEnd("_analyseVariable:" + i);
                 }
             });
@@ -446,7 +446,9 @@ var AnalyseCpp = /** @class */ (function (_super) {
             if (namedata.length > 0) {
                 var rawline = item.reverse().join(" ");
                 var varibles = [];
-                if (this._getCountChars(type, new Set(['<', '>']))) {
+                var _number = this._getCountChars(type, new Set(['<', '>']));
+                if (_number % 2 != 0
+                    || (_number > 0 && !this._checkIsTemplateType(type))) {
                     return { 'v': false, 'p': permission };
                 }
                 for (var i = 0; i < namedata.length; i++) {
@@ -474,6 +476,28 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 return { 'v': varibles, 'p': permission };
             }
             return { 'v': false, 'p': permission };
+        };
+        _this._checkIsTemplateType = function (type) {
+            if (type[type.length - 1] != ">") {
+                //如果最后一个不是>
+                return false;
+            }
+            var stack = [];
+            for (var i = 0; i < type.length; i++) {
+                if (type[i] == "<") {
+                    stack.push("<");
+                    continue;
+                }
+                if (type[i] == ">") {
+                    if (stack.length <= 0) {
+                        //不匹配
+                        return false;
+                    }
+                    stack.pop();
+                    continue;
+                }
+            }
+            return stack.length == 0;
         };
         //构造命名空间范围，遍历节点计算出每个节点的作用域
         //这里作用域包括各种容器类型的定义，如：函数、类、命名空间、结构体、枚举都属于作用域名称
@@ -710,7 +734,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 //弹出参数
                 if (item[i] == ',') {
                     var popnum = 0;
-                    while (!stack.isEmpty()) {
+                    while (!stack.isEmpty() && popnum < 500) {
                         //弹出数据
                         var data = stack.pop();
                         //if (showlog == 1) console.log("dddd", data);
@@ -739,7 +763,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 //函数体开始
                 if (item[i] == '(') {
                     var popnum = 0;
-                    while (!stack.isEmpty()) {
+                    while (!stack.isEmpty() && popnum < 500) {
                         //弹出数据
                         var data = stack.pop();
                         if (data == ')') {
@@ -1642,6 +1666,8 @@ var AnalyseCpp = /** @class */ (function (_super) {
         _this.typedef = {};
         //只保存公共函数
         _this.savepublic = false;
+        //代码块
+        _this.lines = [];
         return _this;
     }
     return AnalyseCpp;

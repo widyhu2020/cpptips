@@ -39,12 +39,18 @@ class Completion {
             return this.getClassFullName(extData.v, namespaces);
         }
 
+        findclass.sort((a,b)=>{
+            return b.namespace.length - a.namespace.length;
+        });
+
         //只处理第一个，如果有多个这里忽略除一个以外的
         for (let i = 0; i < findclass.length; i++) {
-            if (findclass[i].type != TypeEnum.CALSS) {
+            if (findclass[i].type != TypeEnum.CALSS
+                && findclass[i].type != TypeEnum.STRUCT) {
                 //不是类的定义
                 continue;
             }
+
             if (findclass[i].namespace == "") {
                 //没有命名空间
                 return findclass[i].name;
@@ -168,11 +174,49 @@ class Completion {
         let infos = KeyWordStore.getInstace().getByOwnNameAndName([ownname], name, namespaces);
         if(infos.length <= 0) {
             return false;
+        } else if(infos.length > 1) {
+            infos.sort((a,b)=>{
+                return b.namespace.length - a.namespace.length;
+            });
         }
-        
-        //返回类型
-        let extJson = JSON.parse(infos[0].extdata);
-        return extJson.t;
+        let findType = false;
+        for(let i = 0; i < infos.length; i++) 
+        {
+            if(infos[0].type == TypeEnum.STRUCT) {
+                //如果是类
+                findType = infos[0].namespace + "::" + infos[0].name;
+                break;
+            }
+
+            if(infos[0].type == TypeEnum.CALSS) {
+                //如果是类
+                findType = infos[0].namespace + "::" + infos[0].name;
+                break;
+            }
+            
+            //如果是函数
+            if(infos[0].type == TypeEnum.VARIABLE) {
+                //返回类型
+                if(infos[0].extdata.length <= 0) {
+                    continue;
+                }
+                let extJson = JSON.parse(infos[0].extdata);
+                findType = extJson.t;
+                break;
+            }
+
+            //如果是变量
+            if(infos[0].type == TypeEnum.FUNCTION) {
+                if(infos[0].extdata.length <= 0) {
+                    continue;
+                }
+                let extJson = JSON.parse(infos[0].extdata);
+                findType = extJson[0].r.t;
+                break;
+            }
+        }
+
+        return findType;
     };
 
     //通过owner取下面的方法或者变量

@@ -35,6 +35,21 @@ class Definition extends Completion{
             if (!findclass || findclass.length <= 0) {
                 //2.命名空间下的方法
                 findclass = kws.getByFullnameAndType('', _namespace, _name, TypeEnum.FUNCTION)
+                if(!findclass) {
+                    //可能命名空间切分到了using namspace和方法名前面
+                    for(let i = 0; i < namespaces.length; i++) {
+                        let ns = namespaces[i];
+                        if(ns != "") {
+                            ns = ns + "::" + _namespace;
+                            namespaces[i] = ns;
+                        }
+                    }
+                    let lists = kws.getByFullnameNssAndType('', namespaces, _name, TypeEnum.FUNCTION);
+                    if(lists.length <= 0) {
+                        return false;
+                    }
+                    findclass = lists[0];
+                }
             } else {
                 findclass = findclass[0];
             }
@@ -67,6 +82,44 @@ class Definition extends Completion{
         return false;
     };
 
+    _getDirsMatching = function(fileA, fileB) {
+        let pathInfoA = fileA.split(/[\\/]{1,2}/);
+        let pathInfoB = fileB.split(/[\\/]{1,2}/);
+
+        let match = 0;
+        for(let i = 0; i < pathInfoA.length && i < pathInfoB.length; i++) {
+            if(pathInfoA[i] == pathInfoB[i]) {
+                //匹配度+1
+                match++;
+            }
+        }
+        return match;
+    };
+
+    //获取头文件信息
+    getIncludeInfo = function(sourceFile, includeFile, fileName) {
+        let fdb = FileIndexStore.getInstace();
+
+        let match = -1;
+        let findIncludeFile = "";
+        console.time("getFileByFileName");
+        let fileList = fdb.getFileByFileName(fileName);
+        console.timeEnd("getFileByFileName");
+        //console.log(fileList);
+        for(let i = 0; i < fileList.length; i++) {
+            let filePath = fileList[i];
+            let _pos = filePath.filepath.indexOf(includeFile);
+            if(_pos != -1) {
+                //匹配规则
+                let _match = this._getDirsMatching(filePath.filepath, sourceFile);
+                if(_match > match) {
+                    findIncludeFile = filePath.filepath;
+                }
+            }
+        }
+        return findIncludeFile;
+    };
+
     //获取类的全名称
     getClassDefineInfo = function (name, namespaces) {
         let kws = KeyWordStore.getInstace();
@@ -74,7 +127,7 @@ class Definition extends Completion{
         let findclass = [];
         let ret = DefineMap.getInstace().getRealName(name);
         //let _pos = name.lastIndexOf("::");
-        if (ret.namespace != "") {
+        if (ret && ret.namespace != "") {
             let _name = ret.name;
             let _namespace = ret.namespace;
             findclass = kws.getByNameAndNamespaces(_name, [_namespace])
@@ -152,11 +205,9 @@ class Definition extends Completion{
         for (let i = 0; i < ownnames.length; i++) {
             let _own = ownnames[i];
             let ret = DefineMap.getInstace().getRealName(_own);
-            //let pos = _own.lastIndexOf('::');
-            // if (pos == -1) {
-            //     _owns[_own] = "";
-            //     continue;
-            // }
+            if(!ret) {
+                continue;
+            }
             let _tmpown = ret.name;
             let _usingnamespace = ret.namespace;
             _owns[_tmpown] = _usingnamespace;
@@ -327,7 +378,7 @@ class Definition extends Completion{
         }
 
         let result = {
-            filename: "file:///" + filepath,
+            filename: "file://" + filepath,
             bline: lineinfo.l,
             bcols: bpos,
             eline: lineinfo.l,
@@ -350,6 +401,7 @@ class Definition extends Completion{
     _readFileFindAchieveFromCpp = function(result, sourcefilepath, ownname, name, type) {
         if(!fs.existsSync(sourcefilepath)){
             //文件不存在
+            console.log("file not exits:",sourcefilepath);
             return false;
         }
 
@@ -369,13 +421,15 @@ class Definition extends Completion{
             let bpos = linecode.indexOf(_name);
             let epos = bpos + _name.length;
 
-            result.filename = "file:///" + sourcefilepath;
+            result.filename = "file://" + sourcefilepath;
             result.bline = lineinfo.l;
             result.bcols = bpos;
             result.eline = lineinfo.l;
             result.ecols = epos;
+            console.log(result);
             return;
         }
+        console.log(type);
     };
 
     _findValInStr = function(source, val, bpos) {

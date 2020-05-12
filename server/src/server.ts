@@ -27,14 +27,27 @@ import {
     FileChangeType,
     CompletionList,
     InsertTextFormat,
+    DocumentSymbolParams,
+    SymbolInformation,
+    CodeAction,
+    CodeActionParams,
+    ExecuteCommandParams,
+    SymbolKind,
+    DocumentSymbol,
+    TextDocument,
+    Position,
+    Diagnostic,
+    TextEdit,
+    Command,
 } from 'vscode-languageserver';
 const path = require('path');
 
-import { CodeAnalyse, NodeItem, ShowItem, CaConfig} from '../../libs/codeAnalyse';
+import { CodeAnalyse, NodeItem, ShowItem, CaConfig, PointInfo} from '../../libs/codeAnalyse';
 import * as fs from 'fs';
 import { URL } from 'url';
 let basepath:string = "/";
 let openFile:{[key: string]: string} = {};
+let treeData:{[key: string]: string} = {};
 let changefile: FileEvent[] = [];
 let dependentfiles:Set<string> = new Set();
 let extpath = "";
@@ -67,6 +80,7 @@ interface Settings {
 
 //配置
 let documentSettings: Map<string, Thenable<Settings>> = new Map();
+
 const defaultSettings: Settings = { 
     needLoadLinkDir: [],
     ignoreFileAndDir: [
@@ -76,7 +90,7 @@ const defaultSettings: Settings = {
     needLoadDir:[
     ],
     updateCheckIntervalTime:10000,
-    updateCheckUrl:"http://9.134.38.144:8888/list.js"
+    updateCheckUrl:"http://9.134.38.144:8888"
 };
 let globalSettings: Settings = defaultSettings;
 
@@ -162,8 +176,18 @@ function updateTips(msg:string){
     connection.sendNotification("show_update", [data]);
 }
 
+connection.onNotification("get_tree", (message: Array<string>) => {
+    //客户端获取右边树的请求
+    console.log(message);
+});
+
+//切换命名规则处理
+connection.onNotification("change_name_type", (message: Array<string>) => {
+    console.log(message);
+});
+
 connection.onInitialize((params: InitializeParams) => {
-    console.log(process);
+    //console.log(JSON.stringify(process));
     console.log("root path", params.rootPath);
     if (params.rootPath != null) {
         basepath = params.rootPath;
@@ -186,7 +210,7 @@ connection.onInitialize((params: InitializeParams) => {
             completionProvider: {
                 //提示注册
                 resolveProvider: true,
-                triggerCharacters:['.','>',':','/']
+                triggerCharacters:['.','>',':','/',' ']
             },
             documentOnTypeFormattingProvider:{
                 firstTriggerCharacter : '}',
@@ -195,6 +219,7 @@ connection.onInitialize((params: InitializeParams) => {
             signatureHelpProvider :{
                 triggerCharacters:['(']
             },
+            documentSymbolProvider: true,
             //triggerKind: CompletionTriggerKind.TriggerCharacter,
             hoverProvider : true,
             definitionProvider: true
@@ -202,6 +227,7 @@ connection.onInitialize((params: InitializeParams) => {
     };
 });
 
+// connection.sendDiagnostics
 connection.onInitialized(() => {
     //如果目录没有则创建目录
     let arrdbpath = [basepath, ".vscode", ".db", ""];
@@ -213,7 +239,7 @@ connection.onInitialized(() => {
     let sectionConf = getUserConfig('cpptips');
     sectionConf.then(
         (config) => {
-            console.log("userconfig",config);
+            console.log("userconfig", JSON.stringify(config));
             dbpath = dbpath + ".cpptips.db";
             //加载索引单例
             let _config = {
@@ -225,11 +251,22 @@ connection.onInitialized(() => {
             };
         
             //代码分析器
+            console.log("begin init");
+            console.time("init");
             CodeAnalyse.getInstace().init(_config);
+            console.timeEnd("init");
+
             //重新加载配置
+            console.log("begin reloadAllIncludeFile");
+            console.time("reloadAllIncludeFile");
             CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
+            console.timeEnd("reloadAllIncludeFile");
+
             //更新检查
+            console.log("begin updateCheck");
+            console.time("updateCheck");
             CodeAnalyse.getInstace().updateCheck(updateTips);
+            console.timeEnd("updateCheck");
         },
         (err: any) => {console.log(err)}
     );
@@ -265,6 +302,7 @@ function processFileChange() {
         setfilename.add(file.uri);
         mapfile.add(file);
     }
+
     console.info(setfilename);
     let files:string[] = [];
     mapfile.forEach((fileevent)=>{
@@ -272,6 +310,7 @@ function processFileChange() {
         let pos: number = uri.indexOf(basepath);
         let filename = uri;
         filename = filename.slice(pos + basepath.length);
+        //如果文件是打开的
         if (openFile[fileevent.uri] && openFile[fileevent.uri] != "" && fileevent.type == FileChangeType.Changed) {
             try {
                 let fd = fs.openSync(basepath + filename, 'r');
@@ -298,9 +337,19 @@ function processFileChange() {
         return;
     }
 
+    if(files.length > 5) {
+        //启动全面增量分析
+        console.time("reloadAllIncludeFile");
+        CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
+        console.timeEnd("reloadAllIncludeFile");
+        //分析头文件依赖
+        process.nextTick(analyseCppFile);
+        files = [];
+        return;
+    }
+
     //加载
     CodeAnalyse.getInstace().reloadBatchIncludeFile(files, reloadIncludeFileCallBack);
-
     //分析头文件依赖
     process.nextTick(analyseCppFile);
 };
@@ -320,7 +369,7 @@ connection.onExit(() => {
 });
 
 connection.onDidChangeWatchedFiles((_change: DidChangeWatchedFilesParams) => {
-    //console.log(_change);
+    console.log(JSON.stringify(_change));
     let changes: FileEvent[] = _change.changes;
     changefile = changefile.concat(changes);
     if (!CodeAnalyse.getInstace().busy()) {
@@ -382,119 +431,174 @@ function getShowType(type: number): CompletionItemKind {
     return CompletionItemKind.Keyword;
 };
 
-connection.onCompletion(
-    (_textDocumentPosition: CompletionParams): CompletionItem[] | CompletionList | null =>
-    {
-        //console.log(_textDocumentPosition);
-        if (!_textDocumentPosition.position
-            || !_textDocumentPosition.position.line
-            || !_textDocumentPosition.position.character) {
-            console.log("onCompletion", _textDocumentPosition.textDocument.uri);
-            return [];
+//闭合测试
+function testCloseMark(str: string, left:string, right:string)
+{
+    let stack = [];
+    for(let i = 0; i < str.length; i++) {
+        if(str[i] == left) {
+            stack.push(left);
+            continue;
         }
-
-        //重新加载文件
-        let basedir = basepath;
-        let uri = decodeURIComponent(_textDocumentPosition.textDocument.uri);
-        let pathpos: number = uri.indexOf(basedir);
-        let filename = uri;
-        filename = filename.slice(pathpos + basedir.length);
-       
-        let line = _textDocumentPosition.position.line;
-        let cpos = _textDocumentPosition.position.character;
-        console.log("pos:", line, cpos);
-
-        let context = openFile[_textDocumentPosition.textDocument.uri];
-        let pos: number = -1;
-        let nowline : number = 0;
-        let linecode:string = "";
-        while (true) {
-            let tmppos = context.indexOf("\n",pos + 1);
-            if (tmppos == -1) {
-                //找完了
-                break;
+        if(str[i] == right) {
+            if(stack.length <= 0) {
+                //不匹配
+                return false;
             }
-            if (nowline == line) {
-                //找到行
-                linecode = context.slice(pos + 1, pos + 1 + cpos);
-                break;
-            }
-            pos = tmppos;
-            nowline++;
-        };
+            stack.pop();
+        }
+    }
 
-        linecode = linecode.trim();
-        console.log(linecode);
-        if(linecode[linecode.length - 1] == '.'){
-            //最后一个字符是点好，启动找知道名字空间下的方法变量或者其他的
-            let list = findWithOwner(cpos, context, pos, filename);
+    if(stack.length != 0) {
+        return false;
+    }
+    return true;
+}
+
+connection.onCompletion((_textDocumentPosition: CompletionParams): CompletionItem[] | CompletionList | null =>{
+    //console.log(_textDocumentPosition);
+    if (!_textDocumentPosition.position
+        || !_textDocumentPosition.position.line
+        || !_textDocumentPosition.position.character) {
+        console.log("onCompletion", _textDocumentPosition.textDocument.uri);
+        return [];
+    }
+
+    //重新加载文件
+    let basedir = basepath;
+    let uri = decodeURIComponent(_textDocumentPosition.textDocument.uri);
+    let pathpos: number = uri.indexOf(basedir);
+    let filename = uri;
+    filename = filename.slice(pathpos + basedir.length);
+    
+    let line = _textDocumentPosition.position.line;
+    let cpos = _textDocumentPosition.position.character;
+    console.log("pos:", line, cpos);
+
+    let context = openFile[_textDocumentPosition.textDocument.uri];
+    let pos: number = -1;
+    let nowline : number = 0;
+    let linecode:string = "";
+    while (true) {
+        let tmppos = context.indexOf("\n",pos + 1);
+        if (tmppos == -1) {
+            //找完了
+            break;
+        }
+        if (nowline == line) {
+            //找到行
+            linecode = context.slice(pos + 1, pos + 1 + cpos);
+            break;
+        }
+        pos = tmppos;
+        nowline++;
+    };
+
+    //判断是否自动填参数分析
+    let autoFillReg = /\([\s]{0,4}(([a-z0-9_\(\)\[\].: \->]{1,128},){0,10})[\s\t]{0,10} $/ig;
+    let autoResult = autoFillReg.exec(linecode);
+    if(autoResult 
+        && testCloseMark(autoResult[1], '(', ')')) {
+        console.log(autoResult);
+        let preKey = autoResult[0];
+        //context = context.substring(0, context.length - preKey.length);
+        console.log("begin autoFillParams");
+        console.time("autoFillParams");
+        let list = autoFillParams(cpos, line, context, pos, filename, preKey);
+        console.timeEnd("autoFillParams");
+        return CompletionList.create(list, true);;
+    }
+
+    linecode = linecode.trim();
+    //判断是否为针对类的提醒
+    let rge = /(\->|\.|::|\/\s)[\s]{0,4}([a-z0-9_]{0,128})$/ig;
+    let _result = rge.exec(linecode);
+    if(_result) {
+        let symbol = _result[1];
+        let preKey = _result[2];
+        cpos = cpos - preKey.length;
+        //context = context.substring(0, context.length - preKey.length);
+        if(symbol == ".") {
+            console.log("begin findWithOwner");
+            console.time("findWithOwner");
+            let list = findWithOwner(cpos, context, pos, filename, preKey);
+            console.timeEnd("findWithOwner");
             return CompletionList.create(list, false);
         }
-
-        if (linecode[linecode.length - 1] == '>') {
-            if (linecode[linecode.length - 2] != '-') {
-                //>只有指针访问才提示
-                return [];
-            }
+        if(symbol == "->") {
             //指针形式
-            let list = findWithPoint(cpos, context, pos, filename);
+            console.log("begin findWithPoint");
+            console.time("findWithPoint");
+            let list = findWithPoint(cpos, context, pos, filename, preKey);
+            console.timeEnd("findWithPoint");
             return CompletionList.create(list, false);
         }
 
-        if (linecode.length > 2
-            && linecode[linecode.length - 1] == ':'
-            && linecode[linecode.length - 2] == ':') {
+        if(symbol == "::") {
             //最后一个字符是点好，启动找知道名字空间下的方法变量或者其他的
             //静态用法
-            let list = findWithNamespace(cpos, context, pos, filename);
+            console.log("begin findWithNamespace");
+            console.time("findWithNamespace");
+            let list = findWithNamespace(cpos, context, pos, filename, preKey);
+            console.timeEnd("findWithNamespace");
             return CompletionList.create(list, false);
         }
 
-        if (linecode[linecode.length - 1] == '/') {
+        if (symbol == '/') {
             //路径提醒处理
+            //未实现
             console.log("路径提醒处理");
         }
 
-        //普通前缀匹配
-        let __return = [];
-        let __icount:number = 0;
-        let result = preKeyWordSearch(context, pos, cpos, linecode, filename);
-        __return = result.__return;
-        __icount = result.__count;
-        let iscompletion = true;
-        if (__icount < 10 && linecode.length > 8) {
-            //已经全部加载完成
-            iscompletion = false;
+
+        if (symbol == '') {
+            //无需处理
+            return null;
         }
-        let clist = CompletionList.create(__return, iscompletion);
-        return clist;
     }
-);
 
-connection.onCompletionResolve(
-    (item: CompletionItem): CompletionItem => {
+    //普通前缀匹配
+    let __return = [];
+    let __icount:number = 0;
+    console.log("begin preKeyWordSearch");
+    console.time("preKeyWordSearch");
+    let result = preKeyWordSearch(context, pos, cpos, linecode, filename);
+    console.timeEnd("preKeyWordSearch");
+    __return = result.__return;
+    __icount = result.__count;
+    let iscompletion = true;
+    if (__icount < 10 && linecode.length > 8) {
+        //已经全部加载完成
+        iscompletion = false;
+    }
+    let clist = CompletionList.create(__return, iscompletion);
+    return clist;
+});
 
-        let data: NodeItem =JSON.parse(item.data);
-        let showData = CodeAnalyse.getInstace().getShowTips('', data);
-        if (showData == false || showData == null) {
-            return item;
-        }
-        let markdown = {
-            kind: MarkupKind.Markdown,
-            value: showData.d
-        };
-        item.detail = showData.t;
-        item.documentation = markdown;
+connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+    let data: NodeItem =JSON.parse(item.data);
+    console.log("begin getShowTips");
+    console.time("getShowTips");
+    let showData = CodeAnalyse.getInstace().getShowTips('', data);
+    console.timeEnd("getShowTips");
+    if (showData == false || showData == null) {
         return item;
     }
-);
+    let markdown = {
+        kind: MarkupKind.Markdown,
+        value: showData.d
+    };
+    item.detail = showData.t;
+    item.documentation = markdown;
+    return item;
+});
 
 connection.onSignatureHelp((_document: TextDocumentPositionParams): SignatureHelp | null => {
     //重新加载文件
     let uri = decodeURIComponent(_document.textDocument.uri);
     let basedir = basepath;
-    let pathpos: number = uri.indexOf(basedir);
-    let filename = uri;
+    let filename = decodeURIComponent(_document.textDocument.uri);
+    let pathpos: number = filename.indexOf(basedir);
     filename = filename.slice(pathpos + basedir.length);
 
     let line = _document.position.line;
@@ -522,7 +626,10 @@ connection.onSignatureHelp((_document: TextDocumentPositionParams): SignatureHel
     let precontext = context.substr(0, ipos + 1);
     
     //get
+    console.log("begin getSignatureHelp");
+    console.time("getSignatureHelp");
     let fundef = CodeAnalyse.getInstace().getSignatureHelp(filename, precontext, null);
+    console.timeEnd("getSignatureHelp");
     if(!fundef) {
         //返回错误
         return null;
@@ -550,9 +657,15 @@ connection.onSignatureHelp((_document: TextDocumentPositionParams): SignatureHel
     return signatureHelp;
 });
 
-function findWithNamespace(cpos: number, context: string, pos: number, filename: string) {
+function findWithNamespace(cpos: number, context: string, pos: number, filename: string, symbol:string) {
     console.log("命名空间或者静态方法");
     let precontext = context.substr(0, pos + cpos - 1);
+    let lastcontext = context.substr(pos + cpos + symbol.length + 2, 100).trim();
+    let hasParams = false;
+    if(lastcontext[0] == "(") {
+        hasParams = true;
+    }
+
     let result = CodeAnalyse.getInstace().getAllNameByNamespace(filename, precontext, []);
     let showlist = [];
     for (let i: number = 0; i < result.length; i++) {
@@ -564,7 +677,7 @@ function findWithNamespace(cpos: number, context: string, pos: number, filename:
         let item = {
             "label": result[i].s,
             "insertTextFormat": InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i]),
+            "insertText": getSelectItemInsertCode(result[i], hasParams),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -573,8 +686,12 @@ function findWithNamespace(cpos: number, context: string, pos: number, filename:
     return showlist;
 };
 
-function getSelectItemInsertCode(item: NodeItem) {
+function getSelectItemInsertCode(item: NodeItem, useName:boolean) {
     //console.info(item);
+    if(useName) {
+        //强制私有提示的值
+        return item.s;
+    }
     if(item.c === undefined) {
         //未明确设置插入字符
         return item.s;
@@ -602,6 +719,7 @@ function preKeyWordSearch(context: string, pos: number, cpos: number, linecode: 
         return { __return: [], __count: icount };
     }
 
+    console.log("begin searchKeyWord");
     console.time("searchKeyWord");
     let result = CodeAnalyse.getInstace().searchKeyWord(filename, linecode, precontext, []);
     console.timeEnd("searchKeyWord");
@@ -612,7 +730,7 @@ function preKeyWordSearch(context: string, pos: number, cpos: number, linecode: 
         let item = {
             "label": result[i].s,
             "insertTextFormat": InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i]),
+            "insertText": getSelectItemInsertCode(result[i], false),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -624,10 +742,17 @@ function preKeyWordSearch(context: string, pos: number, cpos: number, linecode: 
     return { __return: showlist, __count: icount };
 };
 
-function findWithPoint(cpos: number, context: string, pos: number, filename: string) {
+function findWithPoint(cpos: number, context: string, pos: number, filename: string, symbol:string) {
     console.log("指针访问提示", cpos);
     let precontext = context.substr(0, pos + cpos - 1);
+    let lastcontext = context.substr(pos + cpos + symbol.length + 2, 100).trim();
+    let hasParams = false;
+    if(lastcontext[0] == "(") {
+        hasParams = true;
+    }
+
     //console.log(precontext);
+    console.log("begin getAllNameByObj");
     console.time("getAllNameByObj");
     let result = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, null);
     console.timeEnd("getAllNameByObj");
@@ -636,7 +761,7 @@ function findWithPoint(cpos: number, context: string, pos: number, filename: str
         let item = {
             "label": result[i].s,
             "insertTextFormat": InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i]),
+            "insertText": getSelectItemInsertCode(result[i], hasParams),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -645,16 +770,61 @@ function findWithPoint(cpos: number, context: string, pos: number, filename: str
     return showlist;
 };
 
-function findWithOwner(cpos: number, context: string, pos: number, filename: string) {
+function autoFillParams(cpos: number, line:number, context: string, pos: number, filename: string, keyword:string) {
+    console.log("自动匹配函数参数", cpos);
+    let precontext = context.substr(0, pos + cpos + 2);
+    let lastcontext = context.substr(pos + cpos + keyword.length + 1, 100).trim();
+    let hasParams = false;
+
+    let result = CodeAnalyse.getInstace().autoFillParams(filename, precontext, keyword);
+    let _precontext = context.substr(0, pos + cpos);
+    _precontext = _precontext.trim();
+    let backPos = 0;
+    if(_precontext[_precontext.length - 1] == "("){
+        backPos = 1;
+    }
+    let showlist = [];
+    for (let i: number = 0; i < result.length; i++) {
+        let data:string = getSelectItemInsertCode(result[i], hasParams);
+        let item:CompletionItem = {
+            "label": result[i].s,
+            "insertTextFormat": InsertTextFormat.Snippet,
+            "insertText": data,
+            "kind": getShowType(result[i].t),
+            "data": JSON.stringify(result[i])
+        };
+        if(backPos == 1) {
+            let range = Range.create(line, cpos - 1, line, cpos);
+            item["textEdit"] = TextEdit.replace(range, data);
+        }
+        if(item["insertText"] 
+            && item["insertText"].indexOf("%params%") != -1) {
+            //需要进入编辑状态
+            let _pos = item["insertText"].indexOf("%params%");
+            let command = Command.create("move_cursor", "cpptips.service.move_cursor", ["%params%", line, cpos + _pos - backPos, cpos + _pos + 8 - backPos]);
+            item["command"] = command;
+        }
+        showlist.push(item);
+    }
+    return showlist;
+};
+
+function findWithOwner(cpos: number, context: string, pos: number, filename: string, symbol:string) {
     console.log("xxx通过归属找提醒", cpos);
     let precontext = context.substr(0, pos + cpos);
+    let lastcontext = context.substr(pos + cpos + symbol.length + 1, 100).trim();
+    let hasParams = false;
+    if(lastcontext[0] == "(") {
+        hasParams = true;
+    }
+
     let result = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, []);
     let showlist = [];
     for (let i: number = 0; i < result.length; i++) {
         let item = {
             "label": result[i].s,
             "insertTextFormat": InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i]),
+            "insertText": getSelectItemInsertCode(result[i], hasParams),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -664,7 +834,7 @@ function findWithOwner(cpos: number, context: string, pos: number, filename: str
 };
 
 //获取头文件依赖回调
-function getDependentByCppCallBack(msg:string, filepath:string, usingnamepace:string[], include:string[]) {
+function getDependentByCppCallBack(msg:string, filepath:string, usingnamepace:string[], include:string[], showTree:string) {
     console.log(msg);
     if(msg == "busy") {
         //插件正在分析索引，加入队列待会处理
@@ -672,6 +842,7 @@ function getDependentByCppCallBack(msg:string, filepath:string, usingnamepace:st
         dependentfiles.add(filepath);
         return;
     }
+    dependentfiles.delete(filepath);
 };
 
 function analyseCppFile() {
@@ -681,9 +852,14 @@ function analyseCppFile() {
     });
 
     dependentfiles.clear();
+    //dependentfiles = new Set<string>();
+    console.log("xxxxxxxxxxxxxx:", JSON.stringify(dependentfiles));
     for (let i = 0; i < filenames.length; i++) {
         let filename = filenames[i];
+        console.log("begin getDependentByCpp");
+        console.time("getDependentByCpp");
         CodeAnalyse.getInstace().getDependentByCpp(filename, getDependentByCppCallBack);
+        console.timeEnd("getDependentByCpp");
     }
 
     return;
@@ -701,7 +877,11 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
 
     console.log("debug:", uri, basedir, filepath);
     //异步执行
-    process.nextTick(analyseCppFile);
+    //process.nextTick(analyseCppFile);
+    setTimeout(analyseCppFile, 3000);
+
+    //重新计算索引
+    CodeAnalyse.getInstace().reloadOneIncludeFile(filepath, reloadOneIncludeFileCallBack);
 });
 
 //编辑文件触发，增量触发
@@ -782,27 +962,167 @@ function reloadOneIncludeFileCallBack(msg:string) {
 connection.onDidCloseTextDocument((params: DidCloseTextDocumentParams) => {
     //去掉全局文件内容
     openFile[params.textDocument.uri] = "";
+
 });
 
 //保存完文档之后触发
 connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
     //重新加在文件
-    //前面已经加载文件监听，这里无需再触发重新加载
-    // let uri = params.textDocument.uri;
-    // let fileevent: FileEvent = {
-    //     uri: uri,
-    //     type: FileChangeType.Changed
-    // };
-    // changefile.push(fileevent);
-    // if (!CodeAnalyse.getInstace().busy()) {
-    //     processFileChange();
-    // } else {
-    //     connection.window.showErrorMessage("插件正在繁忙中，索引稍后加载");
-    // }
+    let uri = decodeURIComponent(params.textDocument.uri);
+    let basedir = basepath;
+    let pos: number = uri.indexOf(basedir);
+    let filepath = uri;
+    filepath = filepath.slice(pos + basedir.length);
+    dependentfiles.add(filepath);
+
+    console.log("analyseCppFile debug:", uri, basedir, filepath);
+    //异步执行
+    process.nextTick(analyseCppFile);
+
+    let context = openFile[params.textDocument.uri];
+    if(context == undefined) {
+        return;
+    }
+    
+    CodeAnalyse.getInstace().diagnostics(filepath, context, (result:string)=>{
+        let data = JSON.parse(result);
+        console.log(data);
+        let diagnosticsData = [];
+        if(context == undefined) {
+            return;
+        }
+        let doc = TextDocument.create(params.textDocument.uri, "cpp", 0, context);
+        for(let i = 0; i < data.length; i++) {
+            let begin:Position = doc.positionAt(data[i].begin);
+            let end:Position = doc.positionAt(data[i].end);
+            let range = Range.create(begin, end);
+            let _diagnostics = Diagnostic.create(range, "检测到这里语法错误，请确认调整！");
+            diagnosticsData.push(_diagnostics);
+        }
+        let diagnosticsParams = {
+            uri:params.textDocument.uri,
+            diagnostics:diagnosticsData
+        };
+        connection.sendDiagnostics(diagnosticsParams);
+    });
 });
 
-connection.onDefinition((params: TextDocumentPositionParams): Definition | undefined | DefinitionLink[] => {
+connection.onDocumentSymbol((params: DocumentSymbolParams):DocumentSymbol[]|undefined => {
+    let uri = decodeURIComponent(params.textDocument.uri);
+    let basedir = basepath;
+    let pos: number = uri.indexOf(basedir);
+    let filepath = uri;
+    filepath = filepath.slice(pos + basedir.length);
+    if(filepath[0] != "\\" && filepath[0] != "/") {
+        filepath = path.sep + filepath;
+    }
+    let context = openFile[uri];
+    let tdoc = TextDocument.create(uri, "cpp", 0, context);
+    console.log("begin getDocumentTree");
+    console.time("getDocumentTree");
+    let showTree = CodeAnalyse.getInstace().getDocumentTree(filepath, context);
+    console.timeEnd("getDocumentTree");
+    //console.log(JSON.stringify(showTree));
+    if(!showTree) {
+        //如果返回没有文档结构，则报错
+        return undefined;
+    }
+    
+    let list = undefined;
+    console.log("begin getDepsInDefineJson");
+    console.time("getDepsInDefineJson");
+    try {
+        list = getDepsInDefineJson(tdoc, showTree);
+    } catch(error) {
+        list = undefined;
+        console.error("error", error);
+        console.log(JSON.stringify(showTree));
+    }
+    console.timeEnd("getDepsInDefineJson");
+    //console.log(JSON.stringify(list));
+    return list;
+});
 
+function getDefineInfo(tdoc: TextDocument, defineMeta: any, owner:string = ""): DocumentSymbol[] {
+    let dependencys: DocumentSymbol[] = [];
+    
+    let functions = defineMeta["function"];
+    let variables = defineMeta["variable"];
+    let defines = defineMeta["defines"];
+
+    for(let i = 0; i < functions.length; i++) {
+        if(functions[i].name == "") {
+            continue;
+        }
+        let bPosition = tdoc.positionAt(functions[i].bpos);
+        let ePosition = tdoc.positionAt(functions[i].bpos + functions[i].name.length);
+        let dependency =  DocumentSymbol.create(functions[i].name, "", SymbolKind.Function, Range.create(bPosition, ePosition), Range.create(bPosition, ePosition));
+        dependencys.push(dependency);
+    }
+
+    for(let i = 0; i < variables.length; i++) {
+        if(variables[i].name == "") {
+            continue;
+        }
+        let bPosition = tdoc.positionAt(variables[i].bpos);
+        let ePosition = tdoc.positionAt(variables[i].bpos + variables[i].name.length);
+        let dependency = DocumentSymbol.create(variables[i].name, "d", SymbolKind.Variable, Range.create(bPosition, ePosition), Range.create(bPosition, ePosition));
+        dependencys.push(dependency);
+    }
+
+    for(let i = 0; i < defines.length; i++) {
+        if(defines[i].name == "") {
+            continue;
+        }
+        let bPosition = tdoc.positionAt(defines[i].bpos);
+        let ePosition = tdoc.positionAt(defines[i].bpos + defines[i].name.length);
+        let dependency = DocumentSymbol.create(defines[i].name, "", SymbolKind.TypeParameter, Range.create(bPosition, ePosition), Range.create(bPosition, ePosition));
+        dependencys.push(dependency);
+    }
+
+    return dependencys;
+}
+
+function getDepsInDefineJson(tdoc:TextDocument ,nodeInfo: any): DocumentSymbol[] {
+    let dependencys: DocumentSymbol[] = [];
+    
+    //生成列表
+    let defineMeta = nodeInfo;
+    if(defineMeta["function"].length > 0
+        || defineMeta["defines"].length > 0 
+        || defineMeta["variable"].length > 0) {
+        let owner = "";
+        if(defineMeta["type"] == TypeEnum.CALSS) {
+            owner = defineMeta["name"];
+        }
+        let ret = getDefineInfo(tdoc, defineMeta, owner);
+        if(ret.length > 0){
+            //找到数据
+            dependencys = dependencys.concat(ret);
+        }
+    }
+
+    if(defineMeta["child"].length > 0) {
+        for(let i = 0; i < defineMeta["child"].length; i++) {
+            if(defineMeta["child"][i]["name"] == "") {
+                continue;
+            }
+
+            let _dependency = null;
+            if(defineMeta["child"][i]["type"] == TypeEnum.CALSS) {
+                _dependency = DocumentSymbol.create(defineMeta["child"][i]["name"], "", SymbolKind.Class, Range.create(0,1,1,0), Range.create(0,1,1,0));
+            } else {
+                _dependency = DocumentSymbol.create(defineMeta["child"][i]["name"], "", SymbolKind.Namespace, Range.create(0,1,1,0), Range.create(0,1,1,0));
+            }
+            _dependency.children = getDepsInDefineJson(tdoc, defineMeta["child"][i]);
+            dependencys.push(_dependency);  
+        }
+    }
+   
+    return dependencys;
+}
+
+connection.onDefinition((params: TextDocumentPositionParams): Definition | undefined | DefinitionLink[] => {
     let filename = decodeURIComponent(params.textDocument.uri);
     let basedir = basepath;
     let pos: number = filename.indexOf(basedir);
@@ -840,16 +1160,35 @@ connection.onDefinition((params: TextDocumentPositionParams): Definition | undef
         break;
     }
 
+    let result:PointInfo|false = false;
     let precontext = context.substr(0, ipos);
     let lineendpos = context.indexOf('\n', ipos);
-    let linelast = "";
-    if (lineendpos == -1) {
-        linelast = context.substr(ipos);
+    let linestartpos = context.lastIndexOf('\n', ipos);
+
+    let linecode = context.substring(linestartpos, lineendpos).trim();
+    console.log("line:", linecode);
+    if(/^#include /g.test(linecode)) {
+        //是否头文件引用
+        let inlcudeFile = linecode.replace("#include ", "");
+        inlcudeFile = inlcudeFile.replace(/["<>\s\t"]{1,1}/g, "");
+        console.log(inlcudeFile);
+        console.log("begin getIncludeDefine");
+        console.time("getIncludeDefine");
+        result = CodeAnalyse.getInstace().getIncludeDefine(filename, inlcudeFile);
+        console.timeEnd("getIncludeDefine");
     } else {
-        linelast = context.substr(ipos, lineendpos);
+        let linelast = "";
+        if (lineendpos == -1) {
+            linelast = context.substr(ipos);
+        } else {
+            linelast = context.substring(ipos, lineendpos);
+        }
+        console.log("begin getDefinePoint");
+        console.time("getDefinePoint");
+        result = CodeAnalyse.getInstace().getDefinePoint(filename, precontext, linelast, []);
+        console.timeEnd("getDefinePoint");
     }
-    let result = CodeAnalyse.getInstace().getDefinePoint(filename, precontext, linelast, []);
-    //console.log(result);
+
     if(result == false) {
         //查找定位失败
         return undefined;
@@ -912,9 +1251,12 @@ connection.onHover(
         if (lineendpos == -1) {
             linelast = context.substr(ipos);
         } else {
-            linelast = context.substr(ipos, lineendpos);
+            linelast = context.substring(ipos, lineendpos);
         }
+        console.log("begin getDefinePoint");
+        console.time("getDefinePoint");
         let result = CodeAnalyse.getInstace().getDefinePoint(filename, precontext, linelast, []);
+        console.timeEnd("getDefinePoint");
         if (result == false) {
             //查找定位失败
             return undefined;

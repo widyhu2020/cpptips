@@ -76,7 +76,7 @@ if (cluster.isMaster) {
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
-        console.log(data);
+        console.log(JSON.stringify(data));
         //关闭子进程
         worker_1.kill();
     });

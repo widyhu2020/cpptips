@@ -32,9 +32,13 @@ var Completion = /** @class */ (function () {
                 var extData = JSON.parse(findclass[0].extdata);
                 return this.getClassFullName(extData.v, namespaces);
             }
+            findclass.sort(function (a, b) {
+                return b.namespace.length - a.namespace.length;
+            });
             //只处理第一个，如果有多个这里忽略除一个以外的
             for (var i = 0; i < findclass.length; i++) {
-                if (findclass[i].type != TypeEnum.CALSS) {
+                if (findclass[i].type != TypeEnum.CALSS
+                    && findclass[i].type != TypeEnum.STRUCT) {
                     //不是类的定义
                     continue;
                 }
@@ -152,9 +156,44 @@ var Completion = /** @class */ (function () {
             if (infos.length <= 0) {
                 return false;
             }
-            //返回类型
-            var extJson = JSON.parse(infos[0].extdata);
-            return extJson.t;
+            else if (infos.length > 1) {
+                infos.sort(function (a, b) {
+                    return b.namespace.length - a.namespace.length;
+                });
+            }
+            var findType = false;
+            for (var i = 0; i < infos.length; i++) {
+                if (infos[0].type == TypeEnum.STRUCT) {
+                    //如果是类
+                    findType = infos[0].namespace + "::" + infos[0].name;
+                    break;
+                }
+                if (infos[0].type == TypeEnum.CALSS) {
+                    //如果是类
+                    findType = infos[0].namespace + "::" + infos[0].name;
+                    break;
+                }
+                //如果是函数
+                if (infos[0].type == TypeEnum.VARIABLE) {
+                    //返回类型
+                    if (infos[0].extdata.length <= 0) {
+                        continue;
+                    }
+                    var extJson = JSON.parse(infos[0].extdata);
+                    findType = extJson.t;
+                    break;
+                }
+                //如果是变量
+                if (infos[0].type == TypeEnum.FUNCTION) {
+                    if (infos[0].extdata.length <= 0) {
+                        continue;
+                    }
+                    var extJson = JSON.parse(infos[0].extdata);
+                    findType = extJson[0].r.t;
+                    break;
+                }
+            }
+            return findType;
         };
         //通过owner取下面的方法或者变量
         this.getByOwnerNameInNamespace = function (ownname, namespace) {

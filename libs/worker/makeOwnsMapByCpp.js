@@ -14,7 +14,7 @@ var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var cluster = require('cluster');
 var MakeOwnsMapByCpp = /** @class */ (function () {
-    function MakeOwnsMapByCpp(basedir, dbpath, cppfilename) {
+    function MakeOwnsMapByCpp(basedir, dbpath, sysdir) {
         //目录匹配
         this._initFileDir = function () {
             var infos = FileIndexStore.getInstace().getAllFileInfo();
@@ -83,10 +83,15 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
         this.makeSearchTreeByCpp = function (cppfilename) {
             //在文件存储
             this.filename = cppfilename;
+            var that = this;
             //加载头文件
             var filemap = this._initFileDir();
-            var that = this;
-            var fd = fs.openSync(that.basedir + cppfilename, 'r');
+            var filepath = that.basedir + cppfilename;
+            if (!fs.existsSync(filepath)) {
+                //如果文件不存在，则尝试使用系统目录
+                filepath = that.sysdir + cppfilename;
+            }
+            var fd = fs.openSync(filepath, 'r');
             var buffer = Buffer.alloc(1024 * 1024 * 2);
             var bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2);
             var filecontext = buffer.toString('utf8', 0, bytesRead);
@@ -99,7 +104,9 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             var pos = cppfilename.lastIndexOf("/");
             var filename = cppfilename.substr(pos + 1);
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
+            console.time("getFileByFilePath");
             var fileinfo = FileIndexStore.getInstace().getFileByFilePath(cppfilename);
+            console.timeEnd("getFileByFilePath");
             if (fileinfo == false) {
                 var data = {
                     filename: filename,
@@ -116,8 +123,15 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             }
             //执行分析
             var analyse = new Analyse.Analyse(filecontext, cppfilename);
+            console.time("Analyse");
             analyse.doAnalyse();
+            console.timeEnd("Analyse");
+            console.time("getResult");
             var sourceTree = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace());
+            console.timeEnd("getResult");
+            console.time("getDocumentStruct");
+            this.showTree = analyse.getDocumentStruct();
+            console.timeEnd("getDocumentStruct");
             var includefile = sourceTree.__file_inlcude;
             var namespaces = sourceTree.__file_usingnamespace;
             var queue = new Queue();
@@ -179,11 +193,13 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             };
         };
         this.basedir = basedir;
+        this.sysdir = sysdir;
         FileIndexStore.getInstace().connect(dbpath, 0);
         KeyWordStore.getInstace().connect(dbpath, 0);
         this.fileNameMap = {};
         this._usingnamespace = [];
         this.include = [];
+        this.showTree = {};
     }
     return MakeOwnsMapByCpp;
 }());
@@ -192,13 +208,14 @@ if (cluster.isMaster) {
     //测试代码
     var worker_1 = cluster.fork();
     var parasms = {
-        basedir: "/Users/widyhu/workspace/cpp_project/",
+        basedir: "/Users/widyhu/widyhu/cpp_project/",
+        sysdir: "",
         cppfilename: "/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.cpp",
-        dbpath: "/Users/widyhu/workspace/code-analyse/cpptips.db"
+        dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db"
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
-        console.log(data);
+        //console.log(data);
         //关闭子进程
         worker_1.kill();
     });
@@ -210,7 +227,7 @@ else if (cluster.isWorker) {
             console.log(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
             console.time("makeSearchTreeByCpp");
-            var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.cppfilename);
+            var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
             maker.makeSearchTreeByCpp(parasms.cppfilename);
             console.timeEnd("makeSearchTreeByCpp");
             //释放链接

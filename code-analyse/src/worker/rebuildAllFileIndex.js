@@ -165,8 +165,19 @@ class RebuildFileIndex {
             return that.needExit;
         }
 
+        function _inDeleteNotExists(msg){
+            console.log(msg);
+            return that.needExit;
+        }
+
         //目录扫描器
         let tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
+        
+        //清楚已经删除了的文件
+        console.time("traverseFilesDelNotExists");
+        tr.traverseFilesDelNotExists(_inDeleteNotExists);
+        console.timeEnd("traverseFilesDelNotExists");
+
         totalNum = tr.getFileNumInDir(_inDirTipsShow);
         //分析头文件遍历
         tr.scanDirFile(resolve);
@@ -220,8 +231,19 @@ class RebuildFileIndex {
             return that.needExit;
         }
 
+        function _inDeleteNotExists(msg){
+            console.log(msg);
+            return that.needExit;
+        }
+
         //目录扫描器
         let tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
+        
+        //清楚已经删除了的文件
+        console.time("traverseFilesDelNotExists");
+        tr.traverseFilesDelNotExists(_inDeleteNotExists);
+        console.timeEnd("traverseFilesDelNotExists");
+
         totalNum = tr.getFileNumInDir(_inDirTipsShow);
         //分析头文件遍历
         tr.scanDirFile(resolve);
@@ -284,7 +306,7 @@ class RebuildFileIndex {
         let updatetime = Math.floor(fstat.mtimeMs / 1000);
         if (!forckReolad && hasInDb && Math.floor(updatetime) == Math.floor(fileinfo.updatetime)) {
             //文件未更新，无需重新加载
-            //console.info("this file not modify!");
+            console.info("this file not modify!");
             fs.closeSync(fd);
             return;
         }
@@ -320,7 +342,7 @@ class RebuildFileIndex {
 
         //如果是md5值不一样，则启动分析合并
         if ((hasInDb && lastMd5 != md5) || forckReolad) {
-            //console.log(lastMd5, md5, filepath);
+            console.log(lastMd5, md5, filepath);
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
@@ -562,7 +584,7 @@ if (cluster.isMaster) {
 
                 basepath: "/Users/widyhu/widyhu/cpp_project/",
                 dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db",
-                filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/proto/mmpaymchmerchant.proto',
+                filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/CurrentFlowState.cpp',
                 
                 filepaths: ['/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.cpp',
                             '/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.h'],
@@ -673,7 +695,7 @@ if (cluster.isMaster) {
             console.log("input parasms error!", parasms);
             let message = { "function": "error" };
             message['msg'] = "input parasms error!";
-            process.send(message);
+            process.send(JSON.stringify(message));
             return;
         }
 
@@ -758,7 +780,7 @@ if (cluster.isMaster) {
     };
 
     process.on('message', (parasms) => {
-        console.log("onmessage",parasms);
+        console.log("onmessage", JSON.stringify(parasms));
         onMessage(parasms);
     });
 

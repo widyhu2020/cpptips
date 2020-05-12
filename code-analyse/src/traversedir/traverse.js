@@ -36,15 +36,15 @@ class Traverse {
         }
 
         //需要忽略的文件或者文件的匹配
-        console.log("Traverse:", userConfig);
-        console.log("isAnlyseSystemDir:", isAnlyseSystemDir);
+        console.log("Traverse:", JSON.stringify(userConfig));
+        console.log("isAnlyseSystemDir:", JSON.stringify(isAnlyseSystemDir));
         let regex = [];
         this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
         if(this.userConfig.ignoreFileAndDir
             && this.userConfig.ignoreFileAndDir instanceof Array) {
             regex = this.userConfig.ignoreFileAndDir;
             this.regexStr = "(" + regex.join(")|(") + ")";
-            console.log("user regex:",this.regexStr);
+            console.log("user regex:", this.regexStr);
         };
 
         //需要忽略的目录，不支持匹配
@@ -53,7 +53,7 @@ class Traverse {
             && this.userConfig.ignorDir instanceof Array) {
             this.ignorDir = this.userConfig.ignorDir;
         }
-        console.log("ignorDir:", this.ignorDir);
+        console.log("ignorDir:", JSON.stringify(this.ignorDir));
 
         //需要加载的目录，不支持匹配
         this.needLoadDir = [];
@@ -61,13 +61,14 @@ class Traverse {
             && this.userConfig.needLoadDir instanceof Array) {
             this.needLoadDir = this.userConfig.needLoadDir;
         }
-        console.log("needLoadDir:", this.needLoadDir);
+        console.log("needLoadDir:", JSON.stringify(this.needLoadDir));
     };
 
     //加载目录所有文件
     scanDirFile = function(resolve) {
         let that = this;
-        //处理头文件
+
+        //处理文件
         this._readDir(this.basedir);
         console.log("include process over");
     
@@ -91,9 +92,9 @@ class Traverse {
         //延迟10s开始分析文件
         setTimeout(this.analyseConsumer, 1, that, resolve);
     };
+
     //消费者
     analyseConsumer = function(that, resolve) {
-        
         let needEmptyTime = 0;
         let timer = null;
         timer = setInterval(() => {
@@ -138,37 +139,57 @@ class Traverse {
         return taskTotal;
     };
 
-    //遍历头文件-暂时废弃
-    traverseInclude = function(callback, callbackprocess) {
-        
-        let types = [FileType.INCLUDE_FILE, FileType.PROTOBUF_FILE];
+    //遍历文件
+    traverseFilesDelNotExists = function(callback) {
+        let types = [
+            FileType.INCLUDE_FILE, 
+            FileType.PROTOBUF_FILE,
+            FileType.SOURCE_FILE
+        ];
+        callback("正在获取索引库中所有文件数");
         let totalNum = this.fis.getFileTotalWhithType(types);
+        callback("获取索引文件库文件完成，总共："+ totalNum);
         console.log("begin traveseinclude... totalNum:", totalNum);
 
-        //单次获取1000个
-        let batchCount = 1000;
+        //单次获取2000个
+        let batchCount = 2000;
         let beginIndex = 0;
-        let showprocess = 0;
+        let needDeleteFileName = [];
+        let needDelete = [];
         while(beginIndex < totalNum) {
             let endIndex = beginIndex + batchCount;
+            callback("正在批量获取文件：当前，"+ endIndex+ "每页2000条");
+            console.log(beginIndex, "-", batchCount);
             let infos = this.fis.getFilesWhithType(types, beginIndex, batchCount);
-
             for (let i = 0; i < infos.length; i++) {
-                //let filepath = infos[i].filepath;
-                let needStop = callback(infos[i]);
-                if(needStop) {
-                    //需要退出，不再处理
-                    console.debug("need stop and exit!");
-                    return;
+                if(infos[i].systeminclude == 1) {
+                    //系统文件跳过
+                    continue;
                 }
-                let nowshowprocess = ((beginIndex + i) / totalNum) * 100;
-                if (nowshowprocess - showprocess > 0.5) {
-                    //console.log("total:", totalNum, "processed:", i);
-                    callbackprocess(totalNum, (beginIndex + i), showprocess.toFixed(2), "include");
-                    showprocess = nowshowprocess;
+
+                let filepath = infos[i].filepath;
+                if(!fs.existsSync(this.basedir + filepath)) {
+                    //文件不存在，删除数据
+                    needDeleteFileName.push(filepath);
+                    needDelete.push(infos[i].id);
+                    callback("发现文件已经删除："+ filepath + ", id:" + infos[i].id);
                 }
             }
             beginIndex = endIndex;
+        };
+
+        if(totalNum < needDeleteFileName.length * 2) {
+            //如果文件超过一半不存在，可能存在问题
+            console.log("file not exists. list:",JSON.stringify(needDeleteFileName));
+            callback("发现大量删除文件，可能判断有误，不进行索引清理");
+            return;
+        }
+
+        for(let i = 0; i < needDelete.length; i++) {
+            let _id = needDelete[i];
+            callback("正在清理文件及其索引:" + _id);
+            console.log("totalfile:", totalNum, "needDeleteId:", _id);
+            this.fis.delete(_id);
         }
     };
 

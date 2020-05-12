@@ -1,0 +1,51 @@
+// A launch configuration that compiles the extension and then opens it inside a new window
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "extensionHost",
+			"request": "launch",
+			"name": "client",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceRoot}"
+			],
+			"outFiles": [
+				"${workspaceRoot}/client/out/**/*.js"
+			],
+			"preLaunchTask": {
+				"type": "npm",
+				"script": "watch"
+			}
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "启动测试程序（code-analyse）",
+			"skipFiles": [
+				"<node_internals>/**"
+			],
+			"autoAttachChildProcesses": true,
+			"program": "${workspaceFolder}/code-analyse/test.js"
+		},
+		{
+			"type": "node",
+			"request": "attach",
+			"name": "serice",
+			"port": 6009,
+			"restart": true,
+			"outFiles": [
+				"${workspaceRoot}/server/out/**/*.js"
+			]
+		}
+	],
+	"compounds": [
+		{
+			"name": "客户端 + 服务器调试",
+			"configurations": [
+				"client",
+				"serice"
+			]
+		}
+	]
+}

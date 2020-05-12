@@ -132,8 +132,16 @@ var RebuildFileIndex = /** @class */ (function () {
                 updateProcess(0, 0, 0, "scan_ing", path);
                 return that.needExit;
             }
+            function _inDeleteNotExists(msg) {
+                console.log(msg);
+                return that.needExit;
+            }
             //目录扫描器
             var tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
+            //清楚已经删除了的文件
+            console.time("traverseFilesDelNotExists");
+            tr.traverseFilesDelNotExists(_inDeleteNotExists);
+            console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
             //分析头文件遍历
             tr.scanDirFile(resolve);
@@ -181,8 +189,16 @@ var RebuildFileIndex = /** @class */ (function () {
                 updateProcess(0, 0, 0, "scan_ing", path);
                 return that.needExit;
             }
+            function _inDeleteNotExists(msg) {
+                console.log(msg);
+                return that.needExit;
+            }
             //目录扫描器
             var tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
+            //清楚已经删除了的文件
+            console.time("traverseFilesDelNotExists");
+            tr.traverseFilesDelNotExists(_inDeleteNotExists);
+            console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
             //分析头文件遍历
             tr.scanDirFile(resolve);
@@ -241,7 +257,7 @@ var RebuildFileIndex = /** @class */ (function () {
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
             if (!forckReolad && hasInDb && Math.floor(updatetime) == Math.floor(fileinfo.updatetime)) {
                 //文件未更新，无需重新加载
-                //console.info("this file not modify!");
+                console.info("this file not modify!");
                 fs.closeSync(fd);
                 return;
             }
@@ -272,7 +288,7 @@ var RebuildFileIndex = /** @class */ (function () {
             }
             //如果是md5值不一样，则启动分析合并
             if ((hasInDb && lastMd5 != md5) || forckReolad) {
-                //console.log(lastMd5, md5, filepath);
+                console.log(lastMd5, md5, filepath);
                 //获取文件id
                 var fileinfo_1 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_1) {
@@ -503,7 +519,7 @@ if (cluster.isMaster) {
             // filepath: '/usr/local/include/google/protobuf/message_lite.h',
             basepath: "/Users/widyhu/widyhu/cpp_project/",
             dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db",
-            filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/proto/mmpaymchmerchant.proto',
+            filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/CurrentFlowState.cpp',
             filepaths: ['/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.cpp',
                 '/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.h'],
             issystem: 0,
@@ -617,7 +633,7 @@ else if (cluster.isWorker) {
             console.log("input parasms error!", parasms);
             var message_1 = { "function": "error" };
             message_1['msg'] = "input parasms error!";
-            process.send(message_1);
+            process.send(JSON.stringify(message_1));
             return;
         }
         var issystem = 0;
@@ -693,7 +709,7 @@ else if (cluster.isWorker) {
         process.send(message);
     };
     process.on('message', function (parasms) {
-        console.log("onmessage", parasms);
+        console.log("onmessage", JSON.stringify(parasms));
         onMessage(parasms);
     });
     process.on('exit', function (code, signal) {

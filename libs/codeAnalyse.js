@@ -7,12 +7,14 @@
  * ------------------------------------------------------------------------------------------ */
 var cluster = require('cluster');
 var Analyse = require('./analyse/analyseCpp');
+var AnalyseTree = require('./analyse/analyse');
 var AnalyseDomain = require('./analyse/analyseDomain');
 var Completion = require('./completion/completion').Completion;
 var Definition = require('./definition/definition').Definition;
 var FileIndexStore = require('./store/store').FileIndexStore;
 var KeyWordStore = require('./store/store').KeyWordStore;
 var DefineMap = require('./definition/defineMap').DefineMap;
+var AutoFillParam = require('./completion/autoFillParam').AutoFillParam;
 var TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 var fs = require('fs');
 var __path = require('path');
@@ -25,6 +27,7 @@ var CodeAnalyse = /** @class */ (function () {
             }
             console.info("config:", configs);
             var basedir = configs.basedir;
+            this.basedir = basedir;
             var dbpath = configs.dbpath;
             this.dbpath = dbpath;
             this.extPath = configs.extpath;
@@ -42,7 +45,6 @@ var CodeAnalyse = /** @class */ (function () {
                 console.info("mkdir db path!", path);
                 fs.mkdirSync(path, { recursive: true });
             }
-            this.basedir = basedir;
             //这里不进行初始化
             KeyWordStore.getInstace().connect(dbpath, this.showsql);
             FileIndexStore.getInstace().connect(dbpath, this.showsql);
@@ -72,6 +74,7 @@ var CodeAnalyse = /** @class */ (function () {
             var worker = cluster.fork();
             var parasms = {
                 basedir: this.basedir,
+                sysdir: this.extPath + "/data/",
                 cppfilename: filepath,
                 dbpath: this.dbpath
             };
@@ -81,11 +84,12 @@ var CodeAnalyse = /** @class */ (function () {
                 try {
                     var usingnamespace = data['usingnamespace'];
                     var include = data['include'];
+                    var showTree = data['showTree'];
                     //关闭子进程
                     _this.namespacestore[filepath] = usingnamespace;
                     if (callback != null) {
                         //需要回调
-                        callback("success", filepath, usingnamespace, include);
+                        callback("success", filepath, usingnamespace, include, showTree);
                     }
                 }
                 catch (err) {
@@ -208,7 +212,9 @@ var CodeAnalyse = /** @class */ (function () {
                     continue;
                 }
                 beginpos = 0;
-                while (true) {
+                var maxRun = 0;
+                while (true && maxRun < 500) {
+                    maxRun++;
                     var endpos = area.indexOf(';', beginpos);
                     if (endpos == -1) {
                         //没有找到更多的语句
@@ -264,7 +270,9 @@ var CodeAnalyse = /** @class */ (function () {
                 var _code = _codes[i].trim();
                 if (_code.indexOf("<")) {
                     var j = i;
-                    while (true) {
+                    var maxRun = 0;
+                    while (true && maxRun < 500) {
+                        maxRun++;
                         var result = this._getCharCountInStr(_code, 0, new Set(['<', '>']));
                         if (result['<'] == result['>']) {
                             i = j;
@@ -369,7 +377,9 @@ var CodeAnalyse = /** @class */ (function () {
                     var _pos = i;
                     var _beginpos = _pos;
                     var _endpos = _pos;
-                    while (true) {
+                    var maxRun = 0;
+                    while (true && maxRun < 500) {
+                        maxRun++;
                         _endpos = str.indexOf('>', _pos + 1);
                         if (_endpos == -1) {
                             //<>不匹配
@@ -573,7 +583,7 @@ var CodeAnalyse = /** @class */ (function () {
                     userConfig: this.userConfig
                 }
             };
-            console.log("_reloadAllIncludeFile", parasms);
+            console.log("_reloadAllIncludeFile", JSON.stringify(parasms));
             worker.send(parasms);
             worker.on('message', function (data) {
                 var value = data['process'];
@@ -703,7 +713,9 @@ var CodeAnalyse = /** @class */ (function () {
             //xxxx(ddd())
             var _bpos = ipos;
             var _epos = ipos;
-            while (true) {
+            var maxRun = 0;
+            while (true && maxRun < 500) {
+                maxRun++;
                 _epos = str.indexOf(emark, _epos + 1);
                 if (_epos == -1) {
                     //未找到，直接失败
@@ -731,7 +743,9 @@ var CodeAnalyse = /** @class */ (function () {
             //aaaa(ddd())
             var _bpos = ipos;
             var _epos = ipos;
-            while (true) {
+            var maxRun = 0;
+            while (true && maxRun < 500) {
+                maxRun++;
                 _bpos = str.lastIndexOf(bmark, _bpos - 1);
                 if (_bpos == -1) {
                     //未找到，直接失败
@@ -1073,8 +1087,76 @@ var CodeAnalyse = /** @class */ (function () {
                     return [];
                 }
                 valetype = cp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+                usingnamespace.push(_nameInfo.namespace);
+                valetype = cp.getClassFullName(valetype, usingnamespace);
             }
             return this._getClassAndInheritFuntionAndVar(cp, valetype, _ownname, usingnamespace);
+        };
+        //自动填参数分析
+        this._autoFillParams = function (filepath, filecontext, preParams) {
+            filecontext = filecontext.substring(0, filecontext.length - preParams.length - 1);
+            var analyse = new AnalyseDomain(filecontext);
+            var data = analyse.doAnalyse();
+            filecontext = data.reverse().join('\n');
+            filecontext = filecontext.replace(/using namespace/g, "using_ns");
+            var lines = filecontext.split('\n');
+            //这里使用新的set，避免污染
+            var usingnamespace = this._getUsingNamespace(lines, filepath, []);
+            //先找到最后一行的函数
+            var lastline = lines[lines.length - 1];
+            var names = this._getValName(lastline);
+            if (names.length <= 0) {
+                //未找到合适的名字
+                return [];
+            }
+            //获取参数位置
+            preParams = preParams.replace(/\([a-z0-9_\(\)\[\].: \->]{1,128}\)/ig, "");
+            var params = preParams.split(",");
+            var paramsPos = params.length;
+            var valetype = "";
+            if (names.length > 1) {
+                //弹出最顶的，用来找定义
+                var name_4 = names.pop();
+                //获取当前操作的wonname中
+                var _ownname = this._getPosOwner(data);
+                var _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+                if (name_4.n != "this") {
+                    //非this指针，需要找出变量定义的类型
+                    _valetype = this._getValDefineOwn(lines, name_4.n);
+                }
+                valetype = _valetype.t;
+            }
+            //找到函数定义
+            //转化成全名称
+            var afp = new AutoFillParam();
+            valetype = afp.getClassFullName(valetype, usingnamespace);
+            if (valetype == "") {
+                //未找到类型定义，可能未内部函数成员变量，或者全局变量
+                var name_5 = names[0].n;
+                var _ownname = this._getPosOwner(data);
+                var ownnames = ['', _ownname];
+                var realName = afp.getRealOwnByName(name_5, ownnames, usingnamespace);
+                if (!realName) {
+                    //真正没找到定义
+                    return [];
+                }
+                valetype = realName;
+            }
+            for (var i = names.length - 1; i >= 1; i--) {
+                //依次找最终的结构
+                var _nameInfo = DefineMap.getInstace().getRealName(valetype);
+                var _valetype = _nameInfo.namespace != "" ? _nameInfo.namespace + "::" + _nameInfo.name : _nameInfo.name;
+                var tmptype = this._findObjctWhitNames(_valetype, names[i]);
+                if (!tmptype) {
+                    return [];
+                }
+                valetype = afp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+            }
+            var functionName = names[0];
+            console.log(valetype);
+            //获取方法的定义
+            afp.setParamsInfo(filecontext, preParams, paramsPos);
+            return afp.autoAnalyseParams(valetype, functionName.n, usingnamespace);
         };
         //获取归属类或者继承父类的下函数定义
         this._getClassAndInheritFuntionAndVar = function (cp, valetype, ownname, usingnamespace) {
@@ -1082,7 +1164,9 @@ var CodeAnalyse = /** @class */ (function () {
             var showitem = [];
             var deeppath = 0;
             //继承类处理
-            while (true) {
+            var maxRun = 0;
+            while (true && maxRun < 500) {
+                maxRun++;
                 if (queue.length <= 0 || deeppath > 5) {
                     //已经没有元素了
                     //防止死循环，最多只查找5层
@@ -1161,18 +1245,25 @@ var CodeAnalyse = /** @class */ (function () {
             return showitem;
         };
         this._getShowTips = function (filepath, data) {
+            if (!data && data.length <= 0) {
+                //一次情况
+                return { t: "未获取到名称", d: "未获取到描述", f: -1 };
+            }
             var fullnameinfo = JSON.parse(data.n);
             var ownname = fullnameinfo.o;
             var namespace = fullnameinfo.s;
             var name = fullnameinfo.n;
             var file_id = fullnameinfo.f;
             var type = fullnameinfo.t;
+            if (fullnameinfo.d) {
+                //自动填参数推荐来源
+                return { t: "填参推荐", d: "系统为你挑选可能的取值，当前匹配度（最高1000）：" + fullnameinfo.d, f: -1 };
+            }
             if (data.f == -1) {
                 return { t: name, d: name, f: -1 };
             }
             var cp = new Completion();
             var info = cp.getShowDocument(ownname, namespace, name, type);
-            //{ t: '', d: '', f: 0 }
             if (!info && info.length <= 0) {
                 var showdefie = name;
                 if (fullnameinfo.t) {
@@ -1191,6 +1282,104 @@ var CodeAnalyse = /** @class */ (function () {
                 pos = line.indexOf("&" + valname, 0);
             }
             return pos;
+        };
+        //获取头文件定义
+        this._getIncludeDefine = function (sourceFile, includeFile, fileName) {
+            var df = new Definition(this.basedir, this.extPath);
+            if (fileName.indexOf(".pb.h") != -1) {
+                //兼容proto
+                fileName = fileName.replace(".pb.h", ".proto");
+                includeFile = includeFile.replace(".pb.h", ".proto");
+                console.log("process proto:", fileName);
+            }
+            var findIncludeFile = df.getIncludeInfo(sourceFile, includeFile, fileName);
+            if (findIncludeFile == "") {
+                //未找到头文件
+                console.log("find include file error", includeFile);
+                return false;
+            }
+            var _filename = this.basedir + findIncludeFile;
+            if (!fs.existsSync(_filename)) {
+                //可能是系统库
+                _filename = __dirname + "/../data/" + findIncludeFile;
+                if (!fs.existsSync(_filename)) {
+                    //未找到头文件
+                    console.log("find real include file error", includeFile, _filename);
+                    return false;
+                }
+            }
+            var result = {
+                filename: "file://" + _filename,
+                bline: 0,
+                bcols: 0,
+                eline: 1,
+                ecols: 0,
+                linecode: findIncludeFile,
+                prelinecode: findIncludeFile,
+                title: "头文件"
+            };
+            return result;
+        };
+        //获取文档结构
+        this._getDocumentTree = function (filename, filecontext) {
+            var analyse = new AnalyseTree.Analyse(filecontext, filename);
+            console.time("Analyse");
+            analyse.doAnalyse();
+            console.timeEnd("Analyse");
+            console.time("getDocumentStruct");
+            showTree = analyse.getDocumentStruct();
+            console.timeEnd("getDocumentStruct");
+            if (showTree
+                && showTree["name"] == ""
+                && showTree["child"].length == 0
+                && showTree["function"].length == 0
+                && showTree["variable"].length == 0
+                && showTree["defines"].length == 0) {
+                return false;
+            }
+            if (showTree
+                && showTree["name"] == ""
+                && showTree["child"].length == 1
+                && showTree["child"][0]["name"] == ""
+                && showTree["function"].length == 0
+                && showTree["variable"].length == 0
+                && showTree["defines"].length == 0) {
+                //调整格式，应该是个循环，但是这里只做一层
+                showTree = showTree["child"][0];
+            }
+            return showTree;
+        };
+        //语法检查
+        this._diagnostics = function (filepath, filecontext, diagnosticscallback) {
+            var that = this;
+            cluster.setupMaster({
+                exec: __dirname + "/worker/analyseDiagnostics.js",
+                silent: false,
+                windowsHide: true
+            });
+            //锁住功能 wal模式不需要锁
+            that.loadindex = true;
+            var worker = cluster.fork();
+            // paramsms结构定义
+            var parasms = {
+                filecontext: filecontext,
+                filename: filepath,
+                dbpath: this.dbpath
+            };
+            console.log("_diagnostics", JSON.stringify(parasms));
+            worker.send(parasms);
+            worker.on('message', function (data) {
+                if (data.type == "result") {
+                    console.log(data.data);
+                    //其他函数
+                    diagnosticscallback(data.data);
+                    worker.kill();
+                }
+            });
+            worker.on('exit', function (code, signal) {
+                //恢复正常功能
+                that.loadindex = false;
+            });
         };
         this._getDefinePoint = function (filepath, filecontext, linelast, owns) {
             if (owns === void 0) { owns = []; }
@@ -1254,14 +1443,39 @@ var CodeAnalyse = /** @class */ (function () {
             var name = names.pop();
             var _valetype = this._getValDefineOwn(lines, name.n);
             var valetype = _valetype.t;
+            if (_valetype.t == "this") {
+                //非this指针，需要找出变量定义的类型
+                valetype = this._getPosOwner(data);
+            }
+            if (_valetype.t == "auto" || _valetype.t == "typeof") {
+                //这种情况类型有后面的值确定
+                var line = _valetype.l;
+                var _pos = line.indexOf(_valetype.t);
+                var _beginpos = line.indexOf("=", _pos);
+                if (_pos == -1 || _beginpos == -1) {
+                    //没有值无法定位
+                    return [];
+                }
+                var _endpos = line.indexOf(";", _pos);
+                var _type = line.substring(_beginpos + 1, _endpos).trim();
+                var _names = this._getValName(_type);
+                names = names.concat(_names);
+                if (names.length <= 0) {
+                    //未找到合适的名字
+                    return [];
+                }
+                var name_6 = names.pop();
+                _valetype = this._getValDefineOwn(lines, name_6.n);
+                valetype = _valetype.t;
+            }
             if (valetype != "" && names.length == 0) {
                 //可能是本文档定义
-                if (!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
-                    && /\.h$/g.test(filepath)) {
-                    //同文件跳转
-                    var result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
-                    return result;
-                }
+                // if(!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
+                //     && /\.h$/g.test(filepath)) {
+                //同文件跳转
+                var result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
+                return result;
+                // }
                 //可能是函数定义，需要清空类型从全局或者owner找
                 valetype = "";
             }
@@ -1376,6 +1590,8 @@ var CodeAnalyse = /** @class */ (function () {
                     return false;
                 }
                 valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+                usingnamespace.push(_nameInfo.namespace);
+                valetype = df.getClassFullName(valetype, usingnamespace);
             }
             //最后一个定义名称
             var lastname = names[0];
@@ -1404,6 +1620,7 @@ var CodeAnalyse = /** @class */ (function () {
                 ownnames = ownnames.concat(inheritclass);
             }
             var name = lastname.n;
+            //当出现set_xx_size的时候，会出现无法提示的问题
             name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
             var fileinfo = df.getDefineInWitchClass(ownnames, name, usingnamespace);
             if (fileinfo == false) {
@@ -1415,7 +1632,7 @@ var CodeAnalyse = /** @class */ (function () {
             var filepath = fileinfo.filepath;
             var ownname = fileinfo.ownname;
             //读取文件查找内容
-            return df.readFileFindDefine(filepath, ownname, name, fileinfo.type, sourcefilepath);
+            return df.readFileFindDefine(filepath, ownname, name, fileinfo.info.type, sourcefilepath);
         };
         //帮助提示
         this._getSignatureHelp = function (filepath, filecontext, owns) {
@@ -1490,14 +1707,14 @@ var CodeAnalyse = /** @class */ (function () {
             }
             else {
                 //弹出最顶的，用来找定义
-                var name_4 = names.pop();
+                var name_7 = names.pop();
                 console.time("_getValDefineOwn");
-                var _valetype = this._getValDefineOwn(lines, name_4.n);
+                var _valetype = this._getValDefineOwn(lines, name_7.n);
                 console.timeEnd("_getValDefineOwn");
                 if (_valetype.t == "") {
                     //未找到变量类型，可能是函数或者宏定义
                     var ownname = this._getPosOwner(data);
-                    info = completion._GetFunctionDefineByOwnAndName(name_4.n, ownname, usingnamespace);
+                    info = completion._GetFunctionDefineByOwnAndName(name_7.n, ownname, usingnamespace);
                 }
                 else {
                     console.time("_GetFunctionDefine");
@@ -1530,7 +1747,9 @@ var CodeAnalyse = /** @class */ (function () {
             var ilength = linecode.length;
             var lnum = 0;
             var pos = 0;
-            while (true) {
+            var maxRun = 0;
+            while (true && maxRun < 500) {
+                maxRun++;
                 var _pos = filecontext.indexOf("\n", pos);
                 if (_pos == -1) {
                     //未找到
@@ -1571,9 +1790,10 @@ var CodeAnalyse = /** @class */ (function () {
             var parasms = {
                 baseurl: "http://cpptips.com:8888",
                 basedir: "/Users/widyhu/.vscode/extensions/widyhu.cpptips-0.1.9/",
-                intervaltime: 180000
+                intervaltime: 180000,
+                maketools: 0
             };
-            console.log(parasms);
+            console.log(JSON.stringify(parasms));
             var path = require('path');
             var basedir = __dirname;
             basedir = path.resolve(basedir, '../');
@@ -1610,7 +1830,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("file type not match!");
+                    console.error("getAllNameByObj file type not match!");
                     return [];
                 }
                 //test
@@ -1639,7 +1859,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("file type not match!");
+                    console.error("getAllNameByNamespace file type not match!");
                     return [];
                 }
                 return this._getAllNameByNamespace(filepath, filecontext, owns);
@@ -1678,7 +1898,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("file type not match!");
+                    console.error("searchKeyWord file type not match!");
                     return [];
                 }
                 return this._searchKeyWord(filepath, prekeyworld, filecontext, owns);
@@ -1700,7 +1920,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".proto", ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("this file not include.");
+                    console.error("reloadOneIncludeFile this file not include.");
                     callback("error");
                     return;
                 }
@@ -1714,7 +1934,7 @@ var CodeAnalyse = /** @class */ (function () {
         this.reloadBatchIncludeFile = function (filepaths, callback) {
             if (callback === void 0) { callback = null; }
             try {
-                if (this.loadindex || !this.isinit) {
+                if (this.loadindex) {
                     //索引加载中，功能暂时不可用
                     return false;
                 }
@@ -1756,30 +1976,22 @@ var CodeAnalyse = /** @class */ (function () {
         this.getDependentByCpp = function (filepath, callback) {
             if (callback === void 0) { callback = null; }
             try {
-                var that_2 = this;
-                function processFile(filepath, callback) {
-                    var pos = filepath.lastIndexOf('.');
-                    var fileExt = filepath.substring(pos);
-                    var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
-                    if (!includeExt.has(fileExt)) {
-                        callback("fileerror", filepath, [], []);
-                        return;
-                    }
-                    return that_2._getDependentByCpp(filepath, callback);
-                }
+                var that = this;
                 filepath = this._filePathFormat(filepath);
-                if (!this.loadindex) {
+                if (this.loadindex) {
                     //索引加载中，功能可能暂时不可用
                     //进行尝试分析，并且回调加入分析队列中，等待索引加载完成之后再分析一次
                     callback("busy", filepath, [], []);
                 }
-                if (!this.isinit) {
-                    //3之后继续执行
-                    console.log("初始化未完成，10s之后继续加载！");
-                    setTimeout(processFile, 10000, filepath, callback);
+                var pos = filepath.lastIndexOf('.');
+                var fileExt = filepath.substring(pos);
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+                if (!includeExt.has(fileExt)) {
+                    callback("fileerror", filepath, [], []);
                     return;
                 }
-                return processFile(filepath, callback);
+                console.log("dddd", this.isinit, this.loadindex);
+                return that._getDependentByCpp(filepath, callback);
             }
             catch (error) {
                 callback("error", filepath, [], []);
@@ -1802,10 +2014,31 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("file type not match!");
+                    console.error("getDefinePoint file type not match!");
                     return false;
                 }
                 return this._getDefinePoint(filepath, filecontext, linelast, owns);
+            }
+            catch (error) {
+                console.error("call getDefinePoint faild!", error);
+            }
+        };
+        //跳转头文件定义
+        this.getIncludeDefine = function (sourceFile, includeFile) {
+            try {
+                if (!this.isinit) {
+                    //索引加载中，功能暂时不可用
+                    return false;
+                }
+                var fileinfo = __path.parse(includeFile);
+                var filename = fileinfo.base;
+                var fileExt = fileinfo.ext;
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]);
+                if (!includeExt.has(fileExt)) {
+                    console.error("getIncludeDefine file type not match!");
+                    return false;
+                }
+                return this._getIncludeDefine(sourceFile, includeFile, filename);
             }
             catch (error) {
                 console.error("call getDefinePoint faild!", error);
@@ -1827,13 +2060,58 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("file type not match!");
+                    console.error("getSignatureHelp file type not match!");
                     return false;
                 }
                 return this._getSignatureHelp(filepath, filecontext, owns);
             }
             catch (error) {
                 console.error("call getSignatureHelp faild!", error);
+            }
+        };
+        //获取文档结构-非异步
+        this.getDocumentTree = function (filepath, filecontext) {
+            try {
+                if (!this.isinit) {
+                    //索引加载中，功能暂时不可用
+                    return false;
+                }
+                var fileinfo = __path.parse(filepath);
+                var fileExt = fileinfo.ext;
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]);
+                if (!includeExt.has(fileExt)) {
+                    console.error("getDocumentTree file type not match!");
+                    return false;
+                }
+                return this._getDocumentTree(filepath, filecontext);
+            }
+            catch (error) {
+                console.error("call getDefinePoint faild!", error);
+            }
+        };
+        //自动填参数
+        this.autoFillParams = function (filepath, filecontext, preParams) {
+            try {
+                filepath = this._filePathFormat(filepath);
+                if (!this.isinit) {
+                    //索引加载中，功能暂时不可用
+                    return [];
+                }
+                var pos = filepath.lastIndexOf('.');
+                var fileExt = filepath.substring(pos);
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+                if (!includeExt.has(fileExt)) {
+                    console.error("autoFillParams file type not match!");
+                    return [];
+                }
+                //test
+                console.time("_getAllNameByObj");
+                var result = this._autoFillParams(filepath, filecontext, preParams);
+                console.timeEnd("_getAllNameByObj");
+                return result;
+            }
+            catch (error) {
+                console.error("call getAllNameByObj faild!", error);
             }
         };
         //更新检查
@@ -1843,6 +2121,26 @@ var CodeAnalyse = /** @class */ (function () {
             }
             catch (error) {
                 console.error("call updateCheck faild!", error);
+            }
+        };
+        //进行语法检查
+        this.diagnostics = function (filepath, filecontext, diagnosticscallback) {
+            try {
+                if (!this.isinit) {
+                    //索引加载中，功能暂时不可用
+                    return false;
+                }
+                var fileinfo = __path.parse(filepath);
+                var fileExt = fileinfo.ext;
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+                if (!includeExt.has(fileExt)) {
+                    console.error("diagnostics file type not match!");
+                    return false;
+                }
+                return this._diagnostics(filepath, filecontext, diagnosticscallback);
+            }
+            catch (error) {
+                console.error("call getDefinePoint faild!", error);
             }
         };
         //退出

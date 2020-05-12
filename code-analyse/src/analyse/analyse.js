@@ -47,6 +47,15 @@ class Analyse {
         }
         return this.analyseHandler.getResult(filedb, keyworddb, savepublic);
     };
+
+    getDocumentStruct = function() {
+        try{
+            return this.analyseHandler.getDocumentStruct();
+        } catch(error) {
+            console.log(error);
+            return [];
+        }
+    };
 };
 
 module.exports = {

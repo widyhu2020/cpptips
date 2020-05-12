@@ -26,6 +26,15 @@ var Analyse = /** @class */ (function () {
             }
             return this.analyseHandler.getResult(filedb, keyworddb, savepublic);
         };
+        this.getDocumentStruct = function () {
+            try {
+                return this.analyseHandler.getDocumentStruct();
+            }
+            catch (error) {
+                console.log(error);
+                return [];
+            }
+        };
         //分析handler
         this.analyseHandler = null;
         //proto文件

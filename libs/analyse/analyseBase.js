@@ -48,6 +48,8 @@ var AnalyseBase = /** @class */ (function () {
                 return false;
             }
             var fileid = fileinfo.id;
+            //清空该文件所有的扩展数据,防止出现不修改名称的问题
+            //keyworddb.cleanExtData(fileid);
             //变量所有区域
             var nameMap = {};
             this.tree.traverseBF(function (current) {
@@ -55,7 +57,219 @@ var AnalyseBase = /** @class */ (function () {
                 var _nameMap = _this._saveAreaOwn(current, fileid);
                 nameMap = Object.assign(nameMap, _nameMap);
             });
+            //去掉无用的定义
+            this._removeNoUserFunction();
             return nameMap;
+        };
+        //构造树结构体
+        this.makeDefineTree = function (nameMap, result) {
+            var ns = result.ns.split("::");
+            var currentNode = nameMap;
+            var _ns = [];
+            for (var i = 0; i < ns.length; i++) {
+                _ns.push(ns[i]);
+                var isFind = false;
+                for (var j = 0; j < currentNode.child.length; j++) {
+                    if (currentNode.child[j].ns == _ns.join("::")) {
+                        //找到子
+                        currentNode = currentNode.child[j];
+                        isFind = true;
+                    }
+                }
+                if (!isFind && ns[i].length > 0) {
+                    //未找到则构造一个
+                    var _data = { ns: _ns.join("::"), name: ns[i], type: TypeEnum.NAMESPACE, child: [], function: [], variable: [], defines: [] };
+                    ;
+                    currentNode.child.push(_data);
+                    currentNode = _data;
+                }
+            }
+            //加入到其子类中
+            currentNode.child.push(result);
+            //console.log(nameMap);
+            return nameMap;
+        };
+        //获取文档结构
+        this.getDocumentStruct = function () {
+            var _this = this;
+            //变量所有区域
+            var nameMap = { ns: "", name: "", type: TypeEnum.NAMESPACE, child: [], function: [], variable: [], defines: [] };
+            this.tree.traverseBF(function (current) {
+                //获取当前的命名空间
+                var result = _this._saveAreaOwnForDocumentStruct(current);
+                if (!result) {
+                    //无需处理
+                    return;
+                }
+                //console.log(result);
+                var data = Object.values(result);
+                for (var i = 0; i < data.length; i++) {
+                    nameMap = _this.makeDefineTree(nameMap, data[i]);
+                }
+            });
+            var retData = JSON.stringify(nameMap);
+            //console.log(retData);
+            return nameMap;
+        };
+        //获取函数位置信息
+        this._getPosInDocumentFunction = function (name, type) {
+            var types = type.trim().split(/[\s\t\n]{1,10}/g);
+            type = types[types.length - 1];
+            var regStr = type + "[\\s\\t&*\\n]{0,10}([a-zA-Z0-9_]{1,128}[\\s]{0,10}::)?[\\s]{0,10}" + name + "[\\s\\n\\t]{0,10}\\(";
+            var reg = new RegExp(regStr, "gm");
+            var myArray = reg.exec(this.context);
+            if (myArray && myArray.length > 0) {
+                var _pos_1 = this.context.indexOf(myArray[0]);
+                if (_pos_1 != -1) {
+                    //范围位置
+                    return _pos_1;
+                }
+            }
+            var _pos = this.context.indexOf(name);
+            return _pos;
+        };
+        //获取变量位置信息
+        this._getPosInDocumentVirable = function (name, type) {
+            var types = type.trim().split(/[\s\t\n]{1,10}/g);
+            type = types[types.length - 1];
+            var regStr = type + "[\\s\\t&*\\n]{0,10}[\\s]{0,10}" + name + "[\\s\\t]{0,10}";
+            var reg = new RegExp(regStr, "gm");
+            var myArray = reg.exec(this.context);
+            if (myArray && myArray.length > 0) {
+                var _pos_2 = this.context.indexOf(myArray[0]);
+                if (_pos_2 != -1) {
+                    //范围位置
+                    return _pos_2;
+                }
+            }
+            var _pos = this.context.indexOf(name);
+            return _pos;
+        };
+        //获取宏定义位置信息
+        this._getPosInDocumentDefine = function (name) {
+            var regStr = "#define [\\s\\t]{0,10}[\\s]{0,10}" + name + "[\\s\\t]{1,10}";
+            var reg = new RegExp(regStr, "g");
+            var myArray = reg.exec(this.context);
+            if (myArray && myArray.length > 0) {
+                var _pos_3 = this.context.indexOf(myArray[0]);
+                if (_pos_3 != -1) {
+                    //范围位置
+                    return _pos_3;
+                }
+            }
+            var _pos = this.context.indexOf(name);
+            return _pos;
+        };
+        //存储分析作用域节点（如果一个类、一个命名空间、一个结构体）
+        this._saveAreaOwnForDocumentStruct = function (current) {
+            var _this = this;
+            if (!current.ownname
+                || !current.ownname.name) {
+                //不需要的节点
+                return false;
+            }
+            var hasData = false;
+            //当前命名空间
+            var namespace = this._getAreaNamespace(current);
+            //定义的方法
+            var metchod = current.method;
+            //定义变量
+            var variable = current.variable;
+            //枚举
+            var genum = current.enum;
+            //宏定义
+            var defines = current.define;
+            //方法
+            var airName = current.ownname.name;
+            if (current.ownname.type == TypeEnum.NAMESPACE) {
+                airName = "";
+            }
+            var retResult = {};
+            var functionMeta = {};
+            metchod.forEach(function (e) {
+                hasData = true;
+                if (e.name.indexOf("::") != -1) {
+                    var names = e.name.split("::");
+                    var _pos_4 = _this._getPosInDocumentFunction(names[1], e.returndata.type);
+                    if (!functionMeta[names[0]]) {
+                        functionMeta[names[0]] = [{ name: names[1], bpos: _pos_4, permission: e.permission }];
+                    }
+                    else {
+                        functionMeta[names[0]].push({ name: names[1], bpos: _pos_4, permission: e.permission });
+                    }
+                    return;
+                }
+                if (!functionMeta[airName]) {
+                    functionMeta[airName] = [];
+                }
+                var _pos = _this._getPosInDocumentFunction(e.name, e.returndata.type);
+                functionMeta[airName].push({ name: e.name, bpos: _pos, permission: e.permission });
+            });
+            var keys = Object.keys(functionMeta);
+            for (var i = 0; i < keys.length; i++) {
+                var results = { ns: namespace, name: keys[i], type: TypeEnum.CALSS, child: [], function: functionMeta[keys[i]], variable: [], defines: [] };
+                retResult[keys[i]] = results;
+            }
+            //变量
+            var variableMeta = {};
+            variable.forEach(function (e) {
+                hasData = true;
+                if (e.name.indexOf("::") != -1) {
+                    var names = e.name.split("::");
+                    var _pos_5 = _this._getPosInDocumentVirable(names[1], e.type);
+                    if (!variableMeta[names[0]]) {
+                        variableMeta[names[0]] = [{ name: names[1], bpos: _pos_5, permission: e.permission }];
+                    }
+                    else {
+                        variableMeta[names[0]].push({ name: names[1], bpos: _pos_5, permission: e.permission });
+                    }
+                    return;
+                }
+                if (!variableMeta[airName]) {
+                    variableMeta[airName] = [];
+                }
+                var _pos = _this._getPosInDocumentVirable(e.name, e.type);
+                variableMeta[airName].push({ name: e.name, bpos: _pos, permission: e.permission });
+            });
+            keys = Object.keys(variableMeta);
+            for (var i = 0; i < keys.length; i++) {
+                if (!retResult[keys[i]]) {
+                    var results = { ns: namespace, name: keys[i], type: current.ownname.type, child: [], function: [], variable: variableMeta[keys[i]], defines: [] };
+                    retResult[keys[i]] = results;
+                }
+                else {
+                    retResult[keys[i]].variable = retResult[keys[i]].variable.concat(variableMeta[keys[i]]);
+                }
+            }
+            //枚举,暂时不再树列表中展示
+            if (genum.length > 0) {
+            }
+            //宏定义
+            if (defines.length > 0) {
+                var definesMeta = [];
+                for (var i = 0; i < defines.length; i++) {
+                    hasData = true;
+                    var name_1 = defines[i].name;
+                    var _pos = this._getPosInDocumentDefine(name_1);
+                    definesMeta.push({ name: name_1, bpos: _pos, permission: 0 });
+                }
+                if (!retResult[airName]) {
+                    var results = { ns: namespace, name: airName, type: current.ownname.type, child: [], function: [], variable: [], defines: definesMeta };
+                    retResult[airName] = results;
+                }
+                else {
+                    retResult[airName].defines = definesMeta;
+                }
+            }
+            //typedef,暂时不再树列表中展示
+            if (current.typedef.length > 0) {
+            }
+            if (!hasData) {
+                //如果没有任何数据，直接返回false
+                return false;
+            }
+            //console.log(retResult);
+            return retResult;
         };
         //
         this._getAreaNamespace = function (current) {
@@ -78,9 +292,6 @@ var AnalyseBase = /** @class */ (function () {
             return "";
         };
         this._getRealName = function (name) {
-            // if (this.typedef[name]) {
-            //     return this.typedef[name];
-            // }
             return name;
         };
         //存储分析结果中的函数
@@ -135,9 +346,20 @@ var AnalyseBase = /** @class */ (function () {
                 file_id: fileid,
                 extdata: JSON.stringify([sigleFun])
             };
+            var function_id = namespace + "|" + samplename + "|" + e.name;
+            //找到的定义
+            if (!this.newDefine[function_id]) {
+                this.newDefine[function_id] = [sigleFun];
+            }
+            else {
+                this.newDefine[function_id].push(sigleFun);
+            }
             //获取db中的数据
             var info = this.keyworddb.getByFullnameAndType(samplename, namespace, e.name, TypeEnum.FUNCTION);
-            if (info !== false) {
+            if (info !== false && info.extdata && info.extdata.length > 0) {
+                if (!this.methodDefine[function_id]) {
+                    this.methodDefine[function_id] = JSON.parse(info.extdata);
+                }
                 //库中有数据，需要合并
                 var dbExtJson = JSON.parse(info.extdata);
                 var newExtJson = sigleFun;
@@ -161,7 +383,6 @@ var AnalyseBase = /** @class */ (function () {
                 saveData.extdata = JSON.stringify(dbExtJson);
             }
             var result = this.keyworddb.insert(saveData);
-            //if(e.name == "operator>=")console.log(e, result);
             var key = this._getKey(namespace, samplename, e.name);
             mapName[key] = saveData;
             return mapName;
@@ -179,12 +400,12 @@ var AnalyseBase = /** @class */ (function () {
             //获取db中的数据
             var infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
             //console.log(infos);
-            if (infos.length > 1) {
+            if (!infos || infos.length > 1) {
                 //两个以上定义，理论上是有异常的
                 return false;
             }
             var info = infos[0];
-            if (info !== false) {
+            if (info && info.extdata && info.extdata.length > 0) {
                 //库中有数据，需要合并
                 var dbExtJson = JSON.parse(info.extdata);
                 for (var i = 0; i < dbExtJson.length; i++) {
@@ -446,6 +667,7 @@ var AnalyseBase = /** @class */ (function () {
             mergedName = Object.assign(mergedName, gname);
             //方法
             metchod.forEach(function (e) {
+                //console.log(e.name);
                 if (e.name.indexOf("::") == -1) {
                     var methedName = _this._saveMethod(e, samplename, namespace, fileid);
                     mergedName = Object.assign(mergedName, methedName);
@@ -456,7 +678,6 @@ var AnalyseBase = /** @class */ (function () {
                     if (mergedName["__file_usingnamespace"]) {
                         namespaces = namespaces.concat(mergedName["__file_usingnamespace"]);
                     }
-                    //console.log(namespaces, e);
                     _this._saveMethodAchieve(e, namespaces, fileid);
                 }
             });
@@ -482,6 +703,37 @@ var AnalyseBase = /** @class */ (function () {
             }
             return mergedName;
         };
+        //去掉已经废弃的函数定义
+        this._removeNoUserFunction = function () {
+            var _keys = Object.keys(this.newDefine);
+            for (var i = 0; i < _keys.length; i++) {
+                if (!this.methodDefine[_keys[i]]) {
+                    // || this.methodDefine[_keys[i]].length == this.newDefine[_keys[i]].length) {
+                    continue;
+                }
+                var keys = {};
+                for (var j = 0; j < this.methodDefine[_keys[i]].length; j++) {
+                    var key = this.methodDefine[_keys[i]][j].r.t;
+                    for (var k = 0; k < this.methodDefine[_keys[i]][j].i.length; k++) {
+                        key = key + "|" + this.methodDefine[_keys[i]][j].i[k].t;
+                    }
+                    keys[key] = this.methodDefine[_keys[i]][j].a;
+                }
+                //新的函数定义
+                for (var k = 0; k < this.newDefine[_keys[i]].length; k++) {
+                    var key = this.newDefine[_keys[i]][k].r.t;
+                    for (var j = 0; j < this.newDefine[_keys[i]][k].i.length; j++) {
+                        key = key + "|" + this.newDefine[_keys[i]][k].i[j].t;
+                    }
+                    this.newDefine[_keys[i]][k].a = keys[key];
+                }
+                //保存
+                var jsonExt = JSON.stringify(this.newDefine[_keys[i]]);
+                var vals = _keys[i].split("|");
+                this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
+            }
+            console.log("resave over!");
+        };
         //拼接key，拼接的key用于构造返回数据
         this._getKey = function (namespace, ownname, samplename, other) {
             if (other === void 0) { other = ''; }
@@ -500,6 +752,9 @@ var AnalyseBase = /** @class */ (function () {
         //取结果需要的
         this.filedb = null;
         this.keyworddb = null;
+        //函数原定义
+        this.methodDefine = {};
+        this.newDefine = {};
     }
     ;
     return AnalyseBase;

@@ -14,7 +14,7 @@ var Traverse = /** @class */ (function () {
         //加载目录所有文件
         this.scanDirFile = function (resolve) {
             var that = this;
-            //处理头文件
+            //处理文件
             this._readDir(this.basedir);
             console.log("include process over");
             //延迟10s开始分析文件
@@ -77,34 +77,54 @@ var Traverse = /** @class */ (function () {
             taskTotal = this._readDirForTotalFile(this.basedir, callbackshow);
             return taskTotal;
         };
-        //遍历头文件-暂时废弃
-        this.traverseInclude = function (callback, callbackprocess) {
-            var types = [FileType.INCLUDE_FILE, FileType.PROTOBUF_FILE];
+        //遍历文件
+        this.traverseFilesDelNotExists = function (callback) {
+            var types = [
+                FileType.INCLUDE_FILE,
+                FileType.PROTOBUF_FILE,
+                FileType.SOURCE_FILE
+            ];
+            callback("正在获取索引库中所有文件数");
             var totalNum = this.fis.getFileTotalWhithType(types);
+            callback("获取索引文件库文件完成，总共：" + totalNum);
             console.log("begin traveseinclude... totalNum:", totalNum);
-            //单次获取1000个
-            var batchCount = 1000;
+            //单次获取2000个
+            var batchCount = 2000;
             var beginIndex = 0;
-            var showprocess = 0;
+            var needDeleteFileName = [];
+            var needDelete = [];
             while (beginIndex < totalNum) {
                 var endIndex = beginIndex + batchCount;
+                callback("正在批量获取文件：当前，" + endIndex + "每页2000条");
+                console.log(beginIndex, "-", batchCount);
                 var infos = this.fis.getFilesWhithType(types, beginIndex, batchCount);
                 for (var i = 0; i < infos.length; i++) {
-                    //let filepath = infos[i].filepath;
-                    var needStop = callback(infos[i]);
-                    if (needStop) {
-                        //需要退出，不再处理
-                        console.debug("need stop and exit!");
-                        return;
+                    if (infos[i].systeminclude == 1) {
+                        //系统文件跳过
+                        continue;
                     }
-                    var nowshowprocess = ((beginIndex + i) / totalNum) * 100;
-                    if (nowshowprocess - showprocess > 0.5) {
-                        //console.log("total:", totalNum, "processed:", i);
-                        callbackprocess(totalNum, (beginIndex + i), showprocess.toFixed(2), "include");
-                        showprocess = nowshowprocess;
+                    var filepath = infos[i].filepath;
+                    if (!fs.existsSync(this.basedir + filepath)) {
+                        //文件不存在，删除数据
+                        needDeleteFileName.push(filepath);
+                        needDelete.push(infos[i].id);
+                        callback("发现文件已经删除：" + filepath + ", id:" + infos[i].id);
                     }
                 }
                 beginIndex = endIndex;
+            }
+            ;
+            if (totalNum < needDeleteFileName.length * 2) {
+                //如果文件超过一半不存在，可能存在问题
+                console.log("file not exists. list:", JSON.stringify(needDeleteFileName));
+                callback("发现大量删除文件，可能判断有误，不进行索引清理");
+                return;
+            }
+            for (var i = 0; i < needDelete.length; i++) {
+                var _id = needDelete[i];
+                callback("正在清理文件及其索引:" + _id);
+                console.log("totalfile:", totalNum, "needDeleteId:", _id);
+                this.fis.delete(_id);
             }
         };
         //遍历原文件-暂时废弃
@@ -421,8 +441,8 @@ var Traverse = /** @class */ (function () {
             this.analyseLinkDir = new Set(this.userConfig.needLoadLinkDir);
         }
         //需要忽略的文件或者文件的匹配
-        console.log("Traverse:", userConfig);
-        console.log("isAnlyseSystemDir:", isAnlyseSystemDir);
+        console.log("Traverse:", JSON.stringify(userConfig));
+        console.log("isAnlyseSystemDir:", JSON.stringify(isAnlyseSystemDir));
         var regex = [];
         this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
         if (this.userConfig.ignoreFileAndDir
@@ -438,14 +458,14 @@ var Traverse = /** @class */ (function () {
             && this.userConfig.ignorDir instanceof Array) {
             this.ignorDir = this.userConfig.ignorDir;
         }
-        console.log("ignorDir:", this.ignorDir);
+        console.log("ignorDir:", JSON.stringify(this.ignorDir));
         //需要加载的目录，不支持匹配
         this.needLoadDir = [];
         if (this.userConfig.needLoadDir
             && this.userConfig.needLoadDir instanceof Array) {
             this.needLoadDir = this.userConfig.needLoadDir;
         }
-        console.log("needLoadDir:", this.needLoadDir);
+        console.log("needLoadDir:", JSON.stringify(this.needLoadDir));
     }
     ;
     return Traverse;

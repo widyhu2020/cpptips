@@ -85,8 +85,12 @@ var CheckNeedUpdate = /** @class */ (function () {
                             //保存文件
                             var ret = false;
                             //最多尝试三次
-                            var tryNum = 3;
-                            ret = that._saveFileToLocal(fileinfo.path, context);
+                            try {
+                                ret = that._saveFileToLocal(fileinfo.path, context);
+                            }
+                            catch (error) {
+                                console.log("error:", error, fileinfo.path);
+                            }
                         });
                     }
                 };
@@ -106,6 +110,22 @@ var CheckNeedUpdate = /** @class */ (function () {
             console.log("save file! filepath:", filepath);
             var allpath = this.basedir + filepath;
             try {
+                if (fs.existsSync(allpath)) {
+                    //修改文件的权限，保证更新
+                    if (!fs.accessSync(allpath, fs.constants.W_OK)) {
+                        //增加写权限
+                        fs.chmodSync(allpath, 502);
+                    }
+                }
+                else {
+                    //如果文件不存在，调整文件的可写权限
+                    var path_1 = require('path');
+                    var pathinfo = path_1.parse(allpath);
+                    if (!fs.accessSync(pathinfo.dir, fs.constants.W_OK)) {
+                        //增加写权限
+                        fs.chmodSync(pathinfo.dir, 502);
+                    }
+                }
                 var fd = fs.openSync(allpath, 'w+');
                 var length_1 = fs.writeSync(fd, fileconext, 0, "utf8");
                 fs.closeSync(fd);
@@ -237,7 +257,8 @@ if (cluster.isMaster) {
         baseurl: "http://cpptips.com:8888",
         basedir: "/Users/widyhu/widyhu/cpptips",
         intervaltime: 1,
-        showversion: 1
+        showversion: 1,
+        maketools: 1
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
@@ -280,9 +301,16 @@ else if (cluster.isWorker) {
         }
         var basedir = parasms.basedir;
         var baseurl = parasms.baseurl;
+        var maketools = parasms.maketools;
         var intervaltime = parasms.intervaltime;
         checkUpdate_1 = new CheckNeedUpdate(baseurl, basedir, intervaltime, needTips, showversion);
-        checkUpdate_1.do();
+        if (!(/[\\/]{1,1}cpptips[\\/]{1,1}/g.test(__dirname))
+            || maketools == 1) {
+            checkUpdate_1.do();
+        }
+        else {
+            process.send("over");
+        }
     };
     process.on('message', function (parasms) {
         //console.log("onmessage",parasms);

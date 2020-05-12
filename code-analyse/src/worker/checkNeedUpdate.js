@@ -101,8 +101,11 @@ class CheckNeedUpdate {
                         //保存文件
                         let ret = false;
                         //最多尝试三次
-                        let tryNum = 3;
-                        ret = that._saveFileToLocal(fileinfo.path, context);
+                        try{
+                            ret = that._saveFileToLocal(fileinfo.path, context);
+                        } catch(error) {
+                            console.log("error:", error, fileinfo.path);
+                        }
                     });
                 }
             }
@@ -122,6 +125,21 @@ class CheckNeedUpdate {
         console.log("save file! filepath:", filepath);
         let allpath = this.basedir + filepath;
         try{
+            if (fs.existsSync(allpath)) {
+                //修改文件的权限，保证更新
+                if(!fs.accessSync(allpath, fs.constants.W_OK)){
+                    //增加写权限
+                    fs.chmodSync(allpath, 0o766);
+                }
+            } else {
+                //如果文件不存在，调整文件的可写权限
+                const path = require('path');
+                let pathinfo = path.parse(allpath);
+                if(!fs.accessSync(pathinfo.dir, fs.constants.W_OK)){
+                    //增加写权限
+                    fs.chmodSync(pathinfo.dir, 0o766);
+                }
+            }
             let fd = fs.openSync(allpath, 'w+');
             let length = fs.writeSync(fd, fileconext, 0, "utf8");
             fs.closeSync(fd);
@@ -249,7 +267,8 @@ if (cluster.isMaster) {
         baseurl: "http://cpptips.com:8888",
         basedir: "/Users/widyhu/widyhu/cpptips",
         intervaltime: 1,
-        showversion: 1
+        showversion: 1,
+        maketools: 1
     };
     worker.send(parasms);
     worker.on('message', (data) => {
@@ -293,9 +312,15 @@ if (cluster.isMaster) {
         }
         let basedir = parasms.basedir;
         let baseurl = parasms.baseurl;
+        let maketools = parasms.maketools;
         let intervaltime = parasms.intervaltime;
         checkUpdate = new CheckNeedUpdate(baseurl, basedir, intervaltime, needTips, showversion);
-        checkUpdate.do();
+        if(!(/[\\/]{1,1}cpptips[\\/]{1,1}/g.test(__dirname)) 
+            || maketools == 1) {
+            checkUpdate.do();
+        } else {
+            process.send("over");
+        }
     };
     process.on('message', (parasms) => {
         //console.log("onmessage",parasms);

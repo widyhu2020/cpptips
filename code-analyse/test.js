@@ -22,10 +22,10 @@ let basedir = "/Users/widyhu/widyhu/cpp_project/";
 filename = "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/mmpaymchmgrmerchantdaosvr.proto";
 
 //测试归属找提示
-//706 59
-let line = 706;
-let cpos = 59;
-filename = "/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/merchant_product_fsm/productauthoritystatemachine.cpp";
+//113 23
+let line = 113;
+let cpos = 23;
+filename = "/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/ResetCurrentProcess.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);
@@ -49,6 +49,40 @@ while (true) {
     nowline++;
 };
 
+function testCloseMark(str, left, right)
+{
+    let stack = [];
+    for(let i = 0; i < str.length; i++) {
+        if(str[i] == left) {
+            stack.push(left);
+            continue;
+        }
+        if(str[i] == right) {
+            if(stack.length <= 0) {
+                //不匹配
+                return false;
+            }
+            stack.pop();
+        }
+    }
+
+    if(stack.length != 0) {
+        return false;
+    }
+    return true;
+}
+
+console.log(linecode + "|");
+let autoFillReg = /\([\s]{0,4}(([a-z0-9_\(\)\[\].: \->]{1,128},){0,10})[\s\t]{0,10} $/ig;
+let data = autoFillReg.exec(linecode);
+let params = "";
+if(data) {
+    params = data[1];
+    //测试圆括号是否匹配
+    console.log(testCloseMark(params, '(', ')'));
+}
+
+
 
 function succcallbackloadcpp(){
     let ipos = pos + cpos;
@@ -71,24 +105,28 @@ function succcallbackloadcpp(){
     if (lineendpos == -1) {
         linelast = context.substr(ipos);
     } else {
-        linelast = context.substr(ipos, lineendpos);
+        linelast = context.substring(ipo2, lineendpos);
     }
+
     //let d = CodeAnalyse.getInstace().getAllNameByNamespace(filename, precontext, []);
     //let d = CodeAnalyse.getInstace().getSignatureHelp(filename, precontext, []);
     //let d = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, []);
+    //let d = CodeAnalyse.getInstace().getIncludeDefine(filename, "mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductdaosvr/mmpaymchproductdaosvrclient.h");
     let d = CodeAnalyse.getInstace().getDefinePoint(filename, precontext2, linelast, []);
     //let d = CodeAnalyse.getInstace().searchKeyWord(filename, "mmpaymchmerchantofflinedaosvr::MERCHANT_EV", precontext);
+    //let d = CodeAnalyse.getInstace().autoFillParams(filename, precontext, params);
     console.log(d);
 }
 
 function succcallbackloadindex(msg, a, b, c) {
     console.log("当前进度：%f%，总共：%d，当前：%d", a, b, c);
-    CodeAnalyse.getInstace().getDependentByCpp(filename, succcallbackloadcpp);
+    //CodeAnalyse.getInstace().getDependentByCpp(filename, succcallbackloadcpp);
 }
 
 CodeAnalyse.getInstace().init({ 
     basedir: basedir,
     extpath: "/Users/widyhu/widyhu/cpptips",
+    // dbpath: "/Users/widyhu/widyhu/yundb/.db/.cpptips.db",
     dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db", 
     showsql: 1
 });

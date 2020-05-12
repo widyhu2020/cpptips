@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.1.13",
+	"version": "0.1.17",
 	"icon": "resources/cpp.png",
 	"engines": {
 		"vscode": "^1.43.0"
@@ -87,7 +87,32 @@
 				}
 			}
 		},
-		"commands": [],
+		"commands": [
+			{
+				"command": "cpp.changeType",
+				"title": "驼峰式与下划线互切",
+				"icon": {
+					"light": "./resources/class.png",
+					"dark": "./resources/class.png"
+				}
+			},
+			{
+				"command": "cpp.appplatformtosvrkit",
+				"title": "Appplatform切换Svrkit结构",
+				"icon": {
+					"light": "./resources/class.png",
+					"dark": "./resources/class.png"
+				}
+			},
+			{
+				"command": "cpp.copyfilename",
+				"title": "复制文件名称（暂未实现）",
+				"icon": {
+					"light": "./resources/class.png",
+					"dark": "./resources/class.png"
+				}
+			}
+		],
 		"languages": [
 			{
 				"id": "payprotobuf",
@@ -124,13 +149,37 @@
 					"statusBarItem.activeBackground": "#00AA00"
 				}
 			}
-		]
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"when": "resourceLangId == cpp",
+					"command": "cpp.changeType",
+					"alt": "cpp.changeType",
+					"group": "1_modification"
+				},
+				{
+					"when": "resourceLangId == cpp",
+					"command": "cpp.appplatformtosvrkit",
+					"alt": "cpp.appplatformtosvrkit",
+					"group": "1_modification"
+				}
+			],
+			"explorer/context": [
+				{
+					"when": "true",
+					"command": "cpp.copyfilename",
+					"alt": "cpp.copyfilename",
+					"group": "1_modification"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "sh build.sh",
 		"rebuild": "sh build.sh",
 		"compile": "tsc -b",
-		"watch": "sh build.sh"
+		"watch": ""
 	},
 	"devDependencies": {
 		"@types/mocha": "^5.2.7",

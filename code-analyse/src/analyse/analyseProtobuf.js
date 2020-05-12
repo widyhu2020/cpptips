@@ -226,10 +226,10 @@ class AnalyseProtobuf extends AnalyseBase{
             if (parentnamespace != "") {
                 if (current.parent.ownname
                     && current.parent.ownname.type == TypeEnum.CALSS) {
-                    current.namespace = parentnamespace + "_" + current.ownname.name;
+                    current.namespace = parentnamespace;// + "_" + current.ownname.name;
                     current.ownname.name = current.parent.ownname.name + "_" + current.ownname.name;
                 } else { 
-                    current.namespace = parentnamespace + "::" + current.ownname.name;
+                    current.namespace = parentnamespace;// + "::" + current.ownname.name;
                 }
                 //console.log(current.namespace);
             } else {

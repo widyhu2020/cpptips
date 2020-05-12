@@ -134,6 +134,7 @@ var Node = /** @class */ (function () {
         this.ownname = null; //当前节点拥有的元数据
         this.data = []; //表示这里挂载了哪些代码块，数组下标
         this.permission = []; //代码块的访问权限（最后的访问权限，不代表代码块都是这个访问权限）0:公开；1:保护; 2:私有, 与data对应
+        this.nameMap = {};
         //包含的作用域名称
         this.namespace = "";
         //包含的头文件

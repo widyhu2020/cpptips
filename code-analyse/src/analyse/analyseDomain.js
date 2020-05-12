@@ -9,13 +9,29 @@ class AnalyseDomain {
     //分析domain
     constructor(context) {
         this.context = context;
+        this.context = this.context.replace(/\/\/[^\n]*\n/g, "\n");
+        // this.context = this.context.replace(/\/\*.+?(\*\/){1,1}/mg, "");
+
+        while(true) {
+            let bpos = this.context.indexOf("/*", 0);
+            let epos = this.context.indexOf("*/", bpos);
+            if(bpos == -1 || epos == -1) {
+                //查找完毕
+                break;
+            }
+            let firstContext = this.context.substring(0, bpos);
+            let lastContext = this.context.substring(epos + 2);
+            this.context = firstContext + lastContext;
+        }  
     };
 
     getCharNumInStr = function(str, bpos, epos, ichar) {
 
         let findnum = 0;
         let fpos = bpos + 1;
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             let pos = str.indexOf(ichar, fpos);
             if(pos == -1 || pos > epos) {
                 //超出范围
@@ -34,12 +50,56 @@ class AnalyseDomain {
             let blcok = data[i];
             blcok = blcok.trim();
             //if(/namespace/g.test(blcok)) console.log(blcok);
+            if(blcok[blcok.length - 1] == '{') {
+                //最后一个为}结束，可能是函数实现
+                //判断是否为函数
+                let reg = /([\w]{1,64}[\s]{1,10})(([\w]{1,64}::){0,6}[\w]{1,64})[\s]{0,10}(\([\s]{0,10}\)|\([^();!.]{1,1024}\))[\s]{0,10}[{;]{1,1}$/mg;
+                let matchData = reg.exec(blcok);
+                if(matchData){
+                    //判断是否为真正函数
+                    let _retType = matchData[1].trim();
+                    if(_retType == "else" 
+                        || _retType == "if" 
+                        || _retType == "for"
+                        || _retType == "do"
+                        || _retType == "while") {
+                        tmpdata.push(blcok);
+                        continue;
+                    }
+                    let params = matchData[4].replace(/[()*&\n]{1,1}|const/g, "");
+                    params = params.trim();
+                    params = params.replace(/[\s]{0,10}::[\s]{0,10}/g, "::");
+                    let paramsItem = params.split(",");
+                    let isParamsDefine = true;
+                    for(let i = 0; i < paramsItem.length; i++) {
+                        if(paramsItem[i].trim().indexOf(" ") == -1) {
+                            isParamsDefine = false;
+                            break;
+                        }
+                    }
+                    if(params != "" && !isParamsDefine) {
+                        //不是函数定义
+                        continue;
+                    }
+                    
+                    if(findfunctiondefine) {
+                        //只需要一个函数
+                        continue;
+                    }
+                    //函数定义
+                    findfunctiondefine = true;
+                    tmpdata.push(blcok);
+                    continue;
+                }
+            }
             if (blcok[blcok.length - 1] == ')') {
                 let items = [];
                 //最后一个为)结束，可能是函数定义，可能是for、if、while循环等等
                 let pos = blcok.length - 1;
                 let num = 0;
-                while (true) {
+                let maxRun = 0;
+                while (true && maxRun < 500) {
+                    maxRun++;
                     let tmppos = blcok.lastIndexOf('(', pos);
                     let _num = this.getCharNumInStr(blcok, tmppos, pos, ')');
                     num = num + _num - 1;
@@ -60,17 +120,10 @@ class AnalyseDomain {
                     tmpdata.push(data[i]);
                     continue;
                 }
-                if (findfunctiondefine == false) {
-                    //第一个函数定义，全用
-                    findfunctiondefine = true;
-                    tmpdata.push(data[i]);
-                    continue;
-                }
+
                 //函数定义，或者结构体、类等等的定义，此块也应该丢弃
-                pos = blcok.lastIndexOf(';');
-                if(pos != -1) {
-                    tmpdata.push(blcok.substr(0, pos));
-                }
+                blcok = blcok.replace(/(class |struct |enum )[\s\w:<>\n,{]*$/mg, "");
+                tmpdata.push(blcok);
                 continue;
             }
             tmpdata.push(data[i]);
@@ -82,7 +135,9 @@ class AnalyseDomain {
         
         let data = [];
         let lastpos = this.context.length - 1;
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             let result = this._doAnalyse(lastpos);
             data.push(result.text);
             if (result.pos == -1) {
@@ -99,8 +154,9 @@ class AnalyseDomain {
         let beginpos = 0;
         let endNum = 0;
         let epos = pos;
-        //endNum = 1;
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             let spos = this.context.lastIndexOf('{', epos);
             if (spos == -1) {
                 //花括号未闭合，不进行继续分析

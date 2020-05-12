@@ -11,6 +11,7 @@ declare interface NodeItem {
 	n : string,
 	f : string,
 	i : string,
+	d : number,
 	c : string | undefined
 }
 
@@ -19,8 +20,8 @@ declare interface ShowItem {
 	d : string
 }
 
-declare interface GetDependentCallBack<P0, P, P1, P2> {
-	(msg:P0, filepath:P, usingnamespace: P1, include: P2): void;
+declare interface GetDependentCallBack<P0, P, P1, P2, P3> {
+	(msg:P0, filepath:P, usingnamespace: P1, include: P2, showTree: P3): void;
 }
 
 declare interface ReloadOneIncludeCallBack<P1> {
@@ -29,6 +30,10 @@ declare interface ReloadOneIncludeCallBack<P1> {
 
 declare interface ReloadAllIncludeCallBack<P1, P2, P3, P4, P5> {
 	(msg: P1, showprocess: P2, total: P3, nowIndex: P4, extdata: P5): void;
+}
+
+declare interface diagnosticsCallBack<P1> {
+	(result: P1): void;
 }
 
 declare interface UpdateCallBack<P1> {
@@ -68,10 +73,11 @@ declare interface FunctionHelpInfo {
 
 declare class CodeAnalyse {
 	constructor(basepath:string);
-	getDependentByCpp(cppfilename: string, hander: GetDependentCallBack<string, string, string[],string[]>|null ):void;
+	getDependentByCpp(cppfilename: string, hander: GetDependentCallBack<string, string, string[],string[], string>|null ):void;
 	searchKeyWord(filepath: string, keyword: string, context: string, usingnamepace: string[] | null): NodeItem[];
 	getShowTips(filepath: string, name: NodeItem): ShowItem | false;
 	getAllNameByObj(filepath: string, context: string, usingnamepace: string[] | null): NodeItem[];
+	autoFillParams(filepath:string, filecontext:string, preParams:string): NodeItem[];
 	getAllNameByNamespace(filepath: string, filecontext: string, owns: string[] | null): NodeItem[];
 	reloadOneIncludeFile(filepath: string, hander:ReloadOneIncludeCallBack<string> | null):void;
 	reloadAllIncludeFile(hander: ReloadAllIncludeCallBack<string, number, number, number, string>): void;
@@ -79,6 +85,15 @@ declare class CodeAnalyse {
 
 	//获取定义位置
 	getDefinePoint(filepath: string, filecontext: string, linelast: string, usingnamepace: string[] | null): PointInfo|false;
+
+	//跳转头文件定义
+	getIncludeDefine(sourceFile:string, includeFile: string): PointInfo|false;
+
+	//获取文档结构
+	getDocumentTree(filepath:string, filecontex:string): any;
+
+	//进行语法检查
+	diagnostics(filepath:string, filecontext:string, hander:diagnosticsCallBack<string>):void;
 
 	//函数参数提示
 	getSignatureHelp(filepath: string, filecontext: string, usingnamepace: string[] | null): FunctionHelpInfo|false;
@@ -103,5 +118,6 @@ export {
 	CaConfig,
 	GetDependentCallBack,
 	ReloadOneIncludeCallBack,
-	ReloadAllIncludeCallBack
+	ReloadAllIncludeCallBack,
+	PointInfo
 }

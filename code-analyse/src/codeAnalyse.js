@@ -8,12 +8,14 @@
 
 const cluster = require('cluster');
 const Analyse = require('./analyse/analyseCpp');
+const AnalyseTree = require('./analyse/analyse');
 const AnalyseDomain = require('./analyse/analyseDomain');
 const Completion = require('./completion/completion').Completion;
 const Definition = require('./definition/definition').Definition;
 const FileIndexStore = require('./store/store').FileIndexStore;
 const KeyWordStore = require('./store/store').KeyWordStore;
 const DefineMap = require('./definition/defineMap').DefineMap;
+const AutoFillParam = require('./completion/autoFillParam').AutoFillParam;
 const TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 const fs = require('fs');
 const __path = require('path');
@@ -50,6 +52,7 @@ class CodeAnalyse {
         }
         console.info("config:", configs);
         let basedir = configs.basedir;
+        this.basedir = basedir;
         let dbpath = configs.dbpath
         this.dbpath = dbpath;
         this.extPath = configs.extpath;
@@ -68,8 +71,6 @@ class CodeAnalyse {
             console.info("mkdir db path!", path);
             fs.mkdirSync(path, { recursive: true});
         }
-
-        this.basedir = basedir;
 
         //这里不进行初始化
         KeyWordStore.getInstace().connect(dbpath, this.showsql);
@@ -101,6 +102,7 @@ class CodeAnalyse {
         const worker = cluster.fork();
         let parasms = {
             basedir: this.basedir,
+            sysdir: this.extPath + "/data/",
             cppfilename: filepath,
             dbpath: this.dbpath
         }
@@ -110,11 +112,12 @@ class CodeAnalyse {
             try {
                 let usingnamespace = data['usingnamespace'];
                 let include = data['include'];
+                let showTree = data['showTree'];
                 //关闭子进程
                 this.namespacestore[filepath] = usingnamespace;
                 if (callback != null) {
                     //需要回调
-                    callback("success", filepath, usingnamespace, include);
+                    callback("success", filepath, usingnamespace, include, showTree);
                 }
             } catch (err) {
                 console.error(err);
@@ -250,7 +253,9 @@ class CodeAnalyse {
                 continue;
             }
             beginpos = 0;
-            while (true) {
+            let maxRun = 0;
+            while (true && maxRun < 500) {
+                maxRun++;
                 let endpos = area.indexOf(';', beginpos);
                 if(endpos == -1) {
                     //没有找到更多的语句
@@ -310,7 +315,9 @@ class CodeAnalyse {
             let _code = _codes[i].trim();
             if (_code.indexOf("<")) {
                 let j = i;
-                while(true) {
+                let maxRun = 0;
+                while(true && maxRun < 500) {
+                    maxRun++;
                     let result = this._getCharCountInStr(_code, 0, new Set(['<','>']))
                     if (result['<'] == result['>']) {
                         i = j;
@@ -425,7 +432,9 @@ class CodeAnalyse {
                 let _pos = i;
                 let _beginpos = _pos;
                 let _endpos = _pos;
-                while (true) {
+                let maxRun = 0;
+                while (true && maxRun < 500) {
+                    maxRun++;
                     _endpos = str.indexOf('>', _pos + 1);
                     if (_endpos == -1) {
                         //<>不匹配
@@ -658,7 +667,7 @@ class CodeAnalyse {
                 userConfig: this.userConfig
             }
         }
-        console.log("_reloadAllIncludeFile", parasms);
+        console.log("_reloadAllIncludeFile", JSON.stringify(parasms));
         worker.send(parasms);
         worker.on('message', (data) => {
             let value = data['process'];
@@ -801,7 +810,9 @@ class CodeAnalyse {
         //xxxx(ddd())
         let _bpos = ipos;
         let _epos = ipos;
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             _epos = str.indexOf(emark, _epos + 1);
             if (_epos == -1) {
                 //未找到，直接失败
@@ -830,7 +841,9 @@ class CodeAnalyse {
         //aaaa(ddd())
         let _bpos = ipos;
         let _epos = ipos;
-        while(true) {
+        let maxRun = 0;
+        while(true && maxRun < 500) {
+            maxRun++;
             _bpos = str.lastIndexOf(bmark, _bpos - 1);
             if(_bpos == -1) {
                 //未找到，直接失败
@@ -1197,9 +1210,86 @@ class CodeAnalyse {
                 return [];
             }
             valetype = cp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+            usingnamespace.push(_nameInfo.namespace);
+            valetype = cp.getClassFullName(valetype, usingnamespace);
         }
         
         return this._getClassAndInheritFuntionAndVar(cp, valetype, _ownname, usingnamespace);
+    };
+
+    //自动填参数分析
+    _autoFillParams = function(filepath, filecontext, preParams){
+        filecontext = filecontext.substring(0, filecontext.length - preParams.length - 1);
+        let analyse = new AnalyseDomain(filecontext);
+        let data = analyse.doAnalyse();
+        filecontext = data.reverse().join('\n');
+        filecontext = filecontext.replace(/using namespace/g, "using_ns");
+        let lines = filecontext.split('\n');
+
+        //这里使用新的set，避免污染
+        let usingnamespace = this._getUsingNamespace(lines, filepath, []);
+
+        //先找到最后一行的函数
+        let lastline = lines[lines.length - 1];
+        let names = this._getValName(lastline);
+        if (names.length <= 0) {
+            //未找到合适的名字
+            return [];
+        }
+
+        //获取参数位置
+        preParams = preParams.replace(/\([a-z0-9_\(\)\[\].: \->]{1,128}\)/ig, "");
+        let params = preParams.split(",");
+        let paramsPos = params.length;
+
+        let valetype = "";
+        if(names.length > 1) {
+            //弹出最顶的，用来找定义
+            let name = names.pop();
+            //获取当前操作的wonname中
+            let _ownname = this._getPosOwner(data);
+            let _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+            if (name.n != "this") {
+                //非this指针，需要找出变量定义的类型
+                _valetype = this._getValDefineOwn(lines, name.n);
+            }
+            valetype = _valetype.t;
+        }
+
+        //找到函数定义
+        //转化成全名称
+        let afp = new AutoFillParam();
+        valetype = afp.getClassFullName(valetype, usingnamespace);
+        if(valetype == "") {
+            //未找到类型定义，可能未内部函数成员变量，或者全局变量
+            let name = names[0].n;
+            let _ownname = this._getPosOwner(data);
+            let ownnames = ['', _ownname];
+            let realName = afp.getRealOwnByName(name, ownnames, usingnamespace);
+            if(!realName) {
+                //真正没找到定义
+                return [];
+            }
+            valetype = realName;
+        }
+
+        for (let i = names.length - 1; i >= 1; i--) {
+            //依次找最终的结构
+            let _nameInfo = DefineMap.getInstace().getRealName(valetype);
+            let _valetype = _nameInfo.namespace != "" ? _nameInfo.namespace + "::" + _nameInfo.name : _nameInfo.name;
+            let tmptype = this._findObjctWhitNames(_valetype, names[i]);
+            if(!tmptype) {
+                return [];
+            }
+            valetype = afp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+        }
+
+        let functionName = names[0];
+        console.log(valetype);
+
+        //获取方法的定义
+        afp.setParamsInfo(filecontext, preParams, paramsPos);
+        return afp.autoAnalyseParams(valetype, functionName.n, usingnamespace);
     };
 
     //获取归属类或者继承父类的下函数定义
@@ -1208,7 +1298,9 @@ class CodeAnalyse {
         let showitem = [];
         let deeppath = 0;
         //继承类处理
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             if (queue.length <= 0 || deeppath > 5) {
                 //已经没有元素了
                 //防止死循环，最多只查找5层
@@ -1299,6 +1391,11 @@ class CodeAnalyse {
 
     _getShowTips = function (filepath, data) {
 
+        if(!data && data.length <= 0) {
+            //一次情况
+            return { t: "未获取到名称", d: "未获取到描述", f: -1 };
+        }
+
         let fullnameinfo = JSON.parse(data.n);
         let ownname = fullnameinfo.o;
         let namespace = fullnameinfo.s;
@@ -1306,13 +1403,17 @@ class CodeAnalyse {
         let file_id = fullnameinfo.f;
         let type = fullnameinfo.t;
 
+        if(fullnameinfo.d) {
+            //自动填参数推荐来源
+            return { t: "填参推荐", d: "系统为你挑选可能的取值，当前匹配度（最高1000）：" + fullnameinfo.d, f: -1 };
+        }
+
         if (data.f == -1) {
             return { t: name, d: name, f: -1 };
         }
 
         let cp = new Completion();
         let info = cp.getShowDocument(ownname, namespace, name, type);
-        //{ t: '', d: '', f: 0 }
         if (!info && info.length <= 0) {
             let showdefie = name;
             if (fullnameinfo.t) {
@@ -1354,6 +1455,111 @@ class CodeAnalyse {
         }
         
         return usingnamespace;
+    };
+
+    //获取头文件定义
+    _getIncludeDefine = function(sourceFile, includeFile, fileName) {
+        let df = new Definition(this.basedir, this.extPath);
+        if(fileName.indexOf(".pb.h") != -1) {
+            //兼容proto
+            fileName = fileName.replace(".pb.h", ".proto");
+            includeFile = includeFile.replace(".pb.h", ".proto");
+            console.log("process proto:", fileName);
+        }
+
+        let findIncludeFile = df.getIncludeInfo(sourceFile, includeFile, fileName);
+        if(findIncludeFile == "") {
+            //未找到头文件
+            console.log("find include file error", includeFile);
+            return false;
+        }
+    
+        let _filename = this.basedir + findIncludeFile;
+        if(!fs.existsSync(_filename)) {
+            //可能是系统库
+            _filename = __dirname + "/../data/" + findIncludeFile;
+            if(!fs.existsSync(_filename)) {
+                //未找到头文件
+                console.log("find real include file error", includeFile, _filename);
+                return false;
+            }
+        }
+
+        let result = {
+            filename: "file://" + _filename,
+            bline: 0,
+            bcols: 0,
+            eline: 1,
+            ecols: 0,
+            linecode: findIncludeFile,
+            prelinecode: findIncludeFile,
+            title: "头文件"
+        };
+        return result;
+    };
+
+    //获取文档结构
+    _getDocumentTree = function(filename, filecontext) {
+        let analyse = new AnalyseTree.Analyse(filecontext, filename);
+        console.time("Analyse");
+        analyse.doAnalyse();
+        console.timeEnd("Analyse");
+        console.time("getDocumentStruct");
+        showTree = analyse.getDocumentStruct();
+        console.timeEnd("getDocumentStruct");
+        if(showTree
+            && showTree["name"] == "" 
+            && showTree["child"].length == 0
+            && showTree["function"].length == 0
+            && showTree["variable"].length == 0
+            && showTree["defines"].length == 0) {
+            return false;
+        }
+        if(showTree
+            && showTree["name"] == "" 
+            && showTree["child"].length == 1
+            && showTree["child"][0]["name"] == ""
+            && showTree["function"].length == 0
+            && showTree["variable"].length == 0
+            && showTree["defines"].length == 0) {
+            //调整格式，应该是个循环，但是这里只做一层
+            showTree = showTree["child"][0];
+        }
+        return showTree;
+    };
+
+    //语法检查
+    _diagnostics = function(filepath, filecontext, diagnosticscallback) {
+        let that = this;
+        cluster.setupMaster({
+            exec: __dirname + "/worker/analyseDiagnostics.js",
+            silent: false,
+            windowsHide: true
+        });
+
+        //锁住功能 wal模式不需要锁
+        that.loadindex = true;
+        const worker = cluster.fork();
+        // paramsms结构定义
+        let parasms = {
+            filecontext: filecontext,
+            filename: filepath,
+            dbpath: this.dbpath
+        }
+        console.log("_diagnostics", JSON.stringify(parasms));
+        worker.send(parasms);
+        worker.on('message', (data) => {
+            if(data.type == "result") {
+                console.log(data.data);
+                //其他函数
+                diagnosticscallback(data.data);
+                worker.kill();
+            }
+        });
+        worker.on('exit', (code, signal) => {
+            //恢复正常功能
+            that.loadindex = false;
+        });
     };
 
     _getDefinePoint = function (filepath, filecontext, linelast, owns = []) {
@@ -1423,14 +1629,40 @@ class CodeAnalyse {
         let name = names.pop();
         let _valetype = this._getValDefineOwn(lines, name.n);
         let valetype = _valetype.t;
+        if (_valetype.t == "this") {
+            //非this指针，需要找出变量定义的类型
+            valetype = this._getPosOwner(data);
+        } 
+        if (_valetype.t == "auto" || _valetype.t == "typeof") {
+            //这种情况类型有后面的值确定
+            let line = _valetype.l;
+            let _pos = line.indexOf(_valetype.t);
+            let _beginpos = line.indexOf("=", _pos);
+            if (_pos == -1 || _beginpos == -1) {
+                //没有值无法定位
+                return [];
+            }
+            let _endpos = line.indexOf(";", _pos);
+            let _type = line.substring(_beginpos + 1, _endpos).trim();
+            let _names = this._getValName(_type);
+            names = names.concat(_names);
+            if (names.length <= 0) {
+                //未找到合适的名字
+                return [];
+            }
+            let name = names.pop();
+            _valetype = this._getValDefineOwn(lines, name.n);
+            valetype = _valetype.t;
+        }
+        
         if (valetype != "" && names.length == 0) {
             //可能是本文档定义
-            if(!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
-                && /\.h$/g.test(filepath)) {
+            // if(!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
+            //     && /\.h$/g.test(filepath)) {
                 //同文件跳转
                 let result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
                 return result;
-            }
+            // }
             //可能是函数定义，需要清空类型从全局或者owner找
             valetype = "";
         }
@@ -1556,6 +1788,8 @@ class CodeAnalyse {
                 return false;
             }
             valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+            usingnamespace.push(_nameInfo.namespace);
+            valetype = df.getClassFullName(valetype, usingnamespace);
         }
 
         //最后一个定义名称
@@ -1588,6 +1822,7 @@ class CodeAnalyse {
         }
 
         let name = lastname.n;
+        //当出现set_xx_size的时候，会出现无法提示的问题
         name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
 
         let fileinfo = df.getDefineInWitchClass(ownnames, name, usingnamespace);
@@ -1603,7 +1838,7 @@ class CodeAnalyse {
         let ownname = fileinfo.ownname;
         
         //读取文件查找内容
-        return df.readFileFindDefine(filepath, ownname, name, fileinfo.type, sourcefilepath);
+        return df.readFileFindDefine(filepath, ownname, name, fileinfo.info.type, sourcefilepath);
     };
 
     //帮助提示
@@ -1725,7 +1960,9 @@ class CodeAnalyse {
         let ilength = linecode.length;
         let lnum = 0;
         let pos = 0;
-        while (true) {
+        let maxRun = 0;
+        while (true && maxRun < 500) {
+            maxRun++;
             let _pos = filecontext.indexOf("\n", pos);
 
             if(_pos == -1) {
@@ -1770,9 +2007,10 @@ class CodeAnalyse {
         let parasms = {
             baseurl: "http://cpptips.com:8888",
             basedir: "/Users/widyhu/.vscode/extensions/widyhu.cpptips-0.1.9/",
-            intervaltime: 180000
+            intervaltime: 180000,
+            maketools: 0
         }
-        console.log(parasms);
+        console.log(JSON.stringify(parasms));
         const path = require('path');
         let basedir = __dirname;
         basedir = path.resolve(basedir, '../');
@@ -1811,7 +2049,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("file type not match!");
+                console.error("getAllNameByObj file type not match!");
                 return [];
             }
             //test
@@ -1839,7 +2077,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("file type not match!");
+                console.error("getAllNameByNamespace file type not match!");
                 return [];
             }
             return this._getAllNameByNamespace(filepath, filecontext, owns);
@@ -1878,7 +2116,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("file type not match!");
+                console.error("searchKeyWord file type not match!");
                 return [];
             }
             return this._searchKeyWord(filepath, prekeyworld, filecontext, owns);
@@ -1899,7 +2137,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".proto", ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("this file not include.");
+                console.error("reloadOneIncludeFile this file not include.");
                 callback("error");
                 return;
             }
@@ -1912,7 +2150,7 @@ class CodeAnalyse {
     //重新加载一批文件
     reloadBatchIncludeFile = function (filepaths, callback = null) {
         try {
-            if (this.loadindex || !this.isinit) {
+            if (this.loadindex) {
                 //索引加载中，功能暂时不可用
                 return false;
             }
@@ -1953,32 +2191,22 @@ class CodeAnalyse {
     getDependentByCpp = function (filepath, callback = null) {
         try {
             let that = this;
-            function processFile(filepath, callback) {
-                let pos = filepath.lastIndexOf('.');
-                let fileExt = filepath.substring(pos);
-                let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
-                if (!includeExt.has(fileExt)) {
-                    callback("fileerror", filepath, [], []);
-                    return;
-                }
-                return that._getDependentByCpp(filepath, callback);
-            }
-
             filepath = this._filePathFormat(filepath);
-            if(!this.loadindex ) {
+            if(this.loadindex ) {
                 //索引加载中，功能可能暂时不可用
                 //进行尝试分析，并且回调加入分析队列中，等待索引加载完成之后再分析一次
                 callback("busy", filepath, [], []);
             }
 
-            if (!this.isinit) {
-                //3之后继续执行
-                console.log("初始化未完成，10s之后继续加载！");
-                setTimeout(processFile, 10000, filepath, callback);
+            let pos = filepath.lastIndexOf('.');
+            let fileExt = filepath.substring(pos);
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+            if (!includeExt.has(fileExt)) {
+                callback("fileerror", filepath, [], []);
                 return;
             }
-
-            return processFile(filepath, callback);
+            console.log("dddd", this.isinit, this.loadindex);
+            return that._getDependentByCpp(filepath, callback);
         } catch (error) {
             callback("error", filepath, [], []);
             console.error("call getDependentByCpp faild!", error);
@@ -2000,10 +2228,32 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("file type not match!");
+                console.error("getDefinePoint file type not match!");
                 return false;
             }
             return this._getDefinePoint(filepath, filecontext, linelast, owns);
+        } catch (error) {
+            console.error("call getDefinePoint faild!", error);
+        }
+    };
+
+    //跳转头文件定义
+	getIncludeDefine = function (sourceFile, includeFile) {
+        try {
+            if (!this.isinit) {
+                //索引加载中，功能暂时不可用
+                return false;
+            }
+        
+            let fileinfo = __path.parse(includeFile);
+            let filename = fileinfo.base;
+            let fileExt = fileinfo.ext;
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
+            if (!includeExt.has(fileExt)) {
+                console.error("getIncludeDefine file type not match!");
+                return false;
+            }
+            return this._getIncludeDefine(sourceFile, includeFile, filename);
         } catch (error) {
             console.error("call getDefinePoint faild!", error);
         }
@@ -2024,13 +2274,60 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("file type not match!");
+                console.error("getSignatureHelp file type not match!");
                 return false;
             }
             return this._getSignatureHelp(filepath, filecontext, owns);
         } catch (error) {
             console.error("call getSignatureHelp faild!", error);
         }
+    };
+
+    //获取文档结构-非异步
+    getDocumentTree = function(filepath, filecontext) {
+        try {
+            if (!this.isinit) {
+                //索引加载中，功能暂时不可用
+                return false;
+            }
+        
+            let fileinfo = __path.parse(filepath);
+            let fileExt = fileinfo.ext;
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
+            if (!includeExt.has(fileExt)) {
+                console.error("getDocumentTree file type not match!");
+                return false;
+            }
+            return this._getDocumentTree(filepath, filecontext);
+        } catch (error) {
+            console.error("call getDefinePoint faild!", error);
+        }
+    };
+
+    //自动填参数
+    autoFillParams = function(filepath, filecontext, preParams) {
+        try {
+            filepath = this._filePathFormat(filepath);
+            if (!this.isinit) {
+                //索引加载中，功能暂时不可用
+                return [];
+            }
+ 
+            let pos = filepath.lastIndexOf('.');
+            let fileExt = filepath.substring(pos);
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+            if (!includeExt.has(fileExt)) {
+                console.error("autoFillParams file type not match!");
+                return [];
+            }
+            //test
+            console.time("_getAllNameByObj");
+            let result = this._autoFillParams(filepath, filecontext, preParams);
+            console.timeEnd("_getAllNameByObj");
+            return result;
+        } catch (error) {
+            console.error("call getAllNameByObj faild!", error);
+        }  
     };
 
     //更新检查
@@ -2041,6 +2338,29 @@ class CodeAnalyse {
             console.error("call updateCheck faild!", error);
         }
     };
+
+    //进行语法检查
+    diagnostics = function(filepath, filecontext, diagnosticscallback) {
+        try {
+            if (!this.isinit) {
+                //索引加载中，功能暂时不可用
+                return false;
+            }
+        
+            let fileinfo = __path.parse(filepath);
+            let fileExt = fileinfo.ext;
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]); 
+            if (!includeExt.has(fileExt)) {
+                console.error("diagnostics file type not match!");
+                return false;
+            }
+            return this._diagnostics(filepath, filecontext, diagnosticscallback);
+        } catch (error) {
+            console.error("call getDefinePoint faild!", error);
+        }
+    };
+
+
 
     //退出
     onShutdown = function(){

@@ -18,17 +18,11 @@ module.exports = (_a = /** @class */ (function () {
                 return this.node;
             };
             this.traverseDF = function (callback) {
-                // this is a recurse and immediately-invoking function
                 (function recurse(currentNode) {
-                    // step 2
-                    //console.log(currentNode);
+                    callback(currentNode);
                     for (var i = 0, length = currentNode.children.length; i < length; i++) {
-                        // step 3
                         recurse(currentNode.children[i]);
                     }
-                    // step 4
-                    callback(currentNode);
-                    // step 1
                 })(this.node);
             };
             this.traverseBF = function (callback) {

@@ -122,6 +122,13 @@ class KeyWordStore {
         let info = this.getByFullnameAndType(data['ownname'], data['namespace'], data['name'], data['type']);
         if(info) {
             //console.error("data is in db!", info);
+            //文件id不一样，则更新
+            if (info.file_id != data['file_id']) {
+                if(!this.modifyFileId(info.id, data['file_id'])){
+                    console.error("file_id faild!", info.id, data['file_id']);
+                    return false;
+                }
+            }
             //更新附加数据
             if (info.extdata != data['extdata']) {
                 if(!this.modifyExdata(info.id, data['extdata'])){
@@ -158,6 +165,13 @@ class KeyWordStore {
         }
     };
 
+    //清楚所有的扩展数据，防止出现函数修改名称不更换问题
+    cleanExtData = function(fileid) {
+        const stmt_update = this.db.prepare('UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)');
+        const info = stmt_update.run(fileid);
+        return info;
+    };
+
     //修改命名空间
     modifyNamespace = function (id, namespace) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET namespace=? WHERE id=?');
@@ -178,6 +192,14 @@ class KeyWordStore {
     modifyExdata = function (id, extdata) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE id=?');
         const info = stmt.run(extdata, id);
+        //console.log(info);
+        return info.changes == 1;
+    };
+
+    //通过名称修改扩展数据
+    modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
+        const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?');
+        const info = stmt.run(extdata, namespace, ownname, name, type);
         //console.log(info);
         return info.changes == 1;
     };
@@ -305,48 +327,57 @@ class KeyWordStore {
         //只查找公共的定向
         //全局的变量和方法
 
-        let _keyword = keyword.replace('_', '/_');
-        let freezquer = "LIKE \'" + _keyword + '%\' escape \'/\'';
-        let sql = 'SELECT id, ownname, name, namespace,  type, permission, file_id, extdata \
-                    FROM t_keyword \
-                    WHERE \
-                        name ' + freezquer + ' \
-                        AND (\
-                                ( \
-                                    namespace=\'\' \
-                                    AND ownname=\'\' \
-                                    AND namelength < '+ maxlength + '\
-                                    AND name NOT GLOB \'_*\' \
-                                    AND type IN (1,2,3,4,6,7,8,10)\
-                                ) OR \
-                                (\
+        try{
+            let _keyword = keyword.replace('_', '/_');
+            let freezquer = "LIKE \'" + _keyword + '%\' escape \'/\'';
+            let sql = 'SELECT id, ownname, name, namespace,  type, permission, file_id, extdata \
+                        FROM t_keyword \
+                        WHERE \
+                            name ' + freezquer + ' \
+                            AND (\
+                                    ( \
+                                        namespace=\'\' \
+                                        AND ownname=\'\' \
+                                        AND namelength < '+ maxlength + '\
+                                        AND name NOT GLOB \'_*\' \
+                                        AND type IN (1,2,3,4,6,7,8,10)\
+                                    ) OR \
+                                    (\
+                                        namespace in (\'' + sqlnamespace + '\') \
+                                        AND ownname=\'\' \
+                                        AND namelength < '+ maxlength + '\
+                                        AND type IN (1,2,3,4,6,7,8)\
+                                    ) OR \
+                                    (\
+                                        namespace in (\'' + sqlnamespace + '\') \
+                                        AND ownname=\''+ ownname + '\' \
+                                        AND type IN (7,8)\
+                                    ) OR\
+                                    (\
                                     namespace in (\'' + sqlnamespace + '\') \
-                                    AND ownname=\'\' \
                                     AND namelength < '+ maxlength + '\
-                                    AND type IN (1,2,3,4,6,7,8)\
-                                ) OR \
-                                (\
-                                    namespace in (\'' + sqlnamespace + '\') \
-                                    AND ownname=\''+ ownname + '\' \
-                                    AND type IN (7,8)\
-                                ) OR\
-                                (\
-                                   namespace in (\'' + sqlnamespace + '\') \
-                                   AND namelength < '+ maxlength + '\
-                                   AND type IN (9)\
-                                )\
-                            ) ORDER BY namelength ASC,type ASC LIMIT 0,20';
-        sql = sql.replace(/[\t\s]{1,100}/g, " ");                          
-        //console.log(sql);
-        const stmt = this.db.prepare(sql);
-        const infos = stmt.all();
-        //console.log(infos);
-        if (!infos || infos == undefined || infos.length == 0) {
-            //未查询到结果
-            //console.error("not find result. namespace:", keyword, namepsaces);
+                                    AND type IN (9)\
+                                    )\
+                                ) ORDER BY namelength ASC,type ASC LIMIT 0,20';
+            sql = sql.replace(/[\t\s]{1,100}/g, " ");                          
+            //console.log(sql);
+            let begintime = new Date().getTime();
+            const stmt = this.db.prepare(sql);
+            const infos = stmt.all();
+            let endtime = new Date().getTime();
+            if(endtime - begintime > 2000){
+                console.log(sql);
+            }
+            if (!infos || infos == undefined || infos.length == 0) {
+                //未查询到结果
+                //console.error("not find result. namespace:", keyword, namepsaces);
+                return [];
+            }
+            return infos;
+        }catch(error) {
+            console.error("time out!", error);
             return [];
         }
-        return infos;
     };
 
     //从命名空间中匹配own
@@ -479,6 +510,49 @@ class KeyWordStore {
         return infos;
     };
 
+    //指定命名空间和owner已经公开属性查询函数
+    getByOwnNameAndNs = function (ownname, namespaces) {
+        let sqlnamespace = namespaces.join("','");
+        let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
+                                FROM t_keyword \
+                                    WHERE ownname=\'' + ownname + '\' \
+                                    AND namespace in (\'' + sqlnamespace + '\') \
+                                    AND extdata NOT LIKE \'%"r":{"t":"void",%\'\
+                                    AND permission=0 LIMIT 200';
+        sql = sql.replace(/[\t\s]{1,100}/g, " "); 
+        const stmt = this.db.prepare(sql);
+        const infos = stmt.all();
+        //console.log(infos);
+        if (!infos || infos == undefined || infos.length == 0) {
+            //未查询到结果
+            //console.error("not find result. namespace:", ownname, namespace, name);
+            return [];
+        }
+
+        return infos;
+    };
+
+    //获取own下的所有指定类型的定义
+    getAllInOwnNameAndNs = function(ownname, namespaces, type) {
+        let sqlnamespace = namespaces.join("','");
+        let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
+                                FROM t_keyword \
+                                    WHERE ownname=\'' + ownname + '\' \
+                                    AND namespace in (\'' + sqlnamespace + '\') \
+                                    AND type=' + type;
+        sql = sql.replace(/[\t\s]{1,100}/g, " "); 
+        const stmt = this.db.prepare(sql);
+        const infos = stmt.all();
+        //console.log(infos);
+        if (!infos || infos == undefined || infos.length == 0) {
+            //未查询到结果
+            //console.error("not find result. namespace:", ownname, namespace, name);
+            return [];
+        }
+
+        return infos;
+    };
+
     //通过全名获取,不能_开头，用于使用在标准头文件中通过_来决定内部方法变量等等
     getByOwnNameNotStart_ = function (ownname, namespace, permission = []) {
         let sqlpermission = "";
@@ -515,6 +589,29 @@ class KeyWordStore {
                                         AND name=\'' + name + '\' \
                                         AND namespace in (\'' + sqlnamespace + '\')';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
+        const stmt = this.db.prepare(sql);
+        const infos = stmt.all();
+        //console.log(infos);
+        if (!infos || infos == undefined || infos.length == 0) {
+            //未查询到结果
+            //console.error("not find result. namespace:", ownname, namespace, name);
+            return [];
+        }
+
+        return infos;
+    };
+
+    //通过名称和owner获取
+    getByOwnNameAndNameType = function (ownnames, name, namespaces, type) {
+        let owns = ownnames.join('\',\'');
+        let sqlnamespace = namespaces.join("','");
+        let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
+                                FROM t_keyword \
+                                    WHERE ownname IN (\'' + owns + '\') \
+                                        AND name=\'' + name + '\' \
+                                        AND namespace in (\'' + sqlnamespace + '\') \
+                                        AND type=' + type;
+        sql = sql.replace(/[\t\s]{1,100}/g, " ");
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
         //console.log(infos);
@@ -735,6 +832,19 @@ class FileIndexStore {
             this.db.pragma('auto_vacuum = 1');//删除数据时整理文件大小
             this.db.pragma('synchronous = 0');//不怕丢数据，要快
         }
+
+        //创建触发器
+        row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=\'tr_fileindex_delete\' and tbl_name=\'t_fileindex\' and type=\'trigger\'').get();
+        if(row.total == 0) {
+            const createtrigger = this.db.prepare('\
+                CREATE TRIGGER tr_fileindex_delete BEFORE DELETE\
+                    ON t_fileindex\
+                    BEGIN \
+                        DELETE FROM t_keyword WHERE file_id=old.id; \
+                    END;').run();
+            console.log("create trigger. on delete");
+        }
+
         this.db.pragma('cache_size = 50000');//50000*1.5k
         return;
     };
@@ -769,6 +879,19 @@ class FileIndexStore {
             return info.changes == 1;
         } catch (error) {
             console.log("insert faild", error);
+            return false;
+        }
+    };
+
+    //删除数据
+    delete = function(id) {
+        try {
+            const stmt = this.db.prepare('DELETE FROM t_fileindex WHERE id=?');
+            const info = stmt.run(id);
+            console.log(info);
+            return info.changes == 1;
+        } catch (error) {
+            console.log("delete faild", error);
             return false;
         }
     };

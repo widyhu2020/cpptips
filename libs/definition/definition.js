@@ -41,6 +41,21 @@ var Definition = /** @class */ (function (_super) {
                 if (!findclass || findclass.length <= 0) {
                     //2.命名空间下的方法
                     findclass = kws.getByFullnameAndType('', _namespace, _name, TypeEnum.FUNCTION);
+                    if (!findclass) {
+                        //可能命名空间切分到了using namspace和方法名前面
+                        for (var i = 0; i < namespaces.length; i++) {
+                            var ns = namespaces[i];
+                            if (ns != "") {
+                                ns = ns + "::" + _namespace;
+                                namespaces[i] = ns;
+                            }
+                        }
+                        var lists = kws.getByFullnameNssAndType('', namespaces, _name, TypeEnum.FUNCTION);
+                        if (lists.length <= 0) {
+                            return false;
+                        }
+                        findclass = lists[0];
+                    }
                 }
                 else {
                     findclass = findclass[0];
@@ -73,13 +88,47 @@ var Definition = /** @class */ (function (_super) {
             }
             return false;
         };
+        _this._getDirsMatching = function (fileA, fileB) {
+            var pathInfoA = fileA.split(/[\\/]{1,2}/);
+            var pathInfoB = fileB.split(/[\\/]{1,2}/);
+            var match = 0;
+            for (var i = 0; i < pathInfoA.length && i < pathInfoB.length; i++) {
+                if (pathInfoA[i] == pathInfoB[i]) {
+                    //匹配度+1
+                    match++;
+                }
+            }
+            return match;
+        };
+        //获取头文件信息
+        _this.getIncludeInfo = function (sourceFile, includeFile, fileName) {
+            var fdb = FileIndexStore.getInstace();
+            var match = -1;
+            var findIncludeFile = "";
+            console.time("getFileByFileName");
+            var fileList = fdb.getFileByFileName(fileName);
+            console.timeEnd("getFileByFileName");
+            //console.log(fileList);
+            for (var i = 0; i < fileList.length; i++) {
+                var filePath = fileList[i];
+                var _pos = filePath.filepath.indexOf(includeFile);
+                if (_pos != -1) {
+                    //匹配规则
+                    var _match = this._getDirsMatching(filePath.filepath, sourceFile);
+                    if (_match > match) {
+                        findIncludeFile = filePath.filepath;
+                    }
+                }
+            }
+            return findIncludeFile;
+        };
         //获取类的全名称
         _this.getClassDefineInfo = function (name, namespaces) {
             var kws = KeyWordStore.getInstace();
             var findclass = [];
             var ret = DefineMap.getInstace().getRealName(name);
             //let _pos = name.lastIndexOf("::");
-            if (ret.namespace != "") {
+            if (ret && ret.namespace != "") {
                 var _name = ret.name;
                 var _namespace = ret.namespace;
                 findclass = kws.getByNameAndNamespaces(_name, [_namespace]);
@@ -152,11 +201,9 @@ var Definition = /** @class */ (function (_super) {
             for (var i = 0; i < ownnames.length; i++) {
                 var _own = ownnames[i];
                 var ret = DefineMap.getInstace().getRealName(_own);
-                //let pos = _own.lastIndexOf('::');
-                // if (pos == -1) {
-                //     _owns[_own] = "";
-                //     continue;
-                // }
+                if (!ret) {
+                    continue;
+                }
                 var _tmpown = ret.name;
                 var _usingnamespace = ret.namespace;
                 _owns[_tmpown] = _usingnamespace;
@@ -311,7 +358,7 @@ var Definition = /** @class */ (function (_super) {
                 epos = bpos + name.length;
             }
             var result = {
-                filename: "file:///" + filepath,
+                filename: "file://" + filepath,
                 bline: lineinfo.l,
                 bcols: bpos,
                 eline: lineinfo.l,
@@ -331,6 +378,7 @@ var Definition = /** @class */ (function (_super) {
         _this._readFileFindAchieveFromCpp = function (result, sourcefilepath, ownname, name, type) {
             if (!fs.existsSync(sourcefilepath)) {
                 //文件不存在
+                console.log("file not exits:", sourcefilepath);
                 return false;
             }
             if (type == TypeEnum.FUNCTION) {
@@ -347,13 +395,15 @@ var Definition = /** @class */ (function (_super) {
                 //let prelinecode = lineinfo.p;
                 var bpos = linecode.indexOf(_name);
                 var epos = bpos + _name.length;
-                result.filename = "file:///" + sourcefilepath;
+                result.filename = "file://" + sourcefilepath;
                 result.bline = lineinfo.l;
                 result.bcols = bpos;
                 result.eline = lineinfo.l;
                 result.ecols = epos;
+                console.log(result);
                 return;
             }
+            console.log(type);
         };
         _this._findValInStr = function (source, val, bpos) {
             while (true) {
