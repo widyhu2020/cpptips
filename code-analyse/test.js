@@ -15,13 +15,7 @@ const path = require('path');
 // console.log(os.platform());
 // console.log(process.versions.node);
 // return;
-let pathinfo = path.parse("/data/.svn");
-let realname = pathinfo.base;
-let regexStr = "(^[.~]{1,1}[.]{1,128}$)|(^.*_tools_pb\.(cpp|h)$)|(^.*testimpl_pb\.(cpp|h)$)|(^.*\.pb\.(cc|h)$)|(^(sk_|sm_)[a-z0-9_.]{1,128}$)|(^mm3rd$)|(^lib32$)|(^lib64$)|(^lib64_debug$)|(^lib64_release$)|(^lib32_debug$)|(^lib32_release$)|(^debug$)|(^release$)|(^win32$)|(^bin$)|(^\.svn$)|(^\.git$)|(^\.vscode$)";
-let reg = new RegExp(regexStr,"ig");
-let testResult = reg.test(realname);
-console.log(testResult,realname);
-return;
+
 //filename = "/appplatform/export_include/c2cplatform/library/the3/svrkit_api_co/comm2_core/utils/iPriorityQueue_Heap.h";
 filename = "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/mmpaymchmgrmerchantdaosvr.proto";
 

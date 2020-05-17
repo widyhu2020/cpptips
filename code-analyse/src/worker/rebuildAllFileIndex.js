@@ -179,8 +179,8 @@ class RebuildFileIndex {
         console.timeEnd("traverseFilesDelNotExists");
 
         totalNum = tr.getFileNumInDir(_inDirTipsShow);
-        if(totalNum > 150000) {
-            //大于150000个文件将不创建索引，强制引导指定索引目录
+        if(totalNum > 120000) {
+            //大于120000个文件将不创建索引，强制引导指定索引目录
             updateProcess(0, 0, 0, "stop_load_index", "");
             return;
         }
@@ -255,8 +255,8 @@ class RebuildFileIndex {
         console.timeEnd("traverseFilesDelNotExists");
 
         totalNum = tr.getFileNumInDir(_inDirTipsShow);
-        if(totalNum > 150000) {
-            //大于150000个文件将不创建索引，强制引导指定索引目录
+        if(totalNum > 120000) {
+            //大于120000个文件将不创建索引，强制引导指定索引目录
             updateProcess(0, 0, 0, "stop_load_index", "");
             return;
         }
