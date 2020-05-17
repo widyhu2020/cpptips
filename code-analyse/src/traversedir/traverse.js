@@ -384,19 +384,12 @@ class Traverse {
             let dataFile = null;
             try {
                 //不判断软连接
-                //dataFile = fs.statSync(filename);
-                dataFile = fs.lstatSync(filename);
+                dataFile = fs.statSync(filename);
+                // dataFile = fs.lstatSync(filename);
             } catch (error) {
-                console.log(error);
+                //console.log(error);
                 return total;
             }
-        
-            //一定得fstatSync方法
-            // if(dataFile.isSymbolicLink()
-            //     && !that.analyseLinkDir.has(wkfilename)) {
-                //软链接跳过
-                // return total;
-            // }
         
             if (!dataFile) {
                 return total;
@@ -435,8 +428,8 @@ class Traverse {
             }
         });
         
-        if(total > 120000) {
-            //文件超过120000个，终止扫描
+        if(total > 150000) {
+            //文件超过150000个，终止扫描
             that.needStop = true;
         }
         return total;
@@ -464,27 +457,19 @@ class Traverse {
             }
 
             //系统文件不需要分析，安装插件包里面包含
-            // if(!that.isAnlyseSystemDir
-            //     && that._checkIsSystem(filename)) {
-            //     //console.debug("system file, not analyse!");
-            //     return;
-            // }
+            if(!that.isAnlyseSystemDir
+                && that._checkIsSystem(filename)) {
+                //console.debug("system file, not analyse!");
+                return;
+            }
 
             let dataFile = null;
             try {
                 //不判断软连接
-                //dataFile = fs.statSync(filename);
-                dataFile = fs.lstatSync(filename);
+                dataFile = fs.statSync(filename);
+                //dataFile = fs.lstatSync(filename);
             } catch (error) {
-                console.log(error);
-                return;
-            }
-        
-            //一定得fstatSync方法
-            if(dataFile.isSymbolicLink()
-                && !that.analyseLinkDir.has(wkfilename)) {
-                //软链接跳过
-                //console.log("link:", wkfilename);
+                //console.log(error);
                 return;
             }
         

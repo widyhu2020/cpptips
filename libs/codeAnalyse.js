@@ -622,6 +622,7 @@ var CodeAnalyse = /** @class */ (function () {
                     return;
                 }
                 if (data.function == "stop_load_index") {
+                    worker.kill();
                     that.loadindex = false;
                     callback(data.function, 0, 0, 0);
                     return;
