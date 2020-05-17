@@ -22,6 +22,7 @@ cp -rf data ../cpptips_proj/
 cp -rf config ../cpptips_proj/
 cp -rf bin ../cpptips_proj/
 cp -rf .vscode ../cpptips_proj/
+cp -rf .vscodeignore ../cpptips_proj/
 
 rm -rf ../cpptips_proj/node_modules
 rm -rf ../cpptips_proj/server/node_modules

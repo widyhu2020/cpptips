@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.1.17",
+	"version": "0.1.18",
 	"icon": "resources/cpp.png",
 	"engines": {
 		"vscode": "^1.43.0"
@@ -27,14 +27,12 @@
 			"properties": {
 				"cpptips.needLoadLinkDir": {
 					"type": "array",
-					"default": [
-					],
+					"default": [],
 					"description": "默认情况下软连接不加载索引，加入需要加载的白名单中！"
 				},
 				"cpptips.needLoadDir": {
 					"type": "array",
-					"default": [
-					],
+					"default": [],
 					"description": "需要加载的目录，未配置进来将不会加载该目录，如果配置未空，则加载工程目录下全部文件！"
 				},
 				"cpptips.ignorDir": {
