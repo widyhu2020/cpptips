@@ -189,6 +189,9 @@ var CheckNeedUpdate = /** @class */ (function () {
             //lib文件夹
             var dirf = fs.readdirSync(dir, { 'encoding': 'utf8', 'withFileTypes': false });
             dirf.forEach(function (el, index) {
+                if (el == ".DS_Store") {
+                    return;
+                }
                 var filename = "" + dir + "/" + el;
                 var dataFile = null;
                 try {

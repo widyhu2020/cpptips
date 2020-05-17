@@ -26,7 +26,6 @@ cp -rf .vscode ../cpptips_proj/
 rm -rf ../cpptips_proj/node_modules
 rm -rf ../cpptips_proj/server/node_modules
 rm -rf ../cpptips_proj/client/node_modules
-rm -rf ../cpptips_proj/data/usr
 
 #scp -r libs root@193.112.152.71:/data/webroot/
 #scp -r server/out root@193.112.152.71:/data/webroot/

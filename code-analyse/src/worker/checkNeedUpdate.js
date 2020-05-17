@@ -208,6 +208,9 @@ class CheckNeedUpdate {
         
         let dirf = fs.readdirSync(dir, { 'encoding': 'utf8', 'withFileTypes': false });
         dirf.forEach(function (el, index) {
+            if(el == ".DS_Store") {
+                return;
+            }
             let filename = `${dir}` + "/" + el;
             let dataFile = null;
             try {
