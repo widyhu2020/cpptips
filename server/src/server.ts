@@ -28,10 +28,6 @@ import {
     CompletionList,
     InsertTextFormat,
     DocumentSymbolParams,
-    SymbolInformation,
-    CodeAction,
-    CodeActionParams,
-    ExecuteCommandParams,
     SymbolKind,
     DocumentSymbol,
     TextDocument,
@@ -39,18 +35,22 @@ import {
     Diagnostic,
     TextEdit,
     Command,
+    MessageActionItem,
 } from 'vscode-languageserver';
 const path = require('path');
 
 import { CodeAnalyse, NodeItem, ShowItem, CaConfig, PointInfo} from '../../libs/codeAnalyse';
 import * as fs from 'fs';
 import { URL } from 'url';
+import { clearTimeout } from 'timers';
 let basepath:string = "/";
 let openFile:{[key: string]: string} = {};
 let treeData:{[key: string]: string} = {};
 let changefile: FileEvent[] = [];
 let dependentfiles:Set<string> = new Set();
 let extpath = "";
+let rebuildTimeout:NodeJS.Timeout|null = null;
+
 getExtBasePath(process.argv);
 
 var TypeEnum = {
@@ -116,10 +116,59 @@ function sendMsgToVscode(msgname:string, data:any[]) {
     connection.sendNotification(msgname, [data]);
 }
 
-function showTipMessage(message:string) {
+function showTipMessage(message:string, titles:string[] = ["我知道了"], callback:any = null) {
     //发送弹窗
-    let data = [message];
-    connection.sendNotification("show_msg", [data]);
+    let items: MessageActionItem[] = [];
+    for(let i = 0; i < titles.length; i++) {
+        let item:MessageActionItem = {title: titles[i]};
+        items.push(item);
+    }
+
+    connection.window.showInformationMessage(message, ...items).then((selection:MessageActionItem|undefined) => {
+        if (callback != null && selection != undefined) {
+            callback(selection.title);
+        }
+    });
+}
+
+function showWarningMessage(message:string, titles:string[] = ["我知道了"], callback:any = null) {
+    //发送弹窗
+    let items: MessageActionItem[] = [];
+    for(let i = 0; i < titles.length; i++) {
+        let item:MessageActionItem = {title: titles[i]};
+        items.push(item);
+    }
+
+    connection.window.showWarningMessage(message, ...items).then((selection:MessageActionItem|undefined) => {
+        if (callback != null && selection != undefined) {
+            callback(selection.title);
+        }
+    });
+}
+
+function showErrorMessage(message:string, titles:string[] = ["我知道了"], callback:any = null) {
+    //发送弹窗
+    let items: MessageActionItem[] = [];
+    for(let i = 0; i < titles.length; i++) {
+        let item:MessageActionItem = {title: titles[i]};
+        items.push(item);
+    }
+     
+    connection.window.showErrorMessage(message, ...items).then((selection:MessageActionItem|undefined) => {
+        if (callback != null && selection != undefined) {
+            callback(selection.title);
+        }
+    });
+}
+
+function openFilePath(filepath:string, select:string|undefined) {
+    if(fs.existsSync(filepath)) {
+        let params = [filepath];
+        if(select != undefined){
+            params.push(select);
+        }
+        connection.sendNotification("open_file", [params]);
+    }
 }
 
 //获取用户维度的定义
@@ -131,7 +180,7 @@ function getUserConfig(section: string): Thenable<Settings> {
 	if (!result) {
 		result = connection.workspace.getConfiguration(section);
 		documentSettings.set(section, result);
-	}
+    }
 	return result;
 }
 
@@ -161,7 +210,13 @@ function reloadIncludeFileCallBack(
         return;
     }
     if(msg == "error") {
-        showTipMessage("文件索引加载失败！");
+        showErrorMessage("文件索引加载失败！");
+    }
+    if(msg == "stop_load_index") {
+        showErrorMessage("你工程目录文件超过50000个，系统终止索引计算，请目录右键“加入索引范围”指定需要计算的目录！");
+    }
+    if(msg == "show_file_more") {
+        showWarningMessage("你工程目录文件超过30000个，文件过多将影响索引性能，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
     
     sendMsgToVscode("close_show_process", data);
@@ -181,9 +236,145 @@ connection.onNotification("get_tree", (message: Array<string>) => {
     console.log(message);
 });
 
-//切换命名规则处理
-connection.onNotification("change_name_type", (message: Array<string>) => {
-    console.log(message);
+//加入创建索引目录
+connection.onNotification("addDirToIndex", (infos: any) => {
+    console.log(infos);
+    let filepath:string = infos["path"];
+
+    let dataFile = fs.statSync(filepath);
+    if(!dataFile.isDirectory()) {
+        //提示错误信息
+        showErrorMessage("只能添加目录，请选择目录加入索引计算范围！");
+        return;
+    }
+
+    //获取目录名称
+    let dirname = "/" + filepath.replace(basepath, "") + "/";
+    console.log(dirname);
+
+    let setPath = basepath + ".vscode/settings.json";
+    let seting:any = {};
+    if(fs.existsSync(setPath)){
+        let fd = fs.openSync(setPath, 'r');
+        const buffer = Buffer.alloc(1024 * 1024 * 2);
+        let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, null);
+        fs.closeSync(fd);
+        let filecontext = buffer.toString('utf8', 0, bytesRead);
+        seting = JSON.parse(filecontext);
+    }
+
+    if(!seting["cpptips.needLoadDir"]) {
+        seting["cpptips.needLoadDir"] = [dirname];
+    } else {
+        for(let i = 0; i < seting["cpptips.needLoadDir"].length; i++) {
+            if(seting["cpptips.needLoadDir"][i] == dirname
+                || dirname.indexOf(seting["cpptips.needLoadDir"][i]) == 0) {
+                //目录配置过，或者父目录已经配置过
+                //提示错误
+                showErrorMessage("该目录配置或者父目录已经配置，无需重复配置！点击按钮查看当前配置！", ["打开配置文件"], (selection:string)=>{
+                    if(selection == "打开配置文件") {
+                        //打开配置文件
+                        openFilePath(setPath, "cpptips.needLoadDir");
+                    }
+                });
+                return;
+            }
+        }
+        seting["cpptips.needLoadDir"].push(dirname);
+    }
+    //保存配置文件
+    let newSetting = JSON.stringify(seting);
+    console.log("newsetting:", newSetting);
+    fs.writeFileSync(setPath, newSetting, {encoding: "utf8"});
+    documentSettings.clear();
+    showTipMessage("操作成功，你可以继续添加其他目录，完成之后点击“重建索引”开始重建索引，也可以配置完之后通过“刷新全部索引”来重建！", ["重建索引", "我知道了"], (selection:string)=>{
+        if(selection == "重建索引") {
+            //开始重建索引
+            //重新加载配置
+            reloadAllIndex();
+        }
+    });
+});
+
+//移除创建索引目录
+connection.onNotification("delDirToIndex", (infos: any) => {
+    console.log(infos);
+    let filepath:string = infos["path"];
+
+    let dataFile = fs.statSync(filepath);
+    if(!dataFile.isDirectory()) {
+        //提示错误信息
+        showErrorMessage("只能针对目录操作，请重新选择目录操作！");
+        return;
+    }
+
+    //获取目录名称
+    let dirname = "/" + filepath.replace(basepath, "") + "/";
+    console.log(dirname);
+
+    let setPath = basepath + ".vscode/settings.json";
+    let seting:any = {};
+    if(fs.existsSync(setPath)){
+        let fd = fs.openSync(setPath, 'r');
+        const buffer = Buffer.alloc(1024 * 1024 * 2);
+        let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, null);
+        fs.closeSync(fd);
+        let filecontext = buffer.toString('utf8', 0, bytesRead);
+        seting = JSON.parse(filecontext);
+    }
+
+    if(!seting["cpptips.needLoadDir"]) {
+        showErrorMessage("未找到任何指定的索引目录，你可以在.vscode/setting.json中查看配置！", ["打开配置文件"], (selection:string)=>{
+            if(selection == "打开配置文件") {
+                //打开配置文件
+                openFilePath(setPath, "cpptips.needLoadDir");
+            }
+        });
+        return;
+    } else {
+        let _dirs = [];
+        for(let i = 0; i < seting["cpptips.needLoadDir"].length; i++) {
+            if(seting["cpptips.needLoadDir"][i] == dirname) {
+                //找到需要移除的目录
+                continue;
+            }
+            _dirs.push(seting["cpptips.needLoadDir"][i]);
+        }
+        if(seting["cpptips.needLoadDir"].length == _dirs.length) {
+            showErrorMessage("该目录之前未加入索引计算，是否是上级目录有加入，你可以在.vscode/setting.json中查看配置！", ["打开配置文件"], (selection:string)=>{
+                if(selection == "打开配置文件") {
+                    //打开配置文件
+                    openFilePath(setPath, "cpptips.needLoadDir");
+                }
+            });
+            return;
+        }
+        seting["cpptips.needLoadDir"] = _dirs;
+    }
+    
+    //保存配置文件
+    let newSetting = JSON.stringify(seting);
+    console.log("remove newsetting:", newSetting);
+    fs.writeFileSync(setPath, newSetting, {encoding: "utf8"});
+    documentSettings.clear();
+    showTipMessage("操作成功，移除之后原来计算的索引将保留，但后续不再更新索引，需要更新请重新加入该目录！");
+    globalSettings.needLoadDir = seting;
+});
+
+//刷新所有索引
+connection.onNotification("reflushAllIdex", (infos: any) => {
+    console.log(infos);
+    //重新加载配置
+    reloadAllIndex();
+});
+
+//刷新单文件索引
+connection.onNotification("reflushOneIdex", (infos: any) => {
+    console.log(infos);
+    //重新加载配置
+    let filepath:string = infos["path"];
+    let filename = "/" + filepath.replace(basepath, "")
+    CodeAnalyse.getInstace().reloadOneIncludeFile(filename, reloadOneIncludeFileCallBack);
 });
 
 connection.onInitialize((params: InitializeParams) => {
@@ -230,7 +421,7 @@ connection.onInitialize((params: InitializeParams) => {
 // connection.sendDiagnostics
 connection.onInitialized(() => {
     //如果目录没有则创建目录
-    let arrdbpath = [basepath, ".vscode", ".db", ""];
+    let arrdbpath = [basepath, ".vscode", "db", ""];
     let dbpath = arrdbpath.join("/");
     if (!fs.existsSync(dbpath)) {
         fs.mkdirSync(dbpath, { recursive: true});
@@ -240,7 +431,7 @@ connection.onInitialized(() => {
     sectionConf.then(
         (config) => {
             console.log("userconfig", JSON.stringify(config));
-            dbpath = dbpath + ".cpptips.db";
+            dbpath = dbpath + "cpptips.db";
             //加载索引单例
             let _config = {
                 basedir: basepath,
@@ -284,6 +475,23 @@ connection.onDidChangeConfiguration(change => {
 	}
 });
 
+function reloadAllIndex() {
+    let sectionConf = getUserConfig('cpptips');
+    sectionConf.then((config) => {
+        console.log("userconfig", JSON.stringify(config));
+        //加载索引单例
+        let _config = {
+            basedir: undefined,
+            dbpath: undefined,
+            showsql: undefined,
+            extpath: undefined,
+            userConfig: config
+        };
+        CodeAnalyse.getInstace().reloadLoadUserConfig(_config);
+        CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
+    }, (err: any) => { console.log(err); });
+};
+
 function processFileChange() {
     //处理变更的文件
     let filenum:number = 0;
@@ -301,6 +509,12 @@ function processFileChange() {
         }
         setfilename.add(file.uri);
         mapfile.add(file);
+    }
+
+    //清除定时器
+    if(rebuildTimeout != null) {
+        clearTimeout(rebuildTimeout);
+        rebuildTimeout = null;
     }
 
     console.info(setfilename);
@@ -368,11 +582,17 @@ connection.onExit(() => {
     console.log("on onExit");
 });
 
+//文件变更提示
 connection.onDidChangeWatchedFiles((_change: DidChangeWatchedFilesParams) => {
     console.log(JSON.stringify(_change));
     let changes: FileEvent[] = _change.changes;
     changefile = changefile.concat(changes);
     if (!CodeAnalyse.getInstace().busy()) {
+        //清除定时器
+        if(rebuildTimeout != null) {
+            clearTimeout(rebuildTimeout);
+            rebuildTimeout = null;
+        }
         processFileChange();
     } else {
         connection.window.showErrorMessage("插件正在繁忙中，索引稍后加载");
@@ -979,6 +1199,19 @@ connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
     //异步执行
     process.nextTick(analyseCppFile);
 
+    //文件变更
+    let changes: FileEvent = {
+        uri: params.textDocument.uri,
+        type: FileChangeType.Changed
+    };
+    changefile.push(changes);
+    if(rebuildTimeout ==null) {
+        //这里启动一个定时器用于兜底
+        //若文件改动监听器无反应，则这个兜底
+        rebuildTimeout = setTimeout(processFileChange, 2000);
+    }
+
+
     let context = openFile[params.textDocument.uri];
     if(context == undefined) {
         return;
@@ -1205,8 +1438,7 @@ connection.onTypeDefinition((params: TextDocumentPositionParams): Definition | u
 });
 
 //鼠标停留提醒
-connection.onHover(
-    (params: TextDocumentPositionParams): Hover | undefined => {
+connection.onHover((params: TextDocumentPositionParams): Hover | undefined => {
         //重新加载文件
         let filename = decodeURIComponent(params.textDocument.uri);
         let basedir = basepath;

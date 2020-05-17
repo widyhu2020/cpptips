@@ -233,7 +233,7 @@ if (cluster.isMaster) {
         basedir: "/Users/widyhu/widyhu/cpp_project/",
         sysdir: "",
         cppfilename: "/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.cpp",
-        dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db"
+        dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db"
     }
     worker.send(parasms);
     worker.on('message', (data)=>{

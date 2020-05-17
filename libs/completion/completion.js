@@ -12,12 +12,47 @@ var DefineMap = require('../definition/defineMap').DefineMap;
 var StdIteratorType = require('../definition/defineMap').StdIteratorType;
 var Completion = /** @class */ (function () {
     function Completion() {
+        this.transferStlName = function (templatename, params, name) {
+            var _pos = templatename.lastIndexOf("::");
+            if (templatename.substring(0, _pos) != "std") {
+                return templatename;
+            }
+            var ownname = templatename.substring(_pos + 2);
+            if (name == "const_iterator"
+                || name == "iterator"
+                || name == "reverse_iterator"
+                || name == "const_reverse_iterator") {
+                if (ownname == "map") {
+                    return "std::pair<" + params + ">";
+                }
+                return params;
+            }
+            return templatename;
+        };
         //获取类的全名称
         this.getClassFullName = function (name, namespaces) {
             var kws = KeyWordStore.getInstace();
-            if (name.indexOf("::") != -1) {
+            if (name.indexOf("::") != -1 && name.indexOf("<") == -1) {
                 //已经包含命名空间，直接返回
+                //且不是模版定义
                 return name;
+            }
+            //如果类目带模版参数，则去掉
+            if (name[name.length - 1] == ">") {
+                name = name.replace(/<[\w\s<>,:]{1,256}$/g, "");
+            }
+            else {
+                var _pos = name.lastIndexOf(">");
+                var _bpos = name.indexOf("<");
+                if (name[_pos + 1] != ":" || name[_pos + 2] != ":") {
+                    name = name.replace(/<[\w\s<>,:]{1,256}$/g, "");
+                }
+                else {
+                    var _definename = name.substring(_pos + 3);
+                    var _name = name.substring(0, _bpos);
+                    var params = name.substring(_bpos + 1, _pos);
+                    name = this.transferStlName(_name, params, _definename);
+                }
             }
             //没有命名空间的，需要找到全名称
             var findclass = kws.getByNameAndNamespaces(name, namespaces);
@@ -32,15 +67,37 @@ var Completion = /** @class */ (function () {
                 var extData = JSON.parse(findclass[0].extdata);
                 return this.getClassFullName(extData.v, namespaces);
             }
+            //typedef处理
+            if (findclass.length == 1
+                && findclass[0].type == TypeEnum.TYPEDEF) {
+                //宏定义
+                var extData = JSON.parse(findclass[0].extdata);
+                return this.getClassFullName(extData.v, namespaces);
+            }
             findclass.sort(function (a, b) {
+                //这里可以优化成类型排序【类>结构体>type>define>其他】
                 return b.namespace.length - a.namespace.length;
             });
             //只处理第一个，如果有多个这里忽略除一个以外的
             for (var i = 0; i < findclass.length; i++) {
                 if (findclass[i].type != TypeEnum.CALSS
-                    && findclass[i].type != TypeEnum.STRUCT) {
+                    && findclass[i].type != TypeEnum.STRUCT
+                    && findclass[i].type != TypeEnum.DEFINE
+                    && findclass[i].type != TypeEnum.TYPEDEF) {
                     //不是类的定义
                     continue;
+                }
+                //宏定义处理
+                if (findclass[i].type == TypeEnum.DEFINE) {
+                    //宏定义
+                    var extData = JSON.parse(findclass[i].extdata);
+                    return this.getClassFullName(extData.v, namespaces);
+                }
+                //typedef处理
+                if (findclass[i].type == TypeEnum.TYPEDEF) {
+                    //宏定义
+                    var extData = JSON.parse(findclass[i].extdata);
+                    return this.getClassFullName(extData.v, namespaces);
                 }
                 if (findclass[i].namespace == "") {
                     //没有命名空间
@@ -370,7 +427,7 @@ var Completion = /** @class */ (function () {
                     insertCode = info.name + "(";
                     var index = 1;
                     for (var i = 0; i < extJson[0].i.length; i++) {
-                        var showTips = "【按Tab键切换到下个参数】";
+                        var showTips = "【空格自动选参、TAB跳到下一个参数】";
                         if (extJson[0].i.length == 1) {
                             showTips = "";
                         }
@@ -385,7 +442,7 @@ var Completion = /** @class */ (function () {
                     insertCode = info.name + "(";
                     var index = 1;
                     for (var i = 0; i < extJson.p.length; i++) {
-                        var showTips = "【按Tab键切换到下个参数】";
+                        var showTips = "【空格自动选参、TAB跳到下一个参数】";
                         if (extJson.p.length == 1) {
                             showTips = "";
                         }
@@ -688,6 +745,10 @@ var Completion = /** @class */ (function () {
                     if (__ownnames == "map" && paramsdef.length == 2) {
                         tmptype = "std::pair<" + paramsdef[0] + "," + paramsdef[1] + ">";
                         return tmptype;
+                    }
+                    if (tmptype == "__string_type") {
+                        //字符类型
+                        return "std::basic_string";
                     }
                     else {
                         var first = paramsdef[0];

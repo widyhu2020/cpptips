@@ -18,6 +18,9 @@ class AnalyseProtobuf extends AnalyseBase{
         //proto需要的变量
         this.proto_annotate = {};
         this.basenamespace = "";
+
+        //用于处理message中嵌套message
+        this.innerNameMap = {};
     };
 
     //执行分析
@@ -228,6 +231,7 @@ class AnalyseProtobuf extends AnalyseBase{
                     && current.parent.ownname.type == TypeEnum.CALSS) {
                     current.namespace = parentnamespace;// + "_" + current.ownname.name;
                     current.ownname.name = current.parent.ownname.name + "_" + current.ownname.name;
+                    this.innerNameMap[current.ownname.name] = current.parent.ownname.name + "@" + current.ownname.name;
                 } else { 
                     current.namespace = parentnamespace;// + "::" + current.ownname.name;
                 }
@@ -394,6 +398,20 @@ class AnalyseProtobuf extends AnalyseBase{
     //单个字段分析
     _analyseFildProto = function (node, prename, type, name, annotate) {
         //console.log(prename, type, name, annotate);
+        //protobuf生产的方法，会将大些转成小写
+        //获取父区域的名称
+        if(node.parent
+            && node.parent.ownname ) {
+            let _name = node.parent.ownname.name;
+            let _key = node.ownname.name + "_" + type;
+            //console.log("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
+            if(this.innerNameMap[_key]) {
+                type = _key;
+                //console.log("ddddddddd",type);
+            }
+        }
+
+        name = name.toLowerCase();
         //非数组处理
         if (prename == "optional" || prename == "required") {
             //console.log(prename, type, name, annotate);
@@ -860,15 +878,16 @@ class AnalyseProtobuf extends AnalyseBase{
         }
 
         //内部定义的message
-        for (let i = 0; i < node.children.length; i++){
-            if (!node.children[i].ownname) {
-                continue;
-            }
+        // for (let i = 0; i < node.children.length; i++){
+        //     if (!node.children[i].ownname) {
+        //         continue;
+        //     }
 
-            if (node.children[i].ownname.name == prototype) {
-                return node.children[i].namespace;
-            }
-        }
+        //     if (node.children[i].ownname.name == prototype) {
+        //         console.log("dfdfdfd",node.children[i].ownname.name , prototype, node.children[i].namespace);
+        //         return node.children[i].namespace;
+        //     }
+        // }
 
         if (this.basenamespace == "") {
             return prototype;

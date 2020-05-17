@@ -79,6 +79,13 @@ class CodeAnalyse {
         return this;
     };
 
+    //重新加载用户配置
+    reloadLoadUserConfig = function(configs) {
+        //设置用户配置
+        this.userConfig = configs.userConfig;
+        return this;
+    };
+
     //退出
     destroy = function() {
         //退出链接
@@ -581,7 +588,7 @@ class CodeAnalyse {
         const worker = cluster.fork();
         // paramsms结构定义
         let parasms = {
-            msg_type: 1,//0:表示全量加载；1:表示重新加载知道文件，此时data中需要有filepath
+            msg_type: 2,//0:表示全量加载；1:表示重新加载知道文件，此时data中需要有filepath
             data: {
                 basepath: this.basedir,
                 dbpath: this.dbpath,
@@ -634,15 +641,16 @@ class CodeAnalyse {
             if (data.function == "over") {
                 //任务完成关闭子进程
                 worker.kill();
-                that.loadindex = false;
+                // that.loadindex = false;
                 callback("success");
                 return;
             }
         });
         worker.on('exit', (code, signal) => {
             //恢复正常功能
+            //这里不需要恢复正常功能，否则导致变量被设置成false
             // console.log("xxxxxxxxxx:exit");
-            that.loadindex = false;
+            // that.loadindex = false;
         });
     };
 
@@ -676,8 +684,6 @@ class CodeAnalyse {
                 return;
             } 
             if (data.function == "source") {
-                //在分析源文件，此时可以解冻
-                that.loadindex = false;
                 callback("source_process", value["showprocess"], value["totalNum"], value["index"]);
                 return;
             } 
@@ -997,7 +1003,7 @@ class CodeAnalyse {
     //回溯找到变量定义
     _getValDefineOwn = function(lines, valname) {
         for (let i = lines.length - 1; i >= 0; i--) {
-            let line = lines[i];
+            let line = lines[i].trim();
             let pos = this._findVanamePos(line, valname);
             if (pos == -1 ) {
                 //未找到直接跳过
@@ -1031,6 +1037,19 @@ class CodeAnalyse {
             }
 
             pretype = pretype.trim();
+
+            if(pretype[pretype.length - 1] == ","
+                && pretype.indexOf(" ") != -1) {
+                //一行包含多变量定义
+                let _pos = pretype.indexOf(" ");
+                pretype = pretype.substring(0, _pos);
+            }
+
+            if(pretype[pretype.length - 1] == "=") {
+                //这种肯定不是定义
+                continue;
+            }
+
             let ispoint = 0;
             if(pretype.indexOf('*') != -1) {
                 ispoint = 1;
@@ -1054,7 +1073,12 @@ class CodeAnalyse {
                 if(pretype.indexOf("::") == 0) {
                     pretype = pretype.substring(2);
                 }
-                return { t: pretype, l: sourctline, p: ispoint };
+                if(/[\w\s:]{1,256}/g.test(pretype)
+                    || (pretype.indexOf("<") != -1 && pretype[pretype.length - 1] == ">")) {
+                    //定义不能有其他字符
+                    pretype = pretype.replace(/[\s]{0,4}[<>]{1,1}[\s]{0,4}/g, (kw)=>{ return kw.trim(); });
+                    return { t: pretype, l: sourctline, p: ispoint };
+                }
             }
         }
         return { t: "", l: "", p: 0, pos: -1};
@@ -1182,11 +1206,20 @@ class CodeAnalyse {
             let line = _valetype.l;
             let _pos = line.indexOf(_valetype.t);
             let _beginpos = line.indexOf("=", _pos);
+            if(_beginpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                //兼容for(auto a: fddd)语法
+                _beginpos = line.indexOf(":", _pos);
+            }
             if (_pos == -1 || _beginpos == -1) {
                 //没有值无法定位
                 return [];
             }
             let _endpos = line.indexOf(";", _pos);
+            if(_endpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                //兼容for(auto a: fddd)语法
+                _endpos = line.indexOf("{", _pos);
+                _endpos = line.lastIndexOf(")", _endpos);
+            }
             let _type = line.substring(_beginpos + 1, _endpos).trim();
             let _names = this._getValName(_type);
             names = names.concat(_names);
@@ -1207,7 +1240,14 @@ class CodeAnalyse {
             let _valetype = _nameInfo.namespace != "" ? _nameInfo.namespace + "::" + _nameInfo.name : _nameInfo.name;
             let tmptype = this._findObjctWhitNames(_valetype, names[i]);
             if(!tmptype) {
-                return [];
+                //获取对象或者继承父中的定义
+                let df = new Definition(this.basedir, this.extPath);
+                valetype = this._getObjectName(df, _valetype, names[i].n, usingnamespace );
+                if(valetype == false) {
+                    //没有找到
+                    return [];
+                }
+                break;
             }
             valetype = cp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
             usingnamespace.push(_nameInfo.namespace);
@@ -1215,6 +1255,41 @@ class CodeAnalyse {
         }
         
         return this._getClassAndInheritFuntionAndVar(cp, valetype, _ownname, usingnamespace);
+    };
+
+    //获取类的成员函数，包括继承的父类
+    _getObjectName = function(df, valetype, names, usingnamespace) {
+        //尝试获取继承父的方法
+        let maxInherit = 5;
+        let ownnames = [valetype];
+        let dequeue = [valetype];
+        while(--maxInherit > 0) {
+            let _valtype = dequeue.pop();
+            if(!_valtype) {
+                //无元素可处理
+                break;
+            }
+            let result = df.getClassDefineInfo(_valtype, usingnamespace);
+            if (result == false) {
+                //没找到定义
+                break;
+            }
+            let inheritclass = result.inherit;
+            for(let i = 0; i < inheritclass.length; i++) {
+                dequeue.push(inheritclass[i]);
+            }
+            ownnames = ownnames.concat(inheritclass);
+        };
+        
+        let fileinfo = df.getDefineInWitchClass(ownnames, names, usingnamespace);
+        if (fileinfo == false) {
+            //未找到定义
+            return false;
+        }
+        let extJson = JSON.parse(fileinfo.info.extdata);
+        valetype = extJson[0].r.t;
+        valetype = df.getClassFullName(valetype, usingnamespace);
+        return valetype;
     };
 
     //自动填参数分析
@@ -1638,11 +1713,19 @@ class CodeAnalyse {
             let line = _valetype.l;
             let _pos = line.indexOf(_valetype.t);
             let _beginpos = line.indexOf("=", _pos);
+            if(_beginpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                //兼容for(auto a: fddd)语法
+                _beginpos = line.indexOf(":", _pos);
+            }
             if (_pos == -1 || _beginpos == -1) {
                 //没有值无法定位
                 return [];
             }
             let _endpos = line.indexOf(";", _pos);
+            if(_endpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                _endpos = line.indexOf("{", _pos);
+                _endpos = line.lastIndexOf(")", _endpos);
+            }
             let _type = line.substring(_beginpos + 1, _endpos).trim();
             let _names = this._getValName(_type);
             names = names.concat(_names);
@@ -1785,11 +1868,40 @@ class CodeAnalyse {
             let _nameInfo = DefineMap.getInstace().getRealName(valetype);
             let tmptype = this._findObjctWhitNames(valetype, names[i]);
             if (!tmptype) {
-                return false;
+                //尝试获取继承父的方法
+                let maxInherit = 5;
+                let ownnames = [valetype];
+                let dequeue = [valetype];
+                while(--maxInherit > 0) {
+                    let _valtype = dequeue.pop();
+                    if(!_valtype) {
+                        //无元素可处理
+                        break;
+                    }
+                    let result = df.getClassDefineInfo(_valtype, usingnamespace);
+                    if (result == false) {
+                        //没找到定义
+                        break;
+                    }
+                    let inheritclass = result.inherit;
+                    for(let i = 0; i < inheritclass.length; i++) {
+                        dequeue.push(inheritclass[i]);
+                    }
+                    ownnames = ownnames.concat(inheritclass);
+                };
+                let fileinfo = df.getDefineInWitchClass(ownnames, names[i].n, usingnamespace);
+                if (fileinfo == false) {
+                    //未找到定义
+                    return false;
+                }
+                let extJson = JSON.parse(fileinfo.info.extdata);
+                valetype = extJson[0].r.t;
+                valetype = df.getClassFullName(valetype, usingnamespace);
+            } else {
+                valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+                usingnamespace.push(_nameInfo.namespace);
+                valetype = df.getClassFullName(valetype, usingnamespace);
             }
-            valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
-            usingnamespace.push(_nameInfo.namespace);
-            valetype = df.getClassFullName(valetype, usingnamespace);
         }
 
         //最后一个定义名称
@@ -1797,6 +1909,7 @@ class CodeAnalyse {
 
         //找到文件
         //转化成全名称
+        let isProbuf = false;
         let maxInherit = 5;
         let ownnames = [valetype];
         let dequeue = [valetype];
@@ -1813,17 +1926,23 @@ class CodeAnalyse {
                 break;;
             }
 
-            //这里只处理第5层继承
+            //这里只处理5层继承
             let inheritclass = result.inherit;
             for(let i = 0; i < inheritclass.length; i++) {
+                if(inheritclass[i] == "google::protobuf::Message") {
+                    isProbuf = true;
+                }
                 dequeue.push(inheritclass[i]);
             }
             ownnames = ownnames.concat(inheritclass);
         }
 
         let name = lastname.n;
-        //当出现set_xx_size的时候，会出现无法提示的问题
-        name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
+        if(isProbuf) {
+            //当出现命名冲突的时候将无法提示
+            //当出现set_xx_size的时候，会出现无法提示的问题
+            name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
+        }
 
         let fileinfo = df.getDefineInWitchClass(ownnames, name, usingnamespace);
         if (fileinfo == false) {
@@ -2168,8 +2287,9 @@ class CodeAnalyse {
     //重新加载修改过的文件
     reloadAllIncludeFile = function (callback = null) {
         try {
-            if (!this.isinit) {
+            if (!this.isinit || this.loadindex) {
                 //索引加载中，功能暂时不可用
+                console.log("索引加载中，功能暂时不可用");
                 return;
             }
             let that = this;
@@ -2359,8 +2479,6 @@ class CodeAnalyse {
             console.error("call getDefinePoint faild!", error);
         }
     };
-
-
 
     //退出
     onShutdown = function(){

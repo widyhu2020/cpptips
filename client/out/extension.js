@@ -5,6 +5,7 @@
  * ------------------------------------------------------------------------------------------ */
 Object.defineProperty(exports, "__esModule", { value: true });
 const path = require("path");
+const fs = require("fs");
 const vscode_1 = require("vscode");
 const vscode_languageclient_1 = require("vscode-languageclient");
 let client;
@@ -94,6 +95,7 @@ function activate(context) {
             if (data.length <= 0) {
                 return;
             }
+            myStatusBarItem.show();
             myStatusBarItem.text = `$(loading) 正在加载目录：` + data[0];
         });
         client.onNotification("close_show_process", (data) => {
@@ -125,6 +127,32 @@ function activate(context) {
                 //无效通知
                 return;
             }
+        });
+        //打开指定路径的文件
+        client.onNotification("open_file", (message) => {
+            console.log("open_file", message);
+            if (message.length < 1) {
+                //无效通知
+                return;
+            }
+            let options = {
+                selection: new vscode_1.Range(0, 0, 0, 0),
+                preview: false,
+                viewColumn: vscode_1.ViewColumn.Active
+            };
+            let uri = vscode_1.Uri.file(message[0]);
+            vscode_1.workspace.openTextDocument(uri).then(doc => {
+                if (message.length == 2) {
+                    let text = doc.getText();
+                    let _pos = text.indexOf(message[1]);
+                    if (_pos != -1) {
+                        let bposition = doc.positionAt(_pos);
+                        let eposition = doc.positionAt(_pos + message[1].length);
+                        options.selection = new vscode_1.Range(bposition, eposition);
+                    }
+                }
+                vscode_1.window.showTextDocument(doc, options);
+            });
         });
         //右键菜单处理
         context.subscriptions.push(vscode_1.commands.registerCommand('cpp.changeType', (uri) => {
@@ -238,6 +266,102 @@ function activate(context) {
             vscode_1.window.activeTextEditor.edit(editBuilder => {
                 editBuilder.replace(select, newWord);
             });
+        }));
+        //转换为大些
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.transferToUpper', (uri) => {
+            let document = vscode_1.window.activeTextEditor.document;
+            let select = vscode_1.window.activeTextEditor.selection;
+            let word = document.getText(select);
+            let newWord = word.toLocaleUpperCase();
+            vscode_1.window.activeTextEditor.edit(editBuilder => {
+                editBuilder.replace(select, newWord);
+            });
+        }));
+        //转换为小些
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.transferToLower', (uri) => {
+            let document = vscode_1.window.activeTextEditor.document;
+            let select = vscode_1.window.activeTextEditor.selection;
+            let word = document.getText(select);
+            let newWord = word.toLocaleLowerCase();
+            vscode_1.window.activeTextEditor.edit(editBuilder => {
+                editBuilder.replace(select, newWord);
+            });
+        }));
+        //索引处理
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.addIndexDir', (infos) => {
+            console.log(infos);
+            client.sendNotification("addDirToIndex", infos);
+        }));
+        //索引处理
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.delIndexDir', (infos) => {
+            console.log(infos);
+            client.sendNotification("delDirToIndex", infos);
+        }));
+        //刷新所有索引
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.reflushAllIdex', (infos) => {
+            console.log(infos);
+            client.sendNotification("reflushAllIdex", infos);
+        }));
+        //刷新该文件的索引
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.reflushOneIdex', (infos) => {
+            console.log(infos);
+            client.sendNotification("reflushOneIdex", infos);
+        }));
+        //复制文件名称处理
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.copyfilename', (infos) => {
+            console.log(infos);
+            let filepath = infos.path;
+            let pathinfo = path.parse(filepath);
+            console.log(pathinfo.base);
+            let filename = pathinfo.base;
+            const os = require('os');
+            let systemname = process.platform;
+            if (systemname == "linux") {
+                //linux操作系统
+                let exec = require('child_process').exec;
+                exec('printf "' + filename + '" | xsel --input --clipboard');
+                return;
+            }
+            if (systemname == "darwin") {
+                //linux操作系统
+                let exec = require('child_process').exec;
+                let cmd = 'printf "' + filename + '" | pbcopy';
+                console.log(cmd);
+                exec(cmd);
+                return;
+            }
+            if (systemname == "win32") {
+                //windows操作系统
+                let exec = require('child_process').exec;
+                exec('<nul (set/p z="' + filename + '") | clip');
+                return;
+            }
+        }));
+        //提交编译
+        context.subscriptions.push(vscode_1.commands.registerCommand('cpp.build', (infos) => {
+            console.log(infos);
+            let filepath = infos.path;
+            let pathinfo = path.parse(filepath);
+            let dirname = pathinfo.dir;
+            let terminal = vscode_1.window.activeTerminal;
+            if (terminal == undefined) {
+                terminal = vscode_1.window.createTerminal("编译");
+            }
+            terminal.show(true);
+            while (true) {
+                if (!fs.existsSync(dirname + "/BUILD")) {
+                    let _pathinfo = path.parse(dirname);
+                    dirname = _pathinfo.dir;
+                    if (dirname == "" || dirname == "/") {
+                        break;
+                    }
+                    continue;
+                }
+                terminal.sendText("cd " + dirname);
+                terminal.sendText("patchbuild build -d .");
+                return;
+            }
+            terminal.sendText("echo \"未找到可编译的目录！\"");
         }));
     });
     myStatusBarItem = vscode_1.window.createStatusBarItem(vscode_1.StatusBarAlignment.Left, 2);

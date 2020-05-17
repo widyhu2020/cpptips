@@ -57,12 +57,14 @@ class AnalyseDomain {
                 let matchData = reg.exec(blcok);
                 if(matchData){
                     //判断是否为真正函数
+                    let functiondef = matchData[0].trim();
                     let _retType = matchData[1].trim();
                     if(_retType == "else" 
                         || _retType == "if" 
                         || _retType == "for"
                         || _retType == "do"
-                        || _retType == "while") {
+                        || _retType == "while"
+                        || functiondef[functiondef.length - 1] == ";") {
                         tmpdata.push(blcok);
                         continue;
                     }
@@ -79,6 +81,7 @@ class AnalyseDomain {
                     }
                     if(params != "" && !isParamsDefine) {
                         //不是函数定义
+                        tmpdata.push(blcok);
                         continue;
                     }
                     

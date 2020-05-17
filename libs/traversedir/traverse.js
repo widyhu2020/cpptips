@@ -233,20 +233,19 @@ var Traverse = /** @class */ (function () {
             if (filepath[filepath.length - 1] != "/") {
                 _filepath = _filepath + "/";
             }
+            //没有配置的时候工程全部目录都加载
             if (this.needLoadDir.length > 0) {
                 //未配置表示默认加载所有
                 var findInConfig = false;
                 for (var i = 0; i < this.needLoadDir.length; i++) {
                     if (_filepath.indexOf(this.needLoadDir[i]) == 0) {
                         //命中需要加载的目录
-                        //console.log("file need load!", _filepath, this.needLoadDir[i]);
                         findInConfig = true;
                         break;
                     }
                 }
                 if (!findInConfig) {
                     //未在需要加载的目录中
-                    //console.log("file not need load!", _filepath);
                     return true;
                 }
             }
@@ -254,7 +253,6 @@ var Traverse = /** @class */ (function () {
             for (var i = 0; i < this.ignorDir.length; i++) {
                 if (_filepath.indexOf(this.ignorDir[i]) == 0) {
                     //命中忽略目录
-                    //console.log("need ignor dir!", _filepath, this.ignorDir[i]);
                     return true;
                 }
             }
@@ -265,7 +263,6 @@ var Traverse = /** @class */ (function () {
             var testResult = reg.test(realname);
             if (testResult) {
                 //不满足条件的目录和文件
-                //console.log("file not reg match!", realname);
                 return true;
             }
             return false;
@@ -288,7 +285,6 @@ var Traverse = /** @class */ (function () {
                 //let realname = filename.substring(_pos + 1);
                 //判断是否需要忽略的文件夹
                 if (that._checkIsIgnorDir(wkfilename)) {
-                    //console.debug("need ignor dir!", wkfilename);
                     return total;
                 }
                 //系统文件不需要分析，安装插件包里面包含
@@ -308,11 +304,11 @@ var Traverse = /** @class */ (function () {
                     return total;
                 }
                 //一定得fstatSync方法
-                if (dataFile.isSymbolicLink()
-                    && !that.analyseLinkDir.has(wkfilename)) {
-                    //软链接跳过
-                    return total;
-                }
+                // if(dataFile.isSymbolicLink()
+                //     && !that.analyseLinkDir.has(wkfilename)) {
+                //软链接跳过
+                // return total;
+                // }
                 if (!dataFile) {
                     return total;
                 }
@@ -351,6 +347,10 @@ var Traverse = /** @class */ (function () {
                     }
                 }
             });
+            if (total > 50000) {
+                //文件超过50000个，终止扫描
+                that.needStop = true;
+            }
             return total;
         };
         //扫描目录文件并分析
@@ -361,7 +361,6 @@ var Traverse = /** @class */ (function () {
             dirf.forEach(function (el, _index) {
                 if (that.needStop) {
                     //需要退出，不再处理
-                    //console.debug("need stop and exit!");
                     return;
                 }
                 // 加上父级访问更深层的文件夹
@@ -369,15 +368,14 @@ var Traverse = /** @class */ (function () {
                 var wkfilename = filename.replace(that.basedir, "");
                 //判断是否需要忽略的文件夹
                 if (that._checkIsIgnorDir(wkfilename)) {
-                    //console.debug("need ignor dir!", wkfilename);
                     return;
                 }
                 //系统文件不需要分析，安装插件包里面包含
-                if (!that.isAnlyseSystemDir
-                    && that._checkIsSystem(filename)) {
-                    //console.debug("system file, not analyse!");
-                    return;
-                }
+                // if(!that.isAnlyseSystemDir
+                //     && that._checkIsSystem(filename)) {
+                //     //console.debug("system file, not analyse!");
+                //     return;
+                // }
                 var dataFile = null;
                 try {
                     //不判断软连接

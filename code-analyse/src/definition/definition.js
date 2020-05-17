@@ -36,19 +36,31 @@ class Definition extends Completion{
                 //2.命名空间下的方法
                 findclass = kws.getByFullnameAndType('', _namespace, _name, TypeEnum.FUNCTION)
                 if(!findclass) {
-                    //可能命名空间切分到了using namspace和方法名前面
-                    for(let i = 0; i < namespaces.length; i++) {
-                        let ns = namespaces[i];
-                        if(ns != "") {
-                            ns = ns + "::" + _namespace;
-                            namespaces[i] = ns;
+                    //可能是静态类下的静态变量
+                    let _prepos = name.lastIndexOf("::", _pos - 1);
+                    let _ownname = "";
+                    if(_prepos == -1) {
+                        _ownname = _namespace;
+                    } else {
+                        _ownname = name.substring(_prepos + 2, _pos);
+                    }
+                    let _snamespace = name.substring(0, _prepos);
+                    findclass = kws.getByFullnameAndType(_ownname, _snamespace, _name, TypeEnum.FUNCTION)
+                    if(!findclass) {
+                        //可能命名空间切分到了using namspace和方法名前面
+                        for(let i = 0; i < namespaces.length; i++) {
+                            let ns = namespaces[i];
+                            if(ns != "") {
+                                ns = ns + "::" + _namespace;
+                                namespaces[i] = ns;
+                            }
                         }
+                        let lists = kws.getByFullnameNssAndType('', namespaces, _name, TypeEnum.FUNCTION);
+                        if(lists.length <= 0) {
+                            return false;
+                        }
+                        findclass = lists[0];
                     }
-                    let lists = kws.getByFullnameNssAndType('', namespaces, _name, TypeEnum.FUNCTION);
-                    if(lists.length <= 0) {
-                        return false;
-                    }
-                    findclass = lists[0];
                 }
             } else {
                 findclass = findclass[0];
@@ -360,11 +372,25 @@ class Definition extends Completion{
             ownpos = this._findValInStr(filecontext, ownname, 0);
             if (ownpos == -1) {
                 //未找到定义
-                return false;
+                if(/[.]{1,1}proto$/g.test(filepath)) {
+                    //如果是proto定义，尝试重新查
+                    //这里有优化空间，_后面的不一定将是message的名称，且可能多个message都定义了相同的内部message，导致调整不准确
+                    let _pos = ownname.lastIndexOf("_");
+                    if(_pos == -1) {
+                        return false;
+                    }
+                    ownname = ownname.substring(_pos + 1);
+                    ownpos = this._findValInStr(filecontext, ownname, 0);
+                    if(_pos == -1) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
             }
 
             //从定义开始的位置开始找name的定义
-            //proto文件才需呀这样处理
+            //proto文件才需这样处理
             namepos = this._findValInStr(filecontext, name, ownpos)
             if (namepos == -1) {
                 //未找到定义
@@ -432,10 +458,18 @@ class Definition extends Completion{
         console.log(type);
     };
 
-    _findValInStr = function(source, val, bpos) {
+    _findValInStr = function(source, val, bpos, issmall = false) {
+        //全部转为小写查找
+        
         while (true) {
             bpos = source.indexOf(val, bpos);
             if(bpos == -1) {
+                if(!issmall) {
+                    //如果找不到，可能需要大小写兼容
+                    //全部转为小写尝试查找
+                    source = source.toLowerCase();
+                    return this._findValInStr(source, val, bpos, true);
+                }
                 return -1;
             }
 

@@ -41,7 +41,7 @@ class CheckNeedUpdate {
             that._getListOnLocation(filepath, "/client/out", filepath);
             filepath = that.basedir + "/server/out/";
             that._getListOnLocation(filepath, "/server/out", filepath);
-            that._getSignFileInfo("/package.json");
+            // that._getSignFileInfo("/package.json");
             let versionInfo = JSON.stringify(that.filelist);
             console.log(versionInfo);
             let fd = fs.openSync(__dirname + "/../../../list.js", "w+");
@@ -77,7 +77,8 @@ class CheckNeedUpdate {
             that._getListOnLocation(filepath, "/client/out", filepath);
             filepath = that.basedir + "/server/out/";
             that._getListOnLocation(filepath, "/server/out", filepath);
-            that._getSignFileInfo("/package.json");
+            //package更新会导致版本不一致，从而导致vscode不加载插件，因此package永远都不更新
+            // that._getSignFileInfo("/package.json");
 
             //构造映射
             let filemap = {};

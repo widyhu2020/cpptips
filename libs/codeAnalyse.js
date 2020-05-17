@@ -51,6 +51,12 @@ var CodeAnalyse = /** @class */ (function () {
             this.isinit = true;
             return this;
         };
+        //重新加载用户配置
+        this.reloadLoadUserConfig = function (configs) {
+            //设置用户配置
+            this.userConfig = configs.userConfig;
+            return this;
+        };
         //退出
         this.destroy = function () {
             //退出链接
@@ -502,7 +508,7 @@ var CodeAnalyse = /** @class */ (function () {
             var worker = cluster.fork();
             // paramsms结构定义
             var parasms = {
-                msg_type: 1,
+                msg_type: 2,
                 data: {
                     basepath: this.basedir,
                     dbpath: this.dbpath,
@@ -551,15 +557,16 @@ var CodeAnalyse = /** @class */ (function () {
                 if (data.function == "over") {
                     //任务完成关闭子进程
                     worker.kill();
-                    that.loadindex = false;
+                    // that.loadindex = false;
                     callback("success");
                     return;
                 }
             });
             worker.on('exit', function (code, signal) {
                 //恢复正常功能
+                //这里不需要恢复正常功能，否则导致变量被设置成false
                 // console.log("xxxxxxxxxx:exit");
-                that.loadindex = false;
+                // that.loadindex = false;
             });
         };
         //全部扫描修改过的头文件重新分析
@@ -592,8 +599,6 @@ var CodeAnalyse = /** @class */ (function () {
                     return;
                 }
                 if (data.function == "source") {
-                    //在分析源文件，此时可以解冻
-                    that.loadindex = false;
                     callback("source_process", value["showprocess"], value["totalNum"], value["index"]);
                     return;
                 }
@@ -890,7 +895,7 @@ var CodeAnalyse = /** @class */ (function () {
         //回溯找到变量定义
         this._getValDefineOwn = function (lines, valname) {
             for (var i = lines.length - 1; i >= 0; i--) {
-                var line = lines[i];
+                var line = lines[i].trim();
                 var pos = this._findVanamePos(line, valname);
                 if (pos == -1) {
                     //未找到直接跳过
@@ -922,6 +927,16 @@ var CodeAnalyse = /** @class */ (function () {
                     pretype = "typeof";
                 }
                 pretype = pretype.trim();
+                if (pretype[pretype.length - 1] == ","
+                    && pretype.indexOf(" ") != -1) {
+                    //一行包含多变量定义
+                    var _pos = pretype.indexOf(" ");
+                    pretype = pretype.substring(0, _pos);
+                }
+                if (pretype[pretype.length - 1] == "=") {
+                    //这种肯定不是定义
+                    continue;
+                }
                 var ispoint = 0;
                 if (pretype.indexOf('*') != -1) {
                     ispoint = 1;
@@ -944,7 +959,12 @@ var CodeAnalyse = /** @class */ (function () {
                     if (pretype.indexOf("::") == 0) {
                         pretype = pretype.substring(2);
                     }
-                    return { t: pretype, l: sourctline, p: ispoint };
+                    if (/[\w\s:]{1,256}/g.test(pretype)
+                        || (pretype.indexOf("<") != -1 && pretype[pretype.length - 1] == ">")) {
+                        //定义不能有其他字符
+                        pretype = pretype.replace(/[\s]{0,4}[<>]{1,1}[\s]{0,4}/g, function (kw) { return kw.trim(); });
+                        return { t: pretype, l: sourctline, p: ispoint };
+                    }
                 }
             }
             return { t: "", l: "", p: 0, pos: -1 };
@@ -1060,11 +1080,20 @@ var CodeAnalyse = /** @class */ (function () {
                 var line = _valetype.l;
                 var _pos = line.indexOf(_valetype.t);
                 var _beginpos = line.indexOf("=", _pos);
+                if (_beginpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                    //兼容for(auto a: fddd)语法
+                    _beginpos = line.indexOf(":", _pos);
+                }
                 if (_pos == -1 || _beginpos == -1) {
                     //没有值无法定位
                     return [];
                 }
                 var _endpos = line.indexOf(";", _pos);
+                if (_endpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                    //兼容for(auto a: fddd)语法
+                    _endpos = line.indexOf("{", _pos);
+                    _endpos = line.lastIndexOf(")", _endpos);
+                }
                 var _type = line.substring(_beginpos + 1, _endpos).trim();
                 var _names = this._getValName(_type);
                 names = names.concat(_names);
@@ -1084,13 +1113,54 @@ var CodeAnalyse = /** @class */ (function () {
                 var _valetype_1 = _nameInfo.namespace != "" ? _nameInfo.namespace + "::" + _nameInfo.name : _nameInfo.name;
                 var tmptype = this._findObjctWhitNames(_valetype_1, names[i]);
                 if (!tmptype) {
-                    return [];
+                    //获取对象或者继承父中的定义
+                    var df = new Definition(this.basedir, this.extPath);
+                    valetype = this._getObjectName(df, _valetype_1, names[i].n, usingnamespace);
+                    if (valetype == false) {
+                        //没有找到
+                        return [];
+                    }
+                    break;
                 }
                 valetype = cp.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
                 usingnamespace.push(_nameInfo.namespace);
                 valetype = cp.getClassFullName(valetype, usingnamespace);
             }
             return this._getClassAndInheritFuntionAndVar(cp, valetype, _ownname, usingnamespace);
+        };
+        //获取类的成员函数，包括继承的父类
+        this._getObjectName = function (df, valetype, names, usingnamespace) {
+            //尝试获取继承父的方法
+            var maxInherit = 5;
+            var ownnames = [valetype];
+            var dequeue = [valetype];
+            while (--maxInherit > 0) {
+                var _valtype = dequeue.pop();
+                if (!_valtype) {
+                    //无元素可处理
+                    break;
+                }
+                var result = df.getClassDefineInfo(_valtype, usingnamespace);
+                if (result == false) {
+                    //没找到定义
+                    break;
+                }
+                var inheritclass = result.inherit;
+                for (var i = 0; i < inheritclass.length; i++) {
+                    dequeue.push(inheritclass[i]);
+                }
+                ownnames = ownnames.concat(inheritclass);
+            }
+            ;
+            var fileinfo = df.getDefineInWitchClass(ownnames, names, usingnamespace);
+            if (fileinfo == false) {
+                //未找到定义
+                return false;
+            }
+            var extJson = JSON.parse(fileinfo.info.extdata);
+            valetype = extJson[0].r.t;
+            valetype = df.getClassFullName(valetype, usingnamespace);
+            return valetype;
         };
         //自动填参数分析
         this._autoFillParams = function (filepath, filecontext, preParams) {
@@ -1452,11 +1522,19 @@ var CodeAnalyse = /** @class */ (function () {
                 var line = _valetype.l;
                 var _pos = line.indexOf(_valetype.t);
                 var _beginpos = line.indexOf("=", _pos);
+                if (_beginpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                    //兼容for(auto a: fddd)语法
+                    _beginpos = line.indexOf(":", _pos);
+                }
                 if (_pos == -1 || _beginpos == -1) {
                     //没有值无法定位
                     return [];
                 }
                 var _endpos = line.indexOf(";", _pos);
+                if (_endpos == -1 && /^for[\s]{0,4}\(/g.test(line)) {
+                    _endpos = line.indexOf("{", _pos);
+                    _endpos = line.lastIndexOf(")", _endpos);
+                }
                 var _type = line.substring(_beginpos + 1, _endpos).trim();
                 var _names = this._getValName(_type);
                 names = names.concat(_names);
@@ -1587,16 +1665,48 @@ var CodeAnalyse = /** @class */ (function () {
                 var _nameInfo = DefineMap.getInstace().getRealName(valetype);
                 var tmptype = this._findObjctWhitNames(valetype, names[i]);
                 if (!tmptype) {
-                    return false;
+                    //尝试获取继承父的方法
+                    var maxInherit_1 = 5;
+                    var ownnames_1 = [valetype];
+                    var dequeue_1 = [valetype];
+                    while (--maxInherit_1 > 0) {
+                        var _valtype = dequeue_1.pop();
+                        if (!_valtype) {
+                            //无元素可处理
+                            break;
+                        }
+                        var result = df.getClassDefineInfo(_valtype, usingnamespace);
+                        if (result == false) {
+                            //没找到定义
+                            break;
+                        }
+                        var inheritclass = result.inherit;
+                        for (var i_1 = 0; i_1 < inheritclass.length; i_1++) {
+                            dequeue_1.push(inheritclass[i_1]);
+                        }
+                        ownnames_1 = ownnames_1.concat(inheritclass);
+                    }
+                    ;
+                    var fileinfo_1 = df.getDefineInWitchClass(ownnames_1, names[i].n, usingnamespace);
+                    if (fileinfo_1 == false) {
+                        //未找到定义
+                        return false;
+                    }
+                    var extJson = JSON.parse(fileinfo_1.info.extdata);
+                    valetype = extJson[0].r.t;
+                    valetype = df.getClassFullName(valetype, usingnamespace);
                 }
-                valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
-                usingnamespace.push(_nameInfo.namespace);
-                valetype = df.getClassFullName(valetype, usingnamespace);
+                else {
+                    valetype = df.getMapedName(tmptype, valetype, _nameInfo.name, _nameInfo.namespace);
+                    usingnamespace.push(_nameInfo.namespace);
+                    valetype = df.getClassFullName(valetype, usingnamespace);
+                }
             }
             //最后一个定义名称
             var lastname = names[0];
             //找到文件
             //转化成全名称
+            var isProbuf = false;
             var maxInherit = 5;
             var ownnames = [valetype];
             var dequeue = [valetype];
@@ -1612,16 +1722,22 @@ var CodeAnalyse = /** @class */ (function () {
                     break;
                     ;
                 }
-                //这里只处理第5层继承
+                //这里只处理5层继承
                 var inheritclass = result.inherit;
                 for (var i = 0; i < inheritclass.length; i++) {
+                    if (inheritclass[i] == "google::protobuf::Message") {
+                        isProbuf = true;
+                    }
                     dequeue.push(inheritclass[i]);
                 }
                 ownnames = ownnames.concat(inheritclass);
             }
             var name = lastname.n;
-            //当出现set_xx_size的时候，会出现无法提示的问题
-            name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
+            if (isProbuf) {
+                //当出现命名冲突的时候将无法提示
+                //当出现set_xx_size的时候，会出现无法提示的问题
+                name = name.replace(/^set_|^add_|^mutable_|^clear_|^has_|_size$|_IsValid$/g, "");
+            }
             var fileinfo = df.getDefineInWitchClass(ownnames, name, usingnamespace);
             if (fileinfo == false) {
                 //未找到定义
@@ -1953,8 +2069,9 @@ var CodeAnalyse = /** @class */ (function () {
         this.reloadAllIncludeFile = function (callback) {
             if (callback === void 0) { callback = null; }
             try {
-                if (!this.isinit) {
+                if (!this.isinit || this.loadindex) {
                     //索引加载中，功能暂时不可用
+                    console.log("索引加载中，功能暂时不可用");
                     return;
                 }
                 var that_1 = this;

@@ -143,6 +143,15 @@ var RebuildFileIndex = /** @class */ (function () {
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
             console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
+            if (totalNum > 50000) {
+                //大于50000个文件将不创建索引，强制引导指定索引目录
+                updateProcess(0, 0, 0, "stop_load_index", "");
+                return;
+            }
+            if (totalNum > 30000) {
+                //大于30000个提示指定目录，但不强制拦截
+                updateProcess(0, 0, 0, "show_file_more", "");
+            }
             //分析头文件遍历
             tr.scanDirFile(resolve);
         };
@@ -200,6 +209,15 @@ var RebuildFileIndex = /** @class */ (function () {
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
             console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
+            if (totalNum > 50000) {
+                //大于50000个文件将不创建索引，强制引导指定索引目录
+                updateProcess(0, 0, 0, "stop_load_index", "");
+                return;
+            }
+            if (totalNum > 30000) {
+                //大于30000个提示指定目录，但不强制拦截
+                updateProcess(0, 0, 0, "show_file_more", "");
+            }
             //分析头文件遍历
             tr.scanDirFile(resolve);
         };
@@ -257,7 +275,7 @@ var RebuildFileIndex = /** @class */ (function () {
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
             if (!forckReolad && hasInDb && Math.floor(updatetime) == Math.floor(fileinfo.updatetime)) {
                 //文件未更新，无需重新加载
-                console.info("this file not modify!");
+                // console.info("this file not modify!");
                 fs.closeSync(fd);
                 return;
             }
@@ -518,8 +536,8 @@ if (cluster.isMaster) {
             // dbpath: "/Users/widyhu/widyhu/cpptips/data/basedb.db",
             // filepath: '/usr/local/include/google/protobuf/message_lite.h',
             basepath: "/Users/widyhu/widyhu/cpp_project/",
-            dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db",
-            filepath: '/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/CurrentFlowState.cpp',
+            dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
+            filepath: '/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffdaosvr/mmpaymchplstaffdaosvr.proto',
             filepaths: ['/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.cpp',
                 '/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.h'],
             issystem: 0,
@@ -567,7 +585,13 @@ else if (cluster.isWorker) {
             },
             extdata: extdata
         };
-        process.send(message);
+        try {
+            process.send(message);
+        }
+        catch (error) {
+            console.log(error);
+            console.log(message);
+        }
     }
     ;
     function reloadAllFile(basedir, dbpath, resolve, issystem) {

@@ -11,7 +11,8 @@ var fs = require('fs');
 var StdIteratorType = new Set([
     'reference', 'const_reference',
     'size_type', 'iterator', 'const_iterator',
-    'const_reverse_iterator', 'reverse_iterator'
+    'const_reverse_iterator', 'reverse_iterator',
+    '__string_type'
 ]);
 var DefineMap = /** @class */ (function () {
     function DefineMap() {

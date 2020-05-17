@@ -22,10 +22,10 @@ let basedir = "/Users/widyhu/widyhu/cpp_project/";
 filename = "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/mmpaymchmgrmerchantdaosvr.proto";
 
 //测试归属找提示
-//113 23
-let line = 113;
-let cpos = 23;
-filename = "/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/ResetCurrentProcess.cpp";
+// 94 140
+let line = 94;
+let cpos = 140;
+filename = "/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffaosvr/logic/QueryEmployeeRealNameUinMini.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);
@@ -110,7 +110,7 @@ function succcallbackloadcpp(){
 
     //let d = CodeAnalyse.getInstace().getAllNameByNamespace(filename, precontext, []);
     //let d = CodeAnalyse.getInstace().getSignatureHelp(filename, precontext, []);
-    //let d = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, []);
+    // let d = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, []);
     //let d = CodeAnalyse.getInstace().getIncludeDefine(filename, "mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductdaosvr/mmpaymchproductdaosvrclient.h");
     let d = CodeAnalyse.getInstace().getDefinePoint(filename, precontext2, linelast, []);
     //let d = CodeAnalyse.getInstace().searchKeyWord(filename, "mmpaymchmerchantofflinedaosvr::MERCHANT_EV", precontext);
@@ -126,8 +126,8 @@ function succcallbackloadindex(msg, a, b, c) {
 CodeAnalyse.getInstace().init({ 
     basedir: basedir,
     extpath: "/Users/widyhu/widyhu/cpptips",
-    // dbpath: "/Users/widyhu/widyhu/yundb/.db/.cpptips.db",
-    dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/.db/.cpptips.db", 
+    // dbpath: "/Users/widyhu/widyhu/yundb/db/cpptips.db",
+    dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db", 
     showsql: 1
 });
 

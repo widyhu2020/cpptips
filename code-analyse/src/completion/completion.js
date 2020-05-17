@@ -17,13 +17,49 @@ class Completion {
         //Store.getInstace(dbfile);
     }
 
+    transferStlName = function(templatename, params, name) {
+        let _pos = templatename.lastIndexOf("::");
+        if(templatename.substring(0, _pos) != "std") {
+            return templatename;
+        }
+        let ownname = templatename.substring(_pos + 2);
+        if(name == "const_iterator" 
+            || name == "iterator"
+            || name == "reverse_iterator"
+            || name == "const_reverse_iterator") {
+            if(ownname == "map") {
+                return "std::pair<" + params + ">";
+            }
+            return params;
+        }
+        return templatename;
+    };
+
     //获取类的全名称
     getClassFullName = function (name, namespaces) {
         let kws = KeyWordStore.getInstace();
-        if(name.indexOf("::") != -1) {
+        if(name.indexOf("::") != -1 && name.indexOf("<") == -1) {
             //已经包含命名空间，直接返回
+            //且不是模版定义
             return name;
         }
+        
+        //如果类目带模版参数，则去掉
+        if(name[name.length - 1] == ">") {
+            name = name.replace(/<[\w\s<>,:]{1,256}$/g, "");
+        } else {
+            let _pos = name.lastIndexOf(">");
+            let _bpos = name.indexOf("<");
+            if(name[_pos + 1] != ":" || name[_pos + 2] != ":") {
+                name = name.replace(/<[\w\s<>,:]{1,256}$/g, "");
+            } else {
+                let _definename = name.substring(_pos + 3);
+                let _name = name.substring(0, _bpos);
+                let params = name.substring(_bpos + 1, _pos);
+                name = this.transferStlName(_name, params, _definename);
+            }
+        }
+
         //没有命名空间的，需要找到全名称
         let findclass = kws.getByNameAndNamespaces(name, namespaces);
         if (findclass.length <= 0) {
@@ -39,16 +75,41 @@ class Completion {
             return this.getClassFullName(extData.v, namespaces);
         }
 
+        //typedef处理
+        if (findclass.length == 1
+            && findclass[0].type == TypeEnum.TYPEDEF) {
+            //宏定义
+            let extData = JSON.parse(findclass[0].extdata);
+            return this.getClassFullName(extData.v, namespaces);
+        }
+
         findclass.sort((a,b)=>{
+            //这里可以优化成类型排序【类>结构体>type>define>其他】
             return b.namespace.length - a.namespace.length;
         });
 
         //只处理第一个，如果有多个这里忽略除一个以外的
         for (let i = 0; i < findclass.length; i++) {
             if (findclass[i].type != TypeEnum.CALSS
-                && findclass[i].type != TypeEnum.STRUCT) {
+                && findclass[i].type != TypeEnum.STRUCT
+                && findclass[i].type != TypeEnum.DEFINE
+                && findclass[i].type != TypeEnum.TYPEDEF) {
                 //不是类的定义
                 continue;
+            }
+
+            //宏定义处理
+            if (findclass[i].type == TypeEnum.DEFINE) {
+                //宏定义
+                let extData = JSON.parse(findclass[i].extdata);
+                return this.getClassFullName(extData.v, namespaces);
+            }
+
+            //typedef处理
+            if (findclass[i].type == TypeEnum.TYPEDEF) {
+                //宏定义
+                let extData = JSON.parse(findclass[i].extdata);
+                return this.getClassFullName(extData.v, namespaces);
             }
 
             if (findclass[i].namespace == "") {
@@ -407,7 +468,7 @@ class Completion {
                 insertCode = info.name + "(";
                 let index = 1;
                 for(let i = 0; i < extJson[0].i.length; i++) {
-                    let showTips = "【按Tab键切换到下个参数】";
+                    let showTips = "【空格自动选参、TAB跳到下一个参数】";
                     if (extJson[0].i.length == 1) {
                         showTips = "";
                     }
@@ -422,7 +483,7 @@ class Completion {
                 insertCode = info.name + "(";
                 let index = 1;
                 for (let i = 0; i < extJson.p.length; i++) {
-                    let showTips = "【按Tab键切换到下个参数】";
+                    let showTips = "【空格自动选参、TAB跳到下一个参数】";
                     if (extJson.p.length == 1) {
                         showTips = "";
                     }
@@ -765,6 +826,9 @@ class Completion {
                 if (__ownnames == "map" && paramsdef.length == 2) {
                     tmptype = "std::pair<" + paramsdef[0] + "," + paramsdef[1] + ">";
                     return tmptype;
+                } if(tmptype == "__string_type") {
+                    //字符类型
+                    return "std::basic_string";
                 } else {
                     let first = paramsdef[0];
                     tmptype = first;

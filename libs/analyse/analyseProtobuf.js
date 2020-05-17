@@ -216,6 +216,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                         && current.parent.ownname.type == TypeEnum.CALSS) {
                         current.namespace = parentnamespace; // + "_" + current.ownname.name;
                         current.ownname.name = current.parent.ownname.name + "_" + current.ownname.name;
+                        _this.innerNameMap[current.ownname.name] = current.parent.ownname.name + "@" + current.ownname.name;
                     }
                     else {
                         current.namespace = parentnamespace; // + "::" + current.ownname.name;
@@ -369,6 +370,19 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         //单个字段分析
         _this._analyseFildProto = function (node, prename, type, name, annotate) {
             //console.log(prename, type, name, annotate);
+            //protobuf生产的方法，会将大些转成小写
+            //获取父区域的名称
+            if (node.parent
+                && node.parent.ownname) {
+                var _name = node.parent.ownname.name;
+                var _key = node.ownname.name + "_" + type;
+                //console.log("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
+                if (this.innerNameMap[_key]) {
+                    type = _key;
+                    //console.log("ddddddddd",type);
+                }
+            }
+            name = name.toLowerCase();
             //非数组处理
             if (prename == "optional" || prename == "required") {
                 //console.log(prename, type, name, annotate);
@@ -778,14 +792,15 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 return prototype;
             }
             //内部定义的message
-            for (var i = 0; i < node.children.length; i++) {
-                if (!node.children[i].ownname) {
-                    continue;
-                }
-                if (node.children[i].ownname.name == prototype) {
-                    return node.children[i].namespace;
-                }
-            }
+            // for (let i = 0; i < node.children.length; i++){
+            //     if (!node.children[i].ownname) {
+            //         continue;
+            //     }
+            //     if (node.children[i].ownname.name == prototype) {
+            //         console.log("dfdfdfd",node.children[i].ownname.name , prototype, node.children[i].namespace);
+            //         return node.children[i].namespace;
+            //     }
+            // }
             if (this.basenamespace == "") {
                 return prototype;
             }
@@ -795,6 +810,8 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         //proto需要的变量
         _this.proto_annotate = {};
         _this.basenamespace = "";
+        //用于处理message中嵌套message
+        _this.innerNameMap = {};
         return _this;
     }
     ;

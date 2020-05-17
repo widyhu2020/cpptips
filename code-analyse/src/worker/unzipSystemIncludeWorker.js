@@ -78,7 +78,7 @@ if (cluster.isMaster) {
     const worker = cluster.fork();
     let parasms = {
         extpath: "/Users/widyhu/workspace/cpptips/",
-        dbpath: "/Users/widyhu/workspace/cpp_project/.vscode/.db/.cpptips.db"
+        dbpath: "/Users/widyhu/workspace/cpp_project/.vscode/db/cpptips.db"
 
     }
     worker.send(parasms);

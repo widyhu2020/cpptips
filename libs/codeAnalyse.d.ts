@@ -41,11 +41,11 @@ declare interface UpdateCallBack<P1> {
 }
 
 declare interface CaConfig {
-	basedir: string,
-	dbpath: string,
-	showsql: number,
-	extpath: string,
-	userConfig: any
+	basedir: string|undefined,
+	dbpath: string|undefined,
+	showsql: number|undefined,
+	extpath: string|undefined,
+	userConfig: any|undefined
 }
 
 declare interface PointInfo {
@@ -100,6 +100,10 @@ declare class CodeAnalyse {
 
 	//初始化
 	init(config: CaConfig): CodeAnalyse;
+
+	//重新加载配置文件
+	reloadLoadUserConfig(configs: CaConfig): CodeAnalyse;
+
 	//释放资源
 	destroy():void;
 	//判断是否正在繁忙中

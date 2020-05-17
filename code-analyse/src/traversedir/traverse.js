@@ -314,20 +314,19 @@ class Traverse {
             _filepath = _filepath + "/";
         }
 
+        //没有配置的时候工程全部目录都加载
         if(this.needLoadDir.length > 0) {
             //未配置表示默认加载所有
             let findInConfig = false;
             for(let i = 0; i < this.needLoadDir.length; i++) {
                 if(_filepath.indexOf(this.needLoadDir[i]) == 0) {
                     //命中需要加载的目录
-                    //console.log("file need load!", _filepath, this.needLoadDir[i]);
                     findInConfig = true;
                     break;
                 }
             }
             if(!findInConfig) {
                 //未在需要加载的目录中
-                //console.log("file not need load!", _filepath);
                 return true;
             }
         }
@@ -336,7 +335,6 @@ class Traverse {
         for(let i = 0; i < this.ignorDir.length; i++) {
             if(_filepath.indexOf(this.ignorDir[i]) == 0) {
                 //命中忽略目录
-                //console.log("need ignor dir!", _filepath, this.ignorDir[i]);
                 return true;
             }
         }
@@ -348,7 +346,6 @@ class Traverse {
         let testResult = reg.test(realname);
         if(testResult) {
             //不满足条件的目录和文件
-            //console.log("file not reg match!", realname);
             return true;
         }
 
@@ -374,7 +371,6 @@ class Traverse {
 
             //判断是否需要忽略的文件夹
             if(that._checkIsIgnorDir(wkfilename)) {
-                //console.debug("need ignor dir!", wkfilename);
                 return total;
             }
 
@@ -396,11 +392,11 @@ class Traverse {
             }
         
             //一定得fstatSync方法
-            if(dataFile.isSymbolicLink()
-                && !that.analyseLinkDir.has(wkfilename)) {
+            // if(dataFile.isSymbolicLink()
+            //     && !that.analyseLinkDir.has(wkfilename)) {
                 //软链接跳过
-                return total;
-            }
+                // return total;
+            // }
         
             if (!dataFile) {
                 return total;
@@ -438,6 +434,11 @@ class Traverse {
                 }
             }
         });
+        
+        if(total > 50000) {
+            //文件超过50000个，终止扫描
+            that.needStop = true;
+        }
         return total;
     };
 
@@ -450,7 +451,6 @@ class Traverse {
         dirf.forEach(function (el, _index) {
             if(that.needStop) {
                 //需要退出，不再处理
-                //console.debug("need stop and exit!");
                 return;
             }
 
@@ -460,16 +460,15 @@ class Traverse {
 
             //判断是否需要忽略的文件夹
             if(that._checkIsIgnorDir(wkfilename)) {
-                //console.debug("need ignor dir!", wkfilename);
                 return;
             }
 
             //系统文件不需要分析，安装插件包里面包含
-            if(!that.isAnlyseSystemDir
-                && that._checkIsSystem(filename)) {
-                //console.debug("system file, not analyse!");
-                return;
-            }
+            // if(!that.isAnlyseSystemDir
+            //     && that._checkIsSystem(filename)) {
+            //     //console.debug("system file, not analyse!");
+            //     return;
+            // }
 
             let dataFile = null;
             try {

@@ -72,7 +72,7 @@ if (cluster.isMaster) {
     var worker_1 = cluster.fork();
     var parasms = {
         extpath: "/Users/widyhu/workspace/cpptips/",
-        dbpath: "/Users/widyhu/workspace/cpp_project/.vscode/.db/.cpptips.db"
+        dbpath: "/Users/widyhu/workspace/cpp_project/.vscode/db/cpptips.db"
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
