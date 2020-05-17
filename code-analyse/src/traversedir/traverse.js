@@ -327,7 +327,16 @@ class Traverse {
             }
             if(!findInConfig) {
                 //未在需要加载的目录中
-                return true;
+                //正则匹配忽略
+                let pathinfo = path.parse(filepath);
+                let realname = pathinfo.base;
+                let reg = new RegExp(this.regexStr,"ig");
+                let testResult = reg.test(realname);
+                if(testResult) {
+                    //不满足条件的目录和文件
+                    return 2;
+                }
+                return 1;
             }
         }
 
@@ -335,21 +344,21 @@ class Traverse {
         for(let i = 0; i < this.ignorDir.length; i++) {
             if(_filepath.indexOf(this.ignorDir[i]) == 0) {
                 //命中忽略目录
-                return true;
+                return 3;
             }
         }
 
         //正则匹配忽略
-        let _pos = filepath.lastIndexOf("/");
-        let realname = filepath.substring(_pos + 1);
+        let pathinfo = path.parse(filepath);
+        let realname = pathinfo.base;
         let reg = new RegExp(this.regexStr,"ig");
         let testResult = reg.test(realname);
         if(testResult) {
             //不满足条件的目录和文件
-            return true;
+            return 2;
         }
 
-        return false;
+        return 0;
     };
 
     //统计任务数量
@@ -368,9 +377,17 @@ class Traverse {
             let wkfilename = filename.replace(that.basedir, "");
             //let _pos = filename.lastIndexOf('/');
             //let realname = filename.substring(_pos + 1);
+            if(filename.split('/').length > 20){
+                //10层以上的目录结构不处理
+                return total;
+            }
 
             //判断是否需要忽略的文件夹
-            if(that._checkIsIgnorDir(wkfilename)) {
+            let needFile = true;
+            let _ret = that._checkIsIgnorDir(wkfilename);
+            if(_ret == 1) {
+                needFile = false;
+            } else if(_ret > 0) {
                 return total;
             }
 
@@ -417,7 +434,7 @@ class Traverse {
                     return total;
                 }
                 total = total + that._readDirForTotalFile(filename, callbackshow);
-            } else if (dataFile.isFile()){   
+            } else if (needFile && dataFile.isFile()){   
                 let pos = filename.lastIndexOf(".");
                 let ext = filename.substr(pos);
                 if(that.includeExt.has(ext) 
@@ -451,8 +468,17 @@ class Traverse {
             let filename = `${dirfather}` + "/" + el;
             let wkfilename = filename.replace(that.basedir, "");
 
+            if(filename.split('/').length > 20){
+                //10层以上的目录结构不处理
+                return;
+            }
+
             //判断是否需要忽略的文件夹
-            if(that._checkIsIgnorDir(wkfilename)) {
+            let needFile = true;
+            let _ret = that._checkIsIgnorDir(wkfilename);
+            if(_ret == 1) {
+                needFile = false;
+            } else if(_ret > 0) {
                 return;
             }
 
@@ -479,7 +505,7 @@ class Traverse {
                 // 又是文件夹
                 // 遍历文件夹
                 that._readDir(filename);
-            } else if (dataFile.isFile()){
+            } else if (needFile && dataFile.isFile()){
                 //后缀校验
                 let pos = filename.lastIndexOf(".");
                 let ext = filename.substr(pos);

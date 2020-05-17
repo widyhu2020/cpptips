@@ -43,7 +43,7 @@
 				"cpptips.ignoreFileAndDir": {
 					"type": "array",
 					"default": [
-						"^[.~]{1,1}.{1,128}$",
+						"^[.~]{1,1}[.]{1,128}$",
 						"^.*_tools_pb\\.(cpp|h)$",
 						"^.*testimpl_pb\\.(cpp|h)$",
 						"^.*\\.pb\\.(cc|h)$",
@@ -58,7 +58,10 @@
 						"^debug$",
 						"^release$",
 						"^win32$",
-						"^bin$"
+						"^bin$",
+						"^\\.svn$",
+						"^\\.git$",
+						"^\\.vscode$"
 					],
 					"description": "需要忽略的文件的名称或者正则表达式，该规则叠加在最后，符合该规则的文件或者文件夹都将不加载"
 				},
