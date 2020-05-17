@@ -710,8 +710,15 @@ class CodeAnalyse {
                 return;
             }
 
+            if(data.function == "stop_load_index"){
+                that.loadindex = false;
+                callback(data.function, 0, 0, 0);
+                return;
+            }
+
             //其他函数
             callback(data.function, 0, 0, 0);
+            
         });
         worker.on('exit', (code, signal) => {
             //恢复正常功能

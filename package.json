@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.1.18",
+	"version": "0.1.20",
 	"icon": "resources/cpp.png",
 	"engines": {
 		"vscode": "^1.43.0"
@@ -201,7 +201,7 @@
 			],
 			"explorer/context": [
 				{
-					"when": "true",
+					"when": "isMac",
 					"command": "cpp.copyfilename",
 					"alt": "cpp.copyfilename",
 					"group": "6_copypath"
@@ -213,7 +213,7 @@
 					"group": "2_workspace@1"
 				},
 				{
-					"when": "isMac && resourceScheme == file && resourceExtname == ",
+					"when": "resourceScheme == file && resourceExtname == ",
 					"command": "cpp.delIndexDir",
 					"alt": "cpp.delIndexDir",
 					"group": "2_workspace@2"

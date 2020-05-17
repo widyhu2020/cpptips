@@ -143,13 +143,13 @@ var RebuildFileIndex = /** @class */ (function () {
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
             console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
-            if (totalNum > 50000) {
-                //大于50000个文件将不创建索引，强制引导指定索引目录
+            if (totalNum > 120000) {
+                //大于120000个文件将不创建索引，强制引导指定索引目录
                 updateProcess(0, 0, 0, "stop_load_index", "");
                 return;
             }
-            if (totalNum > 30000) {
-                //大于30000个提示指定目录，但不强制拦截
+            if (totalNum > 50000) {
+                //大于50000个提示指定目录，但不强制拦截
                 updateProcess(0, 0, 0, "show_file_more", "");
             }
             //分析头文件遍历
@@ -209,13 +209,13 @@ var RebuildFileIndex = /** @class */ (function () {
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
             console.timeEnd("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
-            if (totalNum > 50000) {
-                //大于50000个文件将不创建索引，强制引导指定索引目录
+            if (totalNum > 120000) {
+                //大于120000个文件将不创建索引，强制引导指定索引目录
                 updateProcess(0, 0, 0, "stop_load_index", "");
                 return;
             }
-            if (totalNum > 30000) {
-                //大于30000个提示指定目录，但不强制拦截
+            if (totalNum > 50000) {
+                //大于50000个提示指定目录，但不强制拦截
                 updateProcess(0, 0, 0, "show_file_more", "");
             }
             //分析头文件遍历

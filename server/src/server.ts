@@ -213,10 +213,10 @@ function reloadIncludeFileCallBack(
         showErrorMessage("文件索引加载失败！");
     }
     if(msg == "stop_load_index") {
-        showErrorMessage("你工程目录文件超过50000个，系统终止索引计算，请目录右键“加入索引范围”指定需要计算的目录！");
+        showErrorMessage("你工程目录文件超过120000个，系统终止索引计算，请目录右键“加入索引范围”指定需要计算的目录！");
     }
     if(msg == "show_file_more") {
-        showWarningMessage("你工程目录文件超过30000个，文件过多将影响索引性能，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
+        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
     
     sendMsgToVscode("close_show_process", data);

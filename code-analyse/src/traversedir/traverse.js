@@ -435,8 +435,8 @@ class Traverse {
             }
         });
         
-        if(total > 50000) {
-            //文件超过50000个，终止扫描
+        if(total > 120000) {
+            //文件超过120000个，终止扫描
             that.needStop = true;
         }
         return total;

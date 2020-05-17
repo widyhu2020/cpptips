@@ -621,6 +621,11 @@ var CodeAnalyse = /** @class */ (function () {
                     callback("scan_ing", 0, 0, 0, data.extdata);
                     return;
                 }
+                if (data.function == "stop_load_index") {
+                    that.loadindex = false;
+                    callback(data.function, 0, 0, 0);
+                    return;
+                }
                 //其他函数
                 callback(data.function, 0, 0, 0);
             });

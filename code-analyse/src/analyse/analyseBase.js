@@ -813,7 +813,7 @@ class AnalyseBase {
             this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
         }
 
-        console.log("resave over!");
+        //console.log("resave over!");
     };
 
     //拼接key，拼接的key用于构造返回数据
