@@ -232,7 +232,7 @@ if (cluster.isMaster) {
     let parasms = {
         basedir: "/Users/widyhu/widyhu/cpp_project/",
         sysdir: "",
-        cppfilename: "/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.cpp",
+        cppfilename: "xxxxx",
         dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db"
     }
     worker.send(parasms);

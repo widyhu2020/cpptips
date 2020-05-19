@@ -537,9 +537,9 @@ if (cluster.isMaster) {
             // filepath: '/usr/local/include/google/protobuf/message_lite.h',
             basepath: "/Users/widyhu/widyhu/cpp_project/",
             dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
-            filepath: '/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffdaosvr/mmpaymchplstaffdaosvr.proto',
-            filepaths: ['/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.cpp',
-                '/mmpay/mmpaymchmgr/mmpaymchmerchant4pay/mmpaymchmerchant4payaosvr/logic/MerchantMemCache.h'],
+            filepath: 'xxxxxxxx',
+            filepaths: ['xxxxxxxx',
+                'xxxxxxxx'],
             issystem: 0,
             userConfig: defaultSettings
         }

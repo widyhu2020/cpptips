@@ -1394,6 +1394,9 @@ var CodeAnalyse = /** @class */ (function () {
                 prelinecode: findIncludeFile,
                 title: "头文件"
             };
+            if (_filename.indexOf('/') != 0) {
+                result.filename = "file:///" + _filename;
+            }
             return result;
         };
         //获取文档结构

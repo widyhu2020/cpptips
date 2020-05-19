@@ -1049,9 +1049,9 @@ if (cluster.isMaster) {
     //测试代码
 	//获取basepath
 	const fs = require('fs');
-	let basedir = "/Users/widyhu/widyhu/cpp_project/";
-	let dbpath = "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db";
-	let filename = "/mmpay/mmpaymchmgr/mmpaymchmgrworkflow/mmpaymchmgrworkflowaosvr/doworkflow_logic/PassCurrentProcess.cpp";
+	let basedir = "/";
+	let dbpath = "/";
+	let filename = "PassCurrentProcess.cpp";
 	let fd = fs.openSync(basedir + filename, 'r');
 	const buffer = Buffer.alloc(1024 * 1024);
 	let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);

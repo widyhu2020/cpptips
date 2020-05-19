@@ -16,14 +16,14 @@ const path = require('path');
 // console.log(process.versions.node);
 // return;
 
-//filename = "/appplatform/export_include/c2cplatform/library/the3/svrkit_api_co/comm2_core/utils/iPriorityQueue_Heap.h";
-filename = "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/mmpaymchmgrmerchantdaosvr.proto";
+
+filename = "xxxxx.proto";
 
 //测试归属找提示
 // 94 140
 let line = 94;
 let cpos = 140;
-filename = "/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffaosvr/logic/QueryEmployeeRealNameUinMini.cpp";
+filename = "xxxxxxxx.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);

@@ -413,6 +413,9 @@ class Definition extends Completion{
             prelinecode: this._getHoverTips(filecontext, ownpos, namepos, ownname, name, filepath),
             title: name != "" ? name : ownname
         };
+        if(filepath.indexOf('/') != 0) {
+            result.filename = "file:///" + filepath;
+        }
 
         //修正函数的实现定义
         if(sourcefilepath != ""
@@ -448,6 +451,9 @@ class Definition extends Completion{
             let epos = bpos + _name.length;
 
             result.filename = "file://" + sourcefilepath;
+            if(filepath.indexOf('/') != 0) {
+                result.filename = "file:///" + filepath;
+            }
             result.bline = lineinfo.l;
             result.bcols = bpos;
             result.eline = lineinfo.l;
