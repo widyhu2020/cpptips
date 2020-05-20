@@ -99,7 +99,7 @@ var CodeAnalyse = /** @class */ (function () {
                     }
                 }
                 catch (err) {
-                    console.error(err);
+                    console.log(err);
                 }
                 worker.kill();
             });
@@ -1955,7 +1955,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getAllNameByObj file type not match!");
+                    console.log("getAllNameByObj file type not match!");
                     return [];
                 }
                 //test
@@ -1965,7 +1965,8 @@ var CodeAnalyse = /** @class */ (function () {
                 return result;
             }
             catch (error) {
-                console.error("call getAllNameByObj faild!", error);
+                console.log("call getAllNameByObj faild!", error);
+                return [];
             }
         };
         //通过命名空间查找
@@ -1984,13 +1985,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getAllNameByNamespace file type not match!");
+                    console.log("getAllNameByNamespace file type not match!");
                     return [];
                 }
                 return this._getAllNameByNamespace(filepath, filecontext, owns);
             }
             catch (error) {
-                console.error("call getAllNameByObj faild!", error);
+                console.log("call getAllNameByObj faild!", error);
+                return [];
             }
         };
         //获取提示说明
@@ -2004,7 +2006,8 @@ var CodeAnalyse = /** @class */ (function () {
                 return this._getShowTips(filepath, data);
             }
             catch (error) {
-                console.error("call _getShowTips faild!", error);
+                console.log("call _getShowTips faild!", error);
+                return false;
             }
         };
         //前缀匹配
@@ -2023,13 +2026,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("searchKeyWord file type not match!");
+                    console.log("searchKeyWord file type not match!");
                     return [];
                 }
                 return this._searchKeyWord(filepath, prekeyworld, filecontext, owns);
             }
             catch (error) {
-                console.error("call _searchKeyWord faild!", error);
+                console.log("call _searchKeyWord faild!", error);
+                return [];
             }
         };
         //重新加载知道文件
@@ -2045,14 +2049,15 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".proto", ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("reloadOneIncludeFile this file not include.");
+                    console.log("reloadOneIncludeFile this file not include.");
                     callback("error");
                     return;
                 }
                 return this._reloadOneIncludeFile(filepath, callback);
             }
             catch (error) {
-                console.error("call _reloadOneIncludeFile faild!", error);
+                console.log("call _reloadOneIncludeFile faild!", error);
+                return;
             }
         };
         //重新加载一批文件
@@ -2070,7 +2075,7 @@ var CodeAnalyse = /** @class */ (function () {
                 return this._reloadBatchIncludeFile(filepaths, callback);
             }
             catch (error) {
-                console.error("call _reloadOneIncludeFile faild!", error);
+                console.log("call _reloadOneIncludeFile faild!", error);
             }
             return true;
         };
@@ -2095,7 +2100,7 @@ var CodeAnalyse = /** @class */ (function () {
                 this._initSystemIncludeIndex(initSystemIncludeOver);
             }
             catch (error) {
-                console.error("call _reloadOneIncludeFile faild!", error);
+                console.log("call _reloadOneIncludeFile faild!", error);
             }
         };
         //获取cpp文件的依赖
@@ -2121,7 +2126,8 @@ var CodeAnalyse = /** @class */ (function () {
             }
             catch (error) {
                 callback("error", filepath, [], []);
-                console.error("call getDependentByCpp faild!", error);
+                console.log("call getDependentByCpp faild!", error);
+                return;
             }
         };
         //获取变量定义
@@ -2140,13 +2146,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getDefinePoint file type not match!");
+                    console.log("getDefinePoint file type not match!");
                     return false;
                 }
                 return this._getDefinePoint(filepath, filecontext, linelast, owns);
             }
             catch (error) {
-                console.error("call getDefinePoint faild!", error);
+                console.log("call getDefinePoint faild!", error);
+                return false;
             }
         };
         //跳转头文件定义
@@ -2161,13 +2168,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = fileinfo.ext;
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getIncludeDefine file type not match!");
+                    console.log("getIncludeDefine file type not match!");
                     return false;
                 }
                 return this._getIncludeDefine(sourceFile, includeFile, filename);
             }
             catch (error) {
-                console.error("call getDefinePoint faild!", error);
+                console.log("call getDefinePoint faild!", error);
+                return false;
             }
         };
         //参数提示
@@ -2186,13 +2194,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getSignatureHelp file type not match!");
+                    console.log("getSignatureHelp file type not match!");
                     return false;
                 }
                 return this._getSignatureHelp(filepath, filecontext, owns);
             }
             catch (error) {
-                console.error("call getSignatureHelp faild!", error);
+                console.log("call getSignatureHelp faild!", error);
+                return [];
             }
         };
         //获取文档结构-非异步
@@ -2206,13 +2215,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = fileinfo.ext;
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("getDocumentTree file type not match!");
+                    console.log("getDocumentTree file type not match!");
                     return false;
                 }
                 return this._getDocumentTree(filepath, filecontext);
             }
             catch (error) {
-                console.error("call getDefinePoint faild!", error);
+                console.log("call getDefinePoint faild!", error);
+                return false;
             }
         };
         //自动填参数
@@ -2227,7 +2237,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = filepath.substring(pos);
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("autoFillParams file type not match!");
+                    console.log("autoFillParams file type not match!");
                     return [];
                 }
                 //test
@@ -2237,7 +2247,8 @@ var CodeAnalyse = /** @class */ (function () {
                 return result;
             }
             catch (error) {
-                console.error("call getAllNameByObj faild!", error);
+                console.log("call getAllNameByObj faild!", error);
+                return [];
             }
         };
         //更新检查
@@ -2246,7 +2257,7 @@ var CodeAnalyse = /** @class */ (function () {
                 this._updateCheck(updatecallback);
             }
             catch (error) {
-                console.error("call updateCheck faild!", error);
+                console.log("call updateCheck faild!", error);
             }
         };
         //进行语法检查
@@ -2260,13 +2271,14 @@ var CodeAnalyse = /** @class */ (function () {
                 var fileExt = fileinfo.ext;
                 var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
                 if (!includeExt.has(fileExt)) {
-                    console.error("diagnostics file type not match!");
+                    console.log("diagnostics file type not match!");
                     return false;
                 }
                 return this._diagnostics(filepath, filecontext, diagnosticscallback);
             }
             catch (error) {
-                console.error("call getDefinePoint faild!", error);
+                console.log("call getDefinePoint faild!", error);
+                return false;
             }
         };
         //退出

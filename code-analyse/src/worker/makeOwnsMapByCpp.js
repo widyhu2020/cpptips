@@ -261,7 +261,7 @@ if (cluster.isMaster) {
             process.send(result);
             console.timeEnd("postMessage");
         } catch(err){
-            console.error(err);
+            console.log(err);
             process.kill(process.pid);
         }
     });

@@ -586,6 +586,7 @@ connection.onExit(() => {
 connection.onDidChangeWatchedFiles((_change: DidChangeWatchedFilesParams) => {
     console.log(JSON.stringify(_change));
     let changes: FileEvent[] = _change.changes;
+    
     changefile = changefile.concat(changes);
     if (!CodeAnalyse.getInstace().busy()) {
         //清除定时器
@@ -1097,7 +1098,7 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
 
     console.log("debug:", uri, basedir, filepath);
     //异步执行
-    //process.nextTick(analyseCppFile);
+    //process.nextTick(analyseCppFile); file://
     setTimeout(analyseCppFile, 3000);
 
     //重新计算索引
@@ -1249,7 +1250,7 @@ connection.onDocumentSymbol((params: DocumentSymbolParams):DocumentSymbol[]|unde
     if(filepath[0] != "\\" && filepath[0] != "/") {
         filepath = path.sep + filepath;
     }
-    let context = openFile[uri];
+    let context = openFile[params.textDocument.uri];
     let tdoc = TextDocument.create(uri, "cpp", 0, context);
     console.log("begin getDocumentTree");
     console.time("getDocumentTree");

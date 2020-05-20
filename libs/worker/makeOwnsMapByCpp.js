@@ -239,7 +239,7 @@ else if (cluster.isWorker) {
             console.timeEnd("postMessage");
         }
         catch (err) {
-            console.error(err);
+            console.log(err);
             process.kill(process.pid);
         }
     });

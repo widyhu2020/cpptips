@@ -427,8 +427,8 @@ var Definition = /** @class */ (function (_super) {
                 var bpos = linecode.indexOf(_name);
                 var epos = bpos + _name.length;
                 result.filename = "file://" + sourcefilepath;
-                if (filepath.indexOf('/') != 0) {
-                    result.filename = "file:///" + filepath;
+                if (sourcefilepath.indexOf('/') != 0) {
+                    result.filename = "file:///" + sourcefilepath;
                 }
                 result.bline = lineinfo.l;
                 result.bcols = bpos;

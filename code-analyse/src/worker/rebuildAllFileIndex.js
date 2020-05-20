@@ -366,7 +366,7 @@ class RebuildFileIndex {
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
-                //console.error("not find file!", filepath);
+                //console.log("not find file!", filepath);
                 return false;
             }
             let file_id = fileinfo.id;
@@ -454,7 +454,7 @@ class RebuildFileIndex {
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
-                //console.error("not find file!", filepath);
+                //console.log("not find file!", filepath);
                 return false;
             }
             let file_id = fileinfo.id;

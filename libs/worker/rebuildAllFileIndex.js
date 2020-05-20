@@ -310,7 +310,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //获取文件id
                 var fileinfo_1 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_1) {
-                    //console.error("not find file!", filepath);
+                    //console.log("not find file!", filepath);
                     return false;
                 }
                 var file_id = fileinfo_1.id;
@@ -386,7 +386,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //获取文件id
                 var fileinfo_2 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_2) {
-                    //console.error("not find file!", filepath);
+                    //console.log("not find file!", filepath);
                     return false;
                 }
                 var file_id = fileinfo_2.id;

@@ -63,7 +63,7 @@ class AnalyseBase {
         
         let fileinfo = filedb.getFileByFilePath(this.filename);
         if (!fileinfo || fileinfo === undefined) {
-            console.error("not find file index!", this.filename);
+            console.log("not find file index!", this.filename);
             return false;
         }
         let fileid = fileinfo.id;

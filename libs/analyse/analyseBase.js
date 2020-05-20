@@ -44,7 +44,7 @@ var AnalyseBase = /** @class */ (function () {
             this.savepublic = savepublic;
             var fileinfo = filedb.getFileByFilePath(this.filename);
             if (!fileinfo || fileinfo === undefined) {
-                console.error("not find file index!", this.filename);
+                console.log("not find file index!", this.filename);
                 return false;
             }
             var fileid = fileinfo.id;

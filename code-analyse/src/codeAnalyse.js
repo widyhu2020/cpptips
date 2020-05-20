@@ -127,7 +127,7 @@ class CodeAnalyse {
                     callback("success", filepath, usingnamespace, include, showTree);
                 }
             } catch (err) {
-                console.error(err);
+                console.log(err);
             }
             worker.kill();
         });
@@ -2179,7 +2179,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("getAllNameByObj file type not match!");
+                console.log("getAllNameByObj file type not match!");
                 return [];
             }
             //test
@@ -2188,7 +2188,8 @@ class CodeAnalyse {
             console.timeEnd("_getAllNameByObj");
             return result;
         } catch (error) {
-            console.error("call getAllNameByObj faild!", error);
+            console.log("call getAllNameByObj faild!", error);
+            return [];
         }
     };
 
@@ -2207,12 +2208,13 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("getAllNameByNamespace file type not match!");
+                console.log("getAllNameByNamespace file type not match!");
                 return [];
             }
             return this._getAllNameByNamespace(filepath, filecontext, owns);
         } catch (error) {
-            console.error("call getAllNameByObj faild!", error);
+            console.log("call getAllNameByObj faild!", error);
+            return [];
         }
     };
 
@@ -2226,7 +2228,8 @@ class CodeAnalyse {
             }
             return this._getShowTips(filepath, data);
         } catch (error) {
-            console.error("call _getShowTips faild!", error);
+            console.log("call _getShowTips faild!", error);
+            return false;
         }
     }
 
@@ -2246,12 +2249,13 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("searchKeyWord file type not match!");
+                console.log("searchKeyWord file type not match!");
                 return [];
             }
             return this._searchKeyWord(filepath, prekeyworld, filecontext, owns);
         } catch (error) {
-            console.error("call _searchKeyWord faild!", error);
+            console.log("call _searchKeyWord faild!", error);
+            return [];
         }
     };
 
@@ -2267,13 +2271,14 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".proto", ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("reloadOneIncludeFile this file not include.");
+                console.log("reloadOneIncludeFile this file not include.");
                 callback("error");
                 return;
             }
             return this._reloadOneIncludeFile(filepath, callback);
         } catch (error) {
-            console.error("call _reloadOneIncludeFile faild!", error);
+            console.log("call _reloadOneIncludeFile faild!", error);
+            return;
         }
     };
 
@@ -2290,7 +2295,7 @@ class CodeAnalyse {
             }
             return this._reloadBatchIncludeFile(filepaths, callback);
         } catch (error) {
-            console.error("call _reloadOneIncludeFile faild!", error);
+            console.log("call _reloadOneIncludeFile faild!", error);
         }
         return true;
     };
@@ -2314,7 +2319,7 @@ class CodeAnalyse {
             console.info("begin _initSystemIncludeIndex!");
             this._initSystemIncludeIndex(initSystemIncludeOver);
         } catch (error) {
-            console.error("call _reloadOneIncludeFile faild!", error);
+            console.log("call _reloadOneIncludeFile faild!", error);
         }
     };
 
@@ -2340,7 +2345,8 @@ class CodeAnalyse {
             return that._getDependentByCpp(filepath, callback);
         } catch (error) {
             callback("error", filepath, [], []);
-            console.error("call getDependentByCpp faild!", error);
+            console.log("call getDependentByCpp faild!", error);
+            return;
         }
     };
 
@@ -2359,12 +2365,13 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("getDefinePoint file type not match!");
+                console.log("getDefinePoint file type not match!");
                 return false;
             }
             return this._getDefinePoint(filepath, filecontext, linelast, owns);
         } catch (error) {
-            console.error("call getDefinePoint faild!", error);
+            console.log("call getDefinePoint faild!", error);
+            return false;
         }
     };
 
@@ -2381,12 +2388,13 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
             if (!includeExt.has(fileExt)) {
-                console.error("getIncludeDefine file type not match!");
+                console.log("getIncludeDefine file type not match!");
                 return false;
             }
             return this._getIncludeDefine(sourceFile, includeFile, filename);
         } catch (error) {
-            console.error("call getDefinePoint faild!", error);
+            console.log("call getDefinePoint faild!", error);
+            return false;
         }
     };
 
@@ -2405,12 +2413,13 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("getSignatureHelp file type not match!");
+                console.log("getSignatureHelp file type not match!");
                 return false;
             }
             return this._getSignatureHelp(filepath, filecontext, owns);
         } catch (error) {
-            console.error("call getSignatureHelp faild!", error);
+            console.log("call getSignatureHelp faild!", error);
+            return [];
         }
     };
 
@@ -2426,12 +2435,13 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
             if (!includeExt.has(fileExt)) {
-                console.error("getDocumentTree file type not match!");
+                console.log("getDocumentTree file type not match!");
                 return false;
             }
             return this._getDocumentTree(filepath, filecontext);
         } catch (error) {
-            console.error("call getDefinePoint faild!", error);
+            console.log("call getDefinePoint faild!", error);
+            return false;
         }
     };
 
@@ -2448,7 +2458,7 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.error("autoFillParams file type not match!");
+                console.log("autoFillParams file type not match!");
                 return [];
             }
             //test
@@ -2457,7 +2467,8 @@ class CodeAnalyse {
             console.timeEnd("_getAllNameByObj");
             return result;
         } catch (error) {
-            console.error("call getAllNameByObj faild!", error);
+            console.log("call getAllNameByObj faild!", error);
+            return [];
         }  
     };
 
@@ -2466,7 +2477,7 @@ class CodeAnalyse {
         try {
             this._updateCheck(updatecallback);
         } catch (error) {
-            console.error("call updateCheck faild!", error);
+            console.log("call updateCheck faild!", error);
         }
     };
 
@@ -2482,12 +2493,13 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]); 
             if (!includeExt.has(fileExt)) {
-                console.error("diagnostics file type not match!");
+                console.log("diagnostics file type not match!");
                 return false;
             }
             return this._diagnostics(filepath, filecontext, diagnosticscallback);
         } catch (error) {
-            console.error("call getDefinePoint faild!", error);
+            console.log("call getDefinePoint faild!", error);
+            return false;
         }
     };
 

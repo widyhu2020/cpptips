@@ -451,8 +451,8 @@ class Definition extends Completion{
             let epos = bpos + _name.length;
 
             result.filename = "file://" + sourcefilepath;
-            if(filepath.indexOf('/') != 0) {
-                result.filename = "file:///" + filepath;
+            if(sourcefilepath.indexOf('/') != 0) {
+                result.filename = "file:///" + sourcefilepath;
             }
             result.bline = lineinfo.l;
             result.bcols = bpos;

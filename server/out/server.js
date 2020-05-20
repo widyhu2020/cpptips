@@ -951,7 +951,7 @@ connection.onDidOpenTextDocument((params) => {
     dependentfiles.add(filepath);
     console.log("debug:", uri, basedir, filepath);
     //异步执行
-    //process.nextTick(analyseCppFile);
+    //process.nextTick(analyseCppFile); file://
     setTimeout(analyseCppFile, 3000);
     //重新计算索引
     codeAnalyse_1.CodeAnalyse.getInstace().reloadOneIncludeFile(filepath, reloadOneIncludeFileCallBack);
@@ -1085,7 +1085,7 @@ connection.onDocumentSymbol((params) => {
     if (filepath[0] != "\\" && filepath[0] != "/") {
         filepath = path.sep + filepath;
     }
-    let context = openFile[uri];
+    let context = openFile[params.textDocument.uri];
     let tdoc = vscode_languageserver_1.TextDocument.create(uri, "cpp", 0, context);
     console.log("begin getDocumentTree");
     console.time("getDocumentTree");
