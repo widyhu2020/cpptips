@@ -359,8 +359,8 @@ var Traverse = /** @class */ (function () {
                     }
                 }
             });
-            if (total > 120000) {
-                //文件超过120000个，终止扫描
+            if (total > 150000) {
+                //文件超过150000个，终止扫描
                 that.needStop = true;
             }
             return total;
