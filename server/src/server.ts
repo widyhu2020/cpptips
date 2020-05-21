@@ -43,6 +43,7 @@ import { CodeAnalyse, NodeItem, ShowItem, CaConfig, PointInfo} from '../../libs/
 import * as fs from 'fs';
 import { URL } from 'url';
 import { clearTimeout } from 'timers';
+import { uriToFilePath } from 'vscode-languageserver/lib/files';
 let basepath:string = "/";
 let openFile:{[key: string]: string} = {};
 let treeData:{[key: string]: string} = {};
@@ -213,10 +214,10 @@ function reloadIncludeFileCallBack(
         showErrorMessage("文件索引加载失败！");
     }
     if(msg == "stop_load_index") {
-        showErrorMessage("你工程目录文件超过150000个，系统终止索引计算，请目录右键“加入索引范围”指定需要计算的目录！");
+        showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请在右侧资源管理器中，选择目录右键“加入索引范围”指定需要计算的目录！");
     }
     if(msg == "show_file_more") {
-        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
+        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
     
     sendMsgToVscode("close_show_process", data);
@@ -229,6 +230,41 @@ function updateTips(msg:string){
     //发送弹窗
     let data = ["检查到cpptips有更新，请重启vscode加载最新的插件！"];
     connection.sendNotification("show_update", [data]);
+}
+
+function getFilePath(uri:string) {
+    uri = decodeURIComponent(uri);
+    let filepath:string|undefined = uriToFilePath(uri);
+    if(filepath == undefined) {
+        //路径不是uri格式
+        let pathpos: number = uri.indexOf(basepath);
+        if(pathpos == -1) {
+            //不是根目录的文件
+            return false;
+        }
+        let filename = uri.slice(pathpos + basepath.length);
+        return filename;
+    }
+
+    let pathpos: number = filepath.indexOf(basepath);
+    if(pathpos != -1) {
+        //找到根目录
+        let filename = filepath.slice(pathpos + basepath.length);
+        return filename;
+    }
+
+    //当打开的目录不是当前root下，但是又是同一个文件的时候
+    let paths = filepath.split(path.sep);
+    for(let i = 0; i < paths.length; i++) {
+        let _paths = paths.slice(i);
+        let _filename = _paths.join(path.sep);
+        if(fs.existsSync(basepath + _filename)) {
+            console.log("path not root:", filepath, _filename, basepath);
+            return _filename;
+        }
+    }
+
+    return false;
 }
 
 connection.onNotification("get_tree", (message: Array<string>) => {
@@ -520,10 +556,12 @@ function processFileChange() {
     console.info(setfilename);
     let files:string[] = [];
     mapfile.forEach((fileevent)=>{
-        let uri: string = decodeURIComponent(fileevent.uri);
-        let pos: number = uri.indexOf(basepath);
-        let filename = uri;
-        filename = filename.slice(pos + basepath.length);
+        let filename = getFilePath(fileevent.uri);
+        if(filename == false) {
+            console.log("processFileChange", fileevent.uri);
+            return;
+        }
+
         //如果文件是打开的
         if (openFile[fileevent.uri] && openFile[fileevent.uri] != "" && fileevent.type == FileChangeType.Changed) {
             try {
@@ -686,11 +724,11 @@ connection.onCompletion((_textDocumentPosition: CompletionParams): CompletionIte
     }
 
     //重新加载文件
-    let basedir = basepath;
-    let uri = decodeURIComponent(_textDocumentPosition.textDocument.uri);
-    let pathpos: number = uri.indexOf(basedir);
-    let filename = uri;
-    filename = filename.slice(pathpos + basedir.length);
+    let filename = getFilePath(_textDocumentPosition.textDocument.uri);
+    if(filename == false) {
+        console.log("onCompletion", _textDocumentPosition.textDocument.uri);
+        return [];
+    }
     
     let line = _textDocumentPosition.position.line;
     let cpos = _textDocumentPosition.position.character;
@@ -816,11 +854,11 @@ connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
 
 connection.onSignatureHelp((_document: TextDocumentPositionParams): SignatureHelp | null => {
     //重新加载文件
-    let uri = decodeURIComponent(_document.textDocument.uri);
-    let basedir = basepath;
-    let filename = decodeURIComponent(_document.textDocument.uri);
-    let pathpos: number = filename.indexOf(basedir);
-    filename = filename.slice(pathpos + basedir.length);
+    let filename = getFilePath(_document.textDocument.uri);
+    if(filename == false) {
+        console.log("onSignatureHelp", _document.textDocument.uri);
+        return null;
+    }
 
     let line = _document.position.line;
     let cpos = _document.position.character;
@@ -1088,15 +1126,17 @@ function analyseCppFile() {
 
 //打开文件触发
 connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
-    let uri = decodeURIComponent(params.textDocument.uri);
     openFile[params.textDocument.uri] = params.textDocument.text;
-    let basedir = basepath;
-    let pos: number = uri.indexOf(basedir);
-    let filepath = uri;
-    filepath = filepath.slice(pos + basedir.length);
+    
+    let filepath = getFilePath(params.textDocument.uri);
+    if(filepath == false) {
+        console.log("onDidOpenTextDocument", params.textDocument.uri);
+        return;
+    }
+    //debug: file:///data/mm64/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp 
+    ///home/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp
     dependentfiles.add(filepath);
-
-    console.log("debug:", uri, basedir, filepath);
+    console.log("debug:", params.textDocument.uri, basepath, filepath);
     //异步执行
     //process.nextTick(analyseCppFile); file://
     setTimeout(analyseCppFile, 3000);
@@ -1189,14 +1229,15 @@ connection.onDidCloseTextDocument((params: DidCloseTextDocumentParams) => {
 //保存完文档之后触发
 connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
     //重新加在文件
-    let uri = decodeURIComponent(params.textDocument.uri);
-    let basedir = basepath;
-    let pos: number = uri.indexOf(basedir);
-    let filepath = uri;
-    filepath = filepath.slice(pos + basedir.length);
+    let filepath = getFilePath(params.textDocument.uri);
+    if(filepath == false) {
+        console.log("onDidSaveTextDocument", params.textDocument.uri);
+        return;
+    }
+
     dependentfiles.add(filepath);
 
-    console.log("analyseCppFile debug:", uri, basedir, filepath);
+    console.log("analyseCppFile debug:", params.textDocument.uri, basepath, filepath);
     //异步执行
     process.nextTick(analyseCppFile);
 
@@ -1212,45 +1253,47 @@ connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
         rebuildTimeout = setTimeout(processFileChange, 2000);
     }
 
+    //先不进行语法分析
+    return;
 
-    let context = openFile[params.textDocument.uri];
-    if(context == undefined) {
-        return;
-    }
+    // let context = openFile[params.textDocument.uri];
+    // if(context == undefined) {
+    //     return;
+    // }
     
-    CodeAnalyse.getInstace().diagnostics(filepath, context, (result:string)=>{
-        let data = JSON.parse(result);
-        console.log(data);
-        let diagnosticsData = [];
-        if(context == undefined) {
-            return;
-        }
-        let doc = TextDocument.create(params.textDocument.uri, "cpp", 0, context);
-        for(let i = 0; i < data.length; i++) {
-            let begin:Position = doc.positionAt(data[i].begin);
-            let end:Position = doc.positionAt(data[i].end);
-            let range = Range.create(begin, end);
-            let _diagnostics = Diagnostic.create(range, "检测到这里语法错误，请确认调整！");
-            diagnosticsData.push(_diagnostics);
-        }
-        let diagnosticsParams = {
-            uri:params.textDocument.uri,
-            diagnostics:diagnosticsData
-        };
-        connection.sendDiagnostics(diagnosticsParams);
-    });
+    // CodeAnalyse.getInstace().diagnostics(filepath, context, (result:string)=>{
+    //     let data = JSON.parse(result);
+    //     console.log(data);
+    //     let diagnosticsData = [];
+    //     if(context == undefined) {
+    //         return;
+    //     }
+    //     let doc = TextDocument.create(params.textDocument.uri, "cpp", 0, context);
+    //     for(let i = 0; i < data.length; i++) {
+    //         let begin:Position = doc.positionAt(data[i].begin);
+    //         let end:Position = doc.positionAt(data[i].end);
+    //         let range = Range.create(begin, end);
+    //         let _diagnostics = Diagnostic.create(range, "检测到这里语法错误，请确认调整！");
+    //         diagnosticsData.push(_diagnostics);
+    //     }
+    //     let diagnosticsParams = {
+    //         uri:params.textDocument.uri,
+    //         diagnostics:diagnosticsData
+    //     };
+    //     connection.sendDiagnostics(diagnosticsParams);
+    // });
 });
 
 connection.onDocumentSymbol((params: DocumentSymbolParams):DocumentSymbol[]|undefined => {
-    let uri = decodeURIComponent(params.textDocument.uri);
-    let basedir = basepath;
-    let pos: number = uri.indexOf(basedir);
-    let filepath = uri;
-    filepath = filepath.slice(pos + basedir.length);
-    if(filepath[0] != "\\" && filepath[0] != "/") {
-        filepath = path.sep + filepath;
+    
+    let filepath = getFilePath(params.textDocument.uri);
+    if(filepath == false) {
+        console.log("onDocumentSymbol", params.textDocument.uri);
+        return;
     }
+
     let context = openFile[params.textDocument.uri];
+    let uri = decodeURIComponent(params.textDocument.uri);
     let tdoc = TextDocument.create(uri, "cpp", 0, context);
     console.log("begin getDocumentTree");
     console.time("getDocumentTree");
@@ -1357,16 +1400,18 @@ function getDepsInDefineJson(tdoc:TextDocument ,nodeInfo: any): DocumentSymbol[]
 }
 
 connection.onDefinition((params: TextDocumentPositionParams): Definition | undefined | DefinitionLink[] => {
-    let filename = decodeURIComponent(params.textDocument.uri);
-    let basedir = basepath;
-    let pos: number = filename.indexOf(basedir);
-    filename = filename.slice(pos + basedir.length);
+    let filename = getFilePath(params.textDocument.uri);
+    if(filename == false) {
+        console.log("onDefinition", params.textDocument.uri);
+        return;
+    }
+
     let line = params.position.line;
     let cpos = params.position.character;
     console.log("pos:", line, cpos);
 
     let context = openFile[params.textDocument.uri];
-    pos = -1;
+    let pos = -1;
     let nowline: number = 0;
     while (true) {
         let tmppos = context.indexOf("\n", pos + 1);
@@ -1441,16 +1486,17 @@ connection.onTypeDefinition((params: TextDocumentPositionParams): Definition | u
 //鼠标停留提醒
 connection.onHover((params: TextDocumentPositionParams): Hover | undefined => {
         //重新加载文件
-        let filename = decodeURIComponent(params.textDocument.uri);
-        let basedir = basepath;
-        let pos: number = filename.indexOf(basedir);
-        filename = filename.slice(pos + basedir.length);
+        let filename = getFilePath(params.textDocument.uri);
+        if(filename == false) {
+            console.log("onHover", params.textDocument.uri);
+            return;
+        }
 
         let line = params.position.line;
         let cpos = params.position.character;
         let context = openFile[params.textDocument.uri];
         console.info(line, cpos);
-        pos = -1;
+        let pos = -1;
         let nowline: number = 0;
         while (true) {
             let tmppos = context.indexOf("\n", pos + 1);
