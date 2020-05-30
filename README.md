@@ -7,9 +7,7 @@
  > 该项目为开源项目，任何人均可以获取和修改（包括使用其中部分算法或者功能），但发布使用仅限于任何开源项目。
 
 ## 功能介绍
-<video id="video" controls="" width="1024px" height="768px" preload="none" poster="https://cpptips-118654-1251218909.tcloudbaseapp.com/WechatIMG505.jpeg">
-<source id="mp4" src="https://cpptips-118654-1251218909.tcloudbaseapp.com/helper.mov" type="video/mov">
-</video>
+![功能剪辑嗯](https://cpptips-118654-1251218909.tcloudbaseapp.com/helper.gif)
 
 目前主要功能包括：
 - 1、不需要proto编译成.pb.h和.pb.cc文件就可以提示proto的定义
