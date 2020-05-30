@@ -35,5 +35,7 @@ rm -rf ../cpptips_proj/client/node_modules
 #scp package.json root@193.112.152.71:/data/webroot/
 #scp list.js root@193.112.152.71:/data/webroot/
 #vsce publish patch
+#vsce publish minor
+#vsce publish major
 
 #cd /data/mm64/widyhu/.vscode-server/extensions/widyhu.cpptips-0.1.9/node_modules/better-sqlite3 && /data/mm64/widyhu/.vscode-server/bin/2aae1f26c72891c399f860409176fe435a154b13/node ../node-gyp/bin/node-gyp.js configure && /data/mm64/widyhu/.vscode-server/bin/2aae1f26c72891c399f860409176fe435a154b13/node ../node-gyp/bin/node-gyp.js rebuild&& cd /data/mm64/widyhu/.vscode-server/extensions/widyhu.cpptips-0.1.9/node_modules/integer && /data/mm64/widyhu/.vscode-server/bin/2aae1f26c72891c399f860409176fe435a154b13/node ../node-gyp/bin/node-gyp.js configure && /data/mm64/widyhu/.vscode-server/bin/2aae1f26c72891c399f860409176fe435a154b13/node ../node-gyp/bin/node-gyp.js rebuild

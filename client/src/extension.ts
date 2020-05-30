@@ -397,9 +397,11 @@ export function activate(context: ExtensionContext) {
             if(terminal == undefined) {
                 terminal = window.createTerminal("编译");
             }
-            terminal.show(true);
+            
+            terminal.show(false);
             while(true) {
-                if(!fs.existsSync(dirname + "/BUILD")) {
+                if(!fs.existsSync(dirname + "/BUILD")
+                    && !fs.existsSync(dirname + "/makefile")) {
                     let _pathinfo = path.parse(dirname);
                     dirname = _pathinfo.dir;
                     if(dirname == "" || dirname == "/") {
@@ -407,8 +409,16 @@ export function activate(context: ExtensionContext) {
                     }
                     continue;
                 }
-                terminal.sendText("cd " + dirname);
-                terminal.sendText("patchbuild build -d .");
+                if(fs.existsSync(dirname + "/BUILD")){
+                    //patchbuild 编译
+                    terminal.sendText("cd " + dirname);
+                    terminal.sendText("patchbuild build -d .");
+                }
+                if(fs.existsSync(dirname + "/makefile")){
+                    //makefile编译
+                    terminal.sendText("cd " + dirname);
+                    terminal.sendText("make -j 2");
+                }
                 return;
             }
             terminal.sendText("echo \"未找到可编译的目录！\"");

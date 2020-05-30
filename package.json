@@ -2,7 +2,10 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.1.26",
+	"version": "0.2.0",
+	"repository": {
+		"url": "https://github.com/widyhu2020/cpptips"
+	},
 	"icon": "resources/cpp.png",
 	"engines": {
 		"vscode": "^1.43.0"

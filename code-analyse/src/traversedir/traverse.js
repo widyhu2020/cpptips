@@ -65,6 +65,26 @@ class Traverse {
             && this.userConfig.needLoadDir instanceof Array) {
             this.needLoadDir = this.userConfig.needLoadDir;
         }
+
+        //needLoadDir是否有软连接，如果有加入this.analyseLinkDir
+        for(let i = 0; i < this.needLoadDir.length; i++) {
+            let path = this.needLoadDir[i];
+            try{
+                let fileStat = fs.lstatSync(this.basedir + path);
+                if(fileStat.isSymbolicLink()){
+                    this.analyseLinkDir.add(path);
+                }
+            } catch(error){
+
+            }
+        }
+
+        //链接全部加入索引计算范围
+        for(let i = 0; i < this.userConfig.needLoadLinkDir.length; i++) {
+            let path = this.userConfig.needLoadLinkDir[i];
+            this.needLoadDir.push(path);
+        }
+
         console.log("needLoadDir:", JSON.stringify(this.needLoadDir));
     };
 
@@ -404,20 +424,20 @@ class Traverse {
                 return total;
             }
 
-            if(that.uniqueDir.has(filename)){
-                //该目录已经分析过
-                console.log("file cycle:", filename);
-                return total;
-            }
-            that.uniqueDir.add(filename);
-
             let dataFile = null;
             try {
                 //不判断软连接
                 dataFile = fs.statSync(filename);
-                // dataFile = fs.lstatSync(filename);
+                dataFileLStat = fs.lstatSync(filename);
             } catch (error) {
-                //console.log(error);
+                return total;
+            }
+
+            //一定得fstatSync方法
+            if(dataFileLStat.isSymbolicLink()
+                && !that.analyseLinkDir.has(wkfilename)
+                && !that.analyseLinkDir.has(wkfilename + "/")) {
+                //软链接跳过,且没加入明确执行分析计划
                 return total;
             }
         
@@ -443,11 +463,20 @@ class Traverse {
                 }
                 if(that.needStop) {
                     //需要退出，不再处理
-                    //console.debug("need stop and exit!");
                     return total;
                 }
                 total = total + that._readDirForTotalFile(filename, callbackshow);
-            } else if (needFile && dataFile.isFile()){   
+            } else if (needFile && dataFile.isFile()){
+                //防止重复分析
+                let pathinfo = path.parse(filename);
+                let uniqueName = pathinfo.name + pathinfo.ext + "_" + dataFileLStat.size + "_" + dataFileLStat.mtimeMs;
+                if(that.uniqueDir.has(uniqueName)){
+                    //该目录已经分析过
+                    //console.log("file cycle:", filename, uniqueName);
+                    return total;
+                }
+                that.uniqueDir.add(uniqueName);
+
                 let pos = filename.lastIndexOf(".");
                 let ext = filename.substr(pos);
                 if(that.includeExt.has(ext) 
@@ -502,20 +531,21 @@ class Traverse {
                 return;
             }
 
-            if(that.uniqueDir.has(filename)){
-                //该目录已经分析过
-                console.log("file cycle:", filename);
-                return;
-            }
-            that.uniqueDir.add(filename);
-
             let dataFile = null;
             try {
                 //不判断软连接
                 dataFile = fs.statSync(filename);
-                //dataFile = fs.lstatSync(filename);
+                dataFileLStat = fs.lstatSync(filename);
             } catch (error) {
-                //console.log(error);
+                return;
+            }
+
+            //一定得fstatSync方法
+            if(dataFileLStat.isSymbolicLink()
+                && !that.analyseLinkDir.has(wkfilename)
+                && !that.analyseLinkDir.has(wkfilename + "/")) {
+                //软链接跳过,且没加入明确执行分析计划
+                //console.log("this file is symbolic link! and not in link dir!", wkfilename);
                 return;
             }
         
@@ -540,8 +570,19 @@ class Traverse {
                 if(that.needStop) {
                     //需要退出，不再处理
                     //console.debug("need stop and exit!");
-                    return total;
+                    return;
                 }
+
+                //防止重复分析
+                let pathinfo = path.parse(filename);
+                let uniqueName = pathinfo.name + pathinfo.ext + "_" + dataFileLStat.size + "_" + dataFileLStat.mtimeMs;
+                if(that.uniqueDir.has(uniqueName)){
+                    //该目录已经分析过
+                    //console.log("file cycle:", filename, uniqueName);
+                    return;
+                }
+                that.uniqueDir.add(uniqueName);
+
                 setImmediate(()=>{that._judgeFileTypeAndSave(wkfilename);});
             }
         });

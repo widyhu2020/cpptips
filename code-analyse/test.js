@@ -23,7 +23,7 @@ filename = "xxxxx.proto";
 // 301 30
 let line = 301;
 let cpos = 30;
-filename = "mmpay/mmpaymchmgr/mmpaymchmgrapplyment/mmpaymchmgrapplyment4sub/mmpaymchmgrapply4subdaemon/src/syncmchinfo.cpp";
+filename = "src/syncmchinfo.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);

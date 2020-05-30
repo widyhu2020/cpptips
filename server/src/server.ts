@@ -277,8 +277,10 @@ connection.onNotification("addDirToIndex", (infos: any) => {
     console.log(infos);
     let filepath:string = infos["path"];
 
-    let dataFile = fs.statSync(filepath);
-    if(!dataFile.isDirectory()) {
+    let dataFile = fs.lstatSync(filepath);
+    let dataFileStat = fs.statSync(filepath);
+
+    if(!dataFileStat.isDirectory()) {
         //提示错误信息
         showErrorMessage("只能添加目录，请选择目录加入索引计算范围！");
         return;
@@ -299,31 +301,55 @@ connection.onNotification("addDirToIndex", (infos: any) => {
         seting = JSON.parse(filecontext);
     }
 
-    if(!seting["cpptips.needLoadDir"]) {
-        seting["cpptips.needLoadDir"] = [dirname];
-    } else {
-        for(let i = 0; i < seting["cpptips.needLoadDir"].length; i++) {
-            if(seting["cpptips.needLoadDir"][i] == dirname
-                || dirname.indexOf(seting["cpptips.needLoadDir"][i]) == 0) {
-                //目录配置过，或者父目录已经配置过
-                //提示错误
-                showErrorMessage("该目录配置或者父目录已经配置，无需重复配置！点击按钮查看当前配置！", ["打开配置文件"], (selection:string)=>{
-                    if(selection == "打开配置文件") {
-                        //打开配置文件
-                        openFilePath(setPath, "cpptips.needLoadDir");
-                    }
-                });
-                return;
+    if(dataFile.isSymbolicLink()){
+        //如果是软连接
+        if(!seting["cpptips.needLoadLinkDir"]) {
+            seting["cpptips.needLoadLinkDir"] = [dirname];
+        } else {
+            for(let i = 0; i < seting["cpptips.needLoadLinkDir"].length; i++) {
+                if(seting["cpptips.needLoadLinkDir"][i] == dirname) {
+                    //目录配置过
+                    //提示错误
+                    showErrorMessage("该目录配置或者父目录已经配置，无需重复配置！点击按钮查看当前配置！", ["打开配置文件"], (selection:string)=>{
+                        if(selection == "打开配置文件") {
+                            //打开配置文件
+                            openFilePath(setPath, "cpptips.needLoadLinkDir");
+                        }
+                    });
+                    return;
+                }
             }
+            seting["cpptips.needLoadLinkDir"].push(dirname);
         }
-        seting["cpptips.needLoadDir"].push(dirname);
+    } else {
+        if(!seting["cpptips.needLoadDir"]) {
+            seting["cpptips.needLoadDir"] = [dirname];
+        } else {
+            for(let i = 0; i < seting["cpptips.needLoadDir"].length; i++) {
+                if(seting["cpptips.needLoadDir"][i] == dirname
+                    || dirname.indexOf(seting["cpptips.needLoadDir"][i]) == 0) {
+                    //目录配置过，或者父目录已经配置过
+                    //提示错误
+                    showErrorMessage("该目录配置或者父目录已经配置，无需重复配置！点击按钮查看当前配置！",
+                        ["打开配置文件"], (selection:string)=>{
+                        if(selection == "打开配置文件") {
+                            //打开配置文件
+                            openFilePath(setPath, "cpptips.needLoadDir");
+                        }
+                    });
+                    return;
+                }
+            }
+            seting["cpptips.needLoadDir"].push(dirname);
+        }
     }
     //保存配置文件
     let newSetting = JSON.stringify(seting);
     console.log("newsetting:", newSetting);
     fs.writeFileSync(setPath, newSetting, {encoding: "utf8"});
     documentSettings.clear();
-    showTipMessage("操作成功，你可以继续添加其他目录，完成之后点击“重建索引”开始重建索引，也可以配置完之后通过“刷新全部索引”来重建！", ["重建索引", "我知道了"], (selection:string)=>{
+    showTipMessage("操作成功，你可以忽略该消息，继续添加其他目录，全部加入完成之后点击“重建索引”开始重建索引，也可以配置完之后通过“刷新全部索引”来重建！",
+        ["重建索引", "我知道了"], (selection:string)=>{
         if(selection == "重建索引") {
             //开始重建索引
             //重新加载配置
@@ -359,15 +385,9 @@ connection.onNotification("delDirToIndex", (infos: any) => {
         seting = JSON.parse(filecontext);
     }
 
-    if(!seting["cpptips.needLoadDir"]) {
-        showErrorMessage("未找到任何指定的索引目录，你可以在.vscode/setting.json中查看配置！", ["打开配置文件"], (selection:string)=>{
-            if(selection == "打开配置文件") {
-                //打开配置文件
-                openFilePath(setPath, "cpptips.needLoadDir");
-            }
-        });
-        return;
-    } else {
+    let needSave = false;
+    //从分析目录中删除
+    if(seting["cpptips.needLoadDir"]) {
         let _dirs = [];
         for(let i = 0; i < seting["cpptips.needLoadDir"].length; i++) {
             if(seting["cpptips.needLoadDir"][i] == dirname) {
@@ -376,16 +396,37 @@ connection.onNotification("delDirToIndex", (infos: any) => {
             }
             _dirs.push(seting["cpptips.needLoadDir"][i]);
         }
-        if(seting["cpptips.needLoadDir"].length == _dirs.length) {
-            showErrorMessage("该目录之前未加入索引计算，是否是上级目录有加入，你可以在.vscode/setting.json中查看配置！", ["打开配置文件"], (selection:string)=>{
-                if(selection == "打开配置文件") {
-                    //打开配置文件
-                    openFilePath(setPath, "cpptips.needLoadDir");
-                }
-            });
-            return;
+        if(seting["cpptips.needLoadDir"].length != _dirs.length) {
+            needSave = true;
         }
         seting["cpptips.needLoadDir"] = _dirs;
+    }
+
+    //从软件中删除
+    if(seting["cpptips.needLoadLinkDir"]) {
+        let _dirs = [];
+        for(let i = 0; i < seting["cpptips.needLoadLinkDir"].length; i++) {
+            if(seting["cpptips.needLoadLinkDir"][i] == dirname) {
+                //找到需要移除的目录
+                continue;
+            }
+            _dirs.push(seting["cpptips.needLoadLinkDir"][i]);
+        }
+        if(seting["cpptips.needLoadLinkDir"].length != _dirs.length) {
+            needSave = true;
+        }
+        seting["cpptips.needLoadLinkDir"] = _dirs;
+    }
+
+    if(!needSave) {
+        showErrorMessage("未找到任何指定的索引目录或者该目录之前未加入索引计算，是否是因上级目录加入，你可以在.vscode/setting.json中查看配置！", 
+            ["打开配置文件"], (selection:string)=>{
+            if(selection == "打开配置文件") {
+                //打开配置文件
+                openFilePath(setPath, "cpptips.needLoadDir");
+            }
+        });
+        return;
     }
     
     //保存配置文件
