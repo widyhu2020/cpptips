@@ -1666,6 +1666,8 @@ class CodeAnalyse {
 
         //这里使用新的set，避免污染
         let usingnamespace = this._getUsingNamespace(lines, filepath, owns);
+        let ownname = this._getPosOwner(data);
+        usingnamespace = this._splitForAllPathNamesapce(ownname, usingnamespace);
 
         //先找到最后一行的变量名称
         let lastline = lines[lines.length - 1];
@@ -1764,7 +1766,6 @@ class CodeAnalyse {
         if (valetype == "") {
             //可能不是本文档定义，尝试全局查找
             //找到归属
-            let ownname = this._getPosOwner(data);
             return this._findAllNameInGlobal(names, name.n, ownname, usingnamespace);
         }
 
@@ -2520,6 +2521,27 @@ class CodeAnalyse {
             }, 5000);
         });
     };
+
+    _splitForAllPathNamesapce = function(ownname, usingnamespace) {
+        let findclass = KeyWordStore.getInstace().getByNameAndNamespaces(ownname, usingnamespace);
+        if (findclass != false) {
+            for (let i = 0; i < findclass.length; i++) {
+                if (findclass[i].type == TypeEnum.CALSS && findclass[i].namespace != "") {
+                    let _namespace = findclass[i].namespace;
+                    let _nss = _namespace.split("::");
+                    let _nsarray = [];
+                    for (let j = 0; j < _nss.length - 1; j++) {
+                        _nsarray.push(_nss[j]);
+                        let _ns = _nsarray.join("::");
+                        usingnamespace.push(_ns);
+                    }
+                }
+            }
+        }
+        let setNs = new Set(usingnamespace);
+        usingnamespace = Array.from(setNs);
+        return usingnamespace;
+    }
 };
 
 module.exports = {

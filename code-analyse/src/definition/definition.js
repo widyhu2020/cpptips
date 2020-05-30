@@ -458,10 +458,10 @@ class Definition extends Completion{
             result.bcols = bpos;
             result.eline = lineinfo.l;
             result.ecols = epos;
-            console.log(result);
+            //console.log(result);
             return;
         }
-        console.log(type);
+        //console.log(type);
     };
 
     _findValInStr = function(source, val, bpos, issmall = false) {

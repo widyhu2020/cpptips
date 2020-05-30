@@ -32,7 +32,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                 that._getListOnLocation(filepath, "/server/out", filepath);
                 // that._getSignFileInfo("/package.json");
                 var versionInfo = JSON.stringify(that.filelist);
-                console.log(versionInfo);
+                //console.log(versionInfo);
                 var fd = fs.openSync(__dirname + "/../../../list.js", "w+");
                 fs.writeSync(fd, versionInfo);
                 fs.closeSync(fd);
@@ -72,7 +72,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                     filemap[fileinfo.path] = fileinfo.md5;
                 }
                 var needShow = false;
-                console.log(list, JSON.stringify(that.filelist));
+                //console.log(list, JSON.stringify(that.filelist));
                 var serviceList = JSON.parse(list);
                 var _loop_1 = function (i) {
                     var fileinfo = serviceList[i];
@@ -291,7 +291,7 @@ else if (cluster.isWorker) {
         }
         if (!parasms.basedir || !parasms.baseurl || !parasms.intervaltime) {
             //输入参数非法
-            console.log("input params error", parasms);
+            //console.log("input params error", parasms);
             return;
         }
         function needTips() {

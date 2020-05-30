@@ -68,7 +68,7 @@
 				"cpptips.updateCheckIntervalTime": {
 					"type": "integer",
 					"maximum": 2147483647,
-					"default": 1800000,
+					"default": 600000,
 					"description": "配置更新检查的间隔时间"
 				},
 				"cpptips.updateCheckUrl": {

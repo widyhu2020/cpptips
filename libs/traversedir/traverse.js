@@ -15,6 +15,7 @@ var Traverse = /** @class */ (function () {
         this.scanDirFile = function (resolve) {
             var that = this;
             //处理文件
+            this.uniqueDir = new Set([]);
             this._readDir(this.basedir);
             console.log("include process over");
             //延迟10s开始分析文件
@@ -74,6 +75,7 @@ var Traverse = /** @class */ (function () {
         //获取，目录下需要处理文件的数量
         this.getFileNumInDir = function (callbackshow) {
             var taskTotal = 0;
+            this.uniqueDir = new Set([]);
             taskTotal = this._readDirForTotalFile(this.basedir, callbackshow);
             return taskTotal;
         };
@@ -311,6 +313,12 @@ var Traverse = /** @class */ (function () {
                     //console.debug("system file, not analyse!");
                     return total;
                 }
+                if (that.uniqueDir.has(filename)) {
+                    //该目录已经分析过
+                    console.log("file cycle:", filename);
+                    return total;
+                }
+                that.uniqueDir.add(filename);
                 var dataFile = null;
                 try {
                     //不判断软连接
@@ -359,8 +367,8 @@ var Traverse = /** @class */ (function () {
                     }
                 }
             });
-            if (total > 150000) {
-                //文件超过150000个，终止扫描
+            if (total > 200000) {
+                //文件超过200000个，终止扫描
                 that.needStop = true;
             }
             return total;
@@ -397,6 +405,12 @@ var Traverse = /** @class */ (function () {
                     //console.debug("system file, not analyse!");
                     return;
                 }
+                if (that.uniqueDir.has(filename)) {
+                    //该目录已经分析过
+                    console.log("file cycle:", filename);
+                    return;
+                }
+                that.uniqueDir.add(filename);
                 var dataFile = null;
                 try {
                     //不判断软连接
@@ -439,6 +453,8 @@ var Traverse = /** @class */ (function () {
         this.analyseIncludeCallBack = analyseIncludeCallBack;
         this.analyseSourceCallBack = analyseSourceCallBack;
         this.isAnlyseSystemDir = isAnlyseSystemDir;
+        //防重检查
+        this.uniqueDir = new Set([]);
         //queue
         this.includefiles = [];
         this.sourcefiles = [];

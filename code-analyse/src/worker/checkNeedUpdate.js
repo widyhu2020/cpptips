@@ -43,7 +43,7 @@ class CheckNeedUpdate {
             that._getListOnLocation(filepath, "/server/out", filepath);
             // that._getSignFileInfo("/package.json");
             let versionInfo = JSON.stringify(that.filelist);
-            console.log(versionInfo);
+            //console.log(versionInfo);
             let fd = fs.openSync(__dirname + "/../../../list.js", "w+");
             fs.writeSync(fd, versionInfo);
             fs.closeSync(fd);
@@ -88,7 +88,7 @@ class CheckNeedUpdate {
             }
 
             let needShow = false;
-            console.log(list, JSON.stringify(that.filelist));
+            //console.log(list, JSON.stringify(that.filelist));
             let serviceList = JSON.parse(list);
             for(let i = 0; i < serviceList.length; i++) {
                 let fileinfo = serviceList[i];
@@ -301,7 +301,7 @@ if (cluster.isMaster) {
 
         if(!parasms.basedir || !parasms.baseurl || !parasms.intervaltime) {
             //输入参数非法
-            console.log("input params error", parasms);
+            //console.log("input params error", parasms);
             return;
         }
 

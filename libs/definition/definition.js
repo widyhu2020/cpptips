@@ -434,10 +434,10 @@ var Definition = /** @class */ (function (_super) {
                 result.bcols = bpos;
                 result.eline = lineinfo.l;
                 result.ecols = epos;
-                console.log(result);
+                //console.log(result);
                 return;
             }
-            console.log(type);
+            //console.log(type);
         };
         _this._findValInStr = function (source, val, bpos, issmall) {
             //全部转为小写查找

@@ -19,6 +19,9 @@ class Traverse {
         this.analyseSourceCallBack = analyseSourceCallBack;
         this.isAnlyseSystemDir = isAnlyseSystemDir;
 
+        //防重检查
+        this.uniqueDir = new Set([]);
+
         //queue
         this.includefiles = [];
         this.sourcefiles = [];
@@ -28,6 +31,7 @@ class Traverse {
         this.fis = FileIndexStore.getInstace();
         this.userConfig = userConfig;
         this.needStop = false;
+
 
         this.analyseLinkDir = new Set([]);
         if(this.userConfig.needLoadLinkDir
@@ -69,6 +73,7 @@ class Traverse {
         let that = this;
 
         //处理文件
+        this.uniqueDir = new Set([]);
         this._readDir(this.basedir);
         console.log("include process over");
     
@@ -135,6 +140,7 @@ class Traverse {
     //获取，目录下需要处理文件的数量
     getFileNumInDir = function(callbackshow) {
         let taskTotal = 0;
+        this.uniqueDir = new Set([]);
         taskTotal = this._readDirForTotalFile(this.basedir, callbackshow);
         return taskTotal;
     };
@@ -398,6 +404,13 @@ class Traverse {
                 return total;
             }
 
+            if(that.uniqueDir.has(filename)){
+                //该目录已经分析过
+                console.log("file cycle:", filename);
+                return total;
+            }
+            that.uniqueDir.add(filename);
+
             let dataFile = null;
             try {
                 //不判断软连接
@@ -445,8 +458,8 @@ class Traverse {
             }
         });
         
-        if(total > 150000) {
-            //文件超过150000个，终止扫描
+        if(total > 200000) {
+            //文件超过200000个，终止扫描
             that.needStop = true;
         }
         return total;
@@ -488,6 +501,13 @@ class Traverse {
                 //console.debug("system file, not analyse!");
                 return;
             }
+
+            if(that.uniqueDir.has(filename)){
+                //该目录已经分析过
+                console.log("file cycle:", filename);
+                return;
+            }
+            that.uniqueDir.add(filename);
 
             let dataFile = null;
             try {

@@ -1476,6 +1476,8 @@ var CodeAnalyse = /** @class */ (function () {
             var lines = _filecontext.split('\n');
             //这里使用新的set，避免污染
             var usingnamespace = this._getUsingNamespace(lines, filepath, owns);
+            var ownname = this._getPosOwner(data);
+            usingnamespace = this._splitForAllPathNamesapce(ownname, usingnamespace);
             //先找到最后一行的变量名称
             var lastline = lines[lines.length - 1];
             var names = this._getValName(lastline);
@@ -1569,7 +1571,6 @@ var CodeAnalyse = /** @class */ (function () {
             if (valetype == "") {
                 //可能不是本文档定义，尝试全局查找
                 //找到归属
-                var ownname = this._getPosOwner(data);
                 return this._findAllNameInGlobal(names, name.n, ownname, usingnamespace);
             }
             //如果是关联跟踪
@@ -2297,6 +2298,26 @@ var CodeAnalyse = /** @class */ (function () {
                     worker.kill();
                 }, 5000);
             });
+        };
+        this._splitForAllPathNamesapce = function (ownname, usingnamespace) {
+            var findclass = KeyWordStore.getInstace().getByNameAndNamespaces(ownname, usingnamespace);
+            if (findclass != false) {
+                for (var i = 0; i < findclass.length; i++) {
+                    if (findclass[i].type == TypeEnum.CALSS && findclass[i].namespace != "") {
+                        var _namespace = findclass[i].namespace;
+                        var _nss = _namespace.split("::");
+                        var _nsarray = [];
+                        for (var j = 0; j < _nss.length - 1; j++) {
+                            _nsarray.push(_nss[j]);
+                            var _ns = _nsarray.join("::");
+                            usingnamespace.push(_ns);
+                        }
+                    }
+                }
+            }
+            var setNs = new Set(usingnamespace);
+            usingnamespace = Array.from(setNs);
+            return usingnamespace;
         };
         this.isinit = false;
         this.basedir = "";
