@@ -8,7 +8,7 @@
 
 ## 功能介绍
 
-![功能剪辑](https://cpptips-118654-1251218909.tcloudbaseapp.com/helper_mini.gif)
+![功能剪辑](https://www.cpptips.cn/static/helper_mini.gif)
 
 目前主要功能包括：
 - 1、不需要proto编译成.pb.h和.pb.cc文件就可以提示proto的定义
