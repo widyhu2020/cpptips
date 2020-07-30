@@ -512,7 +512,8 @@ var CodeAnalyse = /** @class */ (function () {
                 data: {
                     basepath: this.basedir,
                     dbpath: this.dbpath,
-                    filepath: filepath
+                    filepath: filepath,
+                    userConfig: this.userConfig
                 }
             };
             worker.send(parasms);

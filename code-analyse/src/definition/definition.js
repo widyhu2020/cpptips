@@ -435,20 +435,24 @@ class Definition extends Completion{
         }
 
         if(type == TypeEnum.FUNCTION) {
-            let _name = ownname + "::" + name;
+            let _nameReg = "[\\s\\t]{1,2}" + ownname + "[\\s\\t]{0,10}::[\\s\\t]{0,10}" + name + "[\\s\\t]{0,10}\\(";
+            let reg = new RegExp(_nameReg);
             let fd = fs.openSync(sourcefilepath, 'r');
             const buffer = Buffer.alloc(1024 * 1024 * 2);
             let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2);
             fs.closeSync(fd);
             let filecontext = buffer.toString('utf8', 0, bytesRead);
 
-            let namepos = this._findValInStr(filecontext, _name, 0);
+            let regResult = filecontext.match(reg);
+            let namepos = regResult['index'];
+            let _name = regResult[0];
             let lineinfo = this._getDefinePost(filecontext, namepos);
             let linecode = lineinfo.c;
-            linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
-            //let prelinecode = lineinfo.p;
+            console.log("lineinfo:", lineinfo);
+            // linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
+            let prelinecode = lineinfo.p;
             let bpos = linecode.indexOf(_name);
-            let epos = bpos + _name.length;
+            let epos = bpos + _name.length - 1;
 
             result.filename = "file://" + sourcefilepath;
             if(sourcefilepath.indexOf('/') != 0) {

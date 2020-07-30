@@ -413,19 +413,23 @@ var Definition = /** @class */ (function (_super) {
                 return false;
             }
             if (type == TypeEnum.FUNCTION) {
-                var _name = ownname + "::" + name;
+                var _nameReg = "[\\s\\t]{1,2}" + ownname + "[\\s\\t]{0,10}::[\\s\\t]{0,10}" + name + "[\\s\\t]{0,10}\\(";
+                var reg = new RegExp(_nameReg);
                 var fd = fs.openSync(sourcefilepath, 'r');
                 var buffer = Buffer.alloc(1024 * 1024 * 2);
                 var bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2);
                 fs.closeSync(fd);
                 var filecontext = buffer.toString('utf8', 0, bytesRead);
-                var namepos = this._findValInStr(filecontext, _name, 0);
+                var regResult = filecontext.match(reg);
+                var namepos = regResult['index'];
+                var _name = regResult[0];
                 var lineinfo = this._getDefinePost(filecontext, namepos);
                 var linecode = lineinfo.c;
-                linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
-                //let prelinecode = lineinfo.p;
+                console.log("lineinfo:", lineinfo);
+                // linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
+                var prelinecode = lineinfo.p;
                 var bpos = linecode.indexOf(_name);
-                var epos = bpos + _name.length;
+                var epos = bpos + _name.length - 1;
                 result.filename = "file://" + sourcefilepath;
                 if (sourcefilepath.indexOf('/') != 0) {
                     result.filename = "file:///" + sourcefilepath;

@@ -6,7 +6,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { DepNodeProvider, Dependency } from './nodeDependencies';
-import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal} from 'vscode';
+import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks} from 'vscode';
 
 import {
     LanguageClient,
@@ -23,6 +23,18 @@ let myStatusBarItem: StatusBarItem;
 let showUpdataBarItem: StatusBarItem;
 //创建状态栏，用于更新加载索引进度
 let showColor = new ThemeColor('superstatus.cpptips');
+
+interface RakeTaskDefinition extends TaskDefinition {
+    /**
+     * The task name
+     */
+    task: string;
+  
+    /**
+     * The rake file containing the task
+     */
+    file?: string;
+  }
 
 export function activate(context: ExtensionContext) {
     // The server is implemented in node
@@ -389,6 +401,7 @@ export function activate(context: ExtensionContext) {
 
         //提交编译
         context.subscriptions.push(commands.registerCommand('cpp.build', (infos) =>{
+
             console.log(infos);
             let filepath:string = infos.path;
             let pathinfo = path.parse(filepath);
