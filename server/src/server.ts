@@ -215,6 +215,8 @@ function reloadIncludeFileCallBack(
     }
     if(msg == "stop_load_index") {
         showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请在右侧资源管理器中，选择目录右键“加入索引范围”指定需要计算的目录！");
+        //显示可视化配置
+        sendMsgToVscode('open_index_config', []);
     }
     if(msg == "show_file_more") {
         showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
@@ -313,7 +315,9 @@ connection.onNotification("addDirToIndex", (infos: any) => {
                     showErrorMessage("该目录配置或者父目录已经配置，无需重复配置！点击按钮查看当前配置！", ["打开配置文件"], (selection:string)=>{
                         if(selection == "打开配置文件") {
                             //打开配置文件
-                            openFilePath(setPath, "cpptips.needLoadLinkDir");
+                            // openFilePath(setPath, "cpptips.needLoadLinkDir");
+                            //显示可视化配置
+                            sendMsgToVscode('open_index_config', []);
                         }
                     });
                     return;
@@ -334,7 +338,9 @@ connection.onNotification("addDirToIndex", (infos: any) => {
                         ["打开配置文件"], (selection:string)=>{
                         if(selection == "打开配置文件") {
                             //打开配置文件
-                            openFilePath(setPath, "cpptips.needLoadDir");
+                            // openFilePath(setPath, "cpptips.needLoadDir");
+                            //显示可视化配置
+                            sendMsgToVscode('open_index_config', []);
                         }
                     });
                     return;
@@ -423,7 +429,9 @@ connection.onNotification("delDirToIndex", (infos: any) => {
             ["打开配置文件"], (selection:string)=>{
             if(selection == "打开配置文件") {
                 //打开配置文件
-                openFilePath(setPath, "cpptips.needLoadDir");
+                //openFilePath(setPath, "cpptips.needLoadDir");
+                //显示可视化配置
+                sendMsgToVscode('open_index_config', []);
             }
         });
         return;

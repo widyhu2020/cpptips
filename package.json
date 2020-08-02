@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.2.1",
+	"version": "0.2.3",
 	"repository": {
 		"url": "https://github.com/widyhu2020/cpptips"
 	},
@@ -115,12 +115,20 @@
 				"title": "刷新全部索引"
 			},
 			{
+				"command": "cpp.showWebConfig",
+				"title": "去可视化配置索引"
+			},
+			{
 				"command": "cpp.reflushOneIdex",
 				"title": "重建该文件索引"
 			},
 			{
 				"command": "cpp.build",
-				"title": "提交编译"
+				"title": "仅提交编译"
+			},
+			{
+				"command": "cpp.buildfordocker",
+				"title": "提交编译到容器(pay专用)"
 			}
 		],
 		"languages": [
@@ -203,6 +211,12 @@
 					"command": "cpp.build",
 					"alt": "cpp.build",
 					"group": "z_commands@1"
+				},
+				{
+					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"command": "cpp.buildfordocker",
+					"alt": "cpp.buildfordocker",
+					"group": "z_commands@1"
 				}
 			],
 			"explorer/context": [
@@ -231,13 +245,71 @@
 					"group": "2_workspace@4"
 				},
 				{
+					"when": "true",
+					"command": "cpp.showWebConfig",
+					"alt": "cpp.showWebConfig",
+					"group": "2_workspace@5"
+				},
+				{
 					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
 					"command": "cpp.reflushOneIdex",
 					"alt": "cpp.reflushOneIdex",
 					"group": "2_workspace@3"
 				}
 			]
-		}
+		},
+		"views": {
+			"explorer": [
+			  {
+				"id": "nodeDependencies",
+				"name": "分析目录",
+				"icon": "media/dep.svg",
+				"contextualTitle": "Package Explorer"
+			  }
+			]
+		},
+		"problemMatchers": [
+			{
+				"owner": "cpp",
+				"name": "cpp_gcc",
+				"fileLocation": ["relative", "${workspaceFolder}"],
+				"pattern": {
+				  "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+				  "file": 1,
+				  "line": 2,
+				  "column": 3,
+				  "severity": 4,
+				  "message": 5
+				}
+			},
+			{
+				"owner": "cpp",
+				"name": "cpp_build",
+				"fileLocation": ["relative", "${workspaceFolder}"],
+				"pattern": {
+				  "regexp": "^(.*):(\\d+):(\\d+): .* (error): (.*)$",
+				  "file": 1,
+				  "line": 2,
+				  "column": 3,
+				  "severity": 4,
+				  "message": 5
+				}
+			}
+		],
+		"keybindings": [
+			{
+				"command": "cpp.buildfordocker",
+				"key": "Ctrl+f5",
+				"mac": "Ctrl+f5",
+				"when": "editorTextFocus"
+			},
+			{
+				"command": "cpp.build",
+				"key": "f5",
+				"mac": "f5",
+				"when": "editorTextFocus"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "sh build.sh",
