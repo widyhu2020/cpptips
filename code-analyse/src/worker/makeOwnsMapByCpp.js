@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const KeyWordStore = require('../store/store').KeyWordStore;
 const cluster = require('cluster');
+const logger = require('log4js').getLogger("cpptips");
 
 class MakeOwnsMapByCpp {
 
@@ -73,7 +74,7 @@ class MakeOwnsMapByCpp {
 
         if (this.fileNameMap[filename]) {
             let listRealName = this.fileNameMap[filename];
-            //console.log("listRealName", listRealName);
+            //logger.debug("listRealName", listRealName);
             //找后缀匹配的全部头文件
             let retInclude = listRealName.length > 0 ? listRealName[0] : '';
             let gSameProportion = 0;
@@ -91,12 +92,12 @@ class MakeOwnsMapByCpp {
                 } 
             }
             if (retInclude != '') {
-                //console.log("return path:",retInclude);
+                //logger.debug("return path:",retInclude);
                 return retInclude;
             }
             return inputfilename;
         }
-        //console.log("return source failename:", inputfilename, filename);
+        //logger.debug("return source failename:", inputfilename, filename);
         return inputfilename;
     };
     
@@ -237,7 +238,7 @@ if (cluster.isMaster) {
     }
     worker.send(parasms);
     worker.on('message', (data)=>{
-        //console.log(data);
+        //logger.debug(data);
         //关闭子进程
         worker.kill();
     });
@@ -245,7 +246,7 @@ if (cluster.isMaster) {
     process.on('message', (parasms) => {
         try {
             //子线程
-            console.log(parasms.basedir, parasms.dbpath, parasms.cppfilename);
+            logger.debug(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
             console.time("makeSearchTreeByCpp");
             let maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
@@ -261,18 +262,18 @@ if (cluster.isMaster) {
             process.send(result);
             console.timeEnd("postMessage");
         } catch(err){
-            console.log(err);
+            logger.debug(err);
             process.kill(process.pid);
         }
     });
 
     process.on('exit', (code, signal) => {
         if (signal) {
-            console.log(`工作进程已被信号 ${signal} 杀死`);
+            logger.debug(`工作进程已被信号 ${signal} 杀死`);
         } else if (code !== 0) {
-            console.log(`工作进程退出，退出码: ${code}`);
+            logger.debug(`工作进程退出，退出码: ${code}`);
         } else {
-            console.log('工作进程成功退出');
+            logger.debug('工作进程成功退出');
         }
     });
 }

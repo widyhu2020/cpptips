@@ -11,6 +11,7 @@ const AnalyseCpp = require('../analyse/analyseCpp').AnalyseCpp;
 const TypeEnum = require('../analyse/analyseBase').TypeEnum;
 const FileIndexStore = require('../store/store').FileIndexStore;
 const KeyWordStore = require('../store/store').KeyWordStore;
+const logger = require('log4js').getLogger("cpptips");
 
 class AnalyseDiagnostics extends AnalyseCpp {
 	constructor(filecontext, dbpath, filename = '') {
@@ -56,7 +57,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 
 		//遍历树结构，分析具体语法规则
 		this.tree.traverseDF((current) => {
-			//console.log(current);
+			//logger.debug(current);
 			let fatherNameMap = {};
 			//获取父节点的定义
 			fatherNameMap = this.GetFatherNameMap(current);
@@ -81,7 +82,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		});	
 
 		for(let i = 0; i < this.result.length; i++) {
-			console.log(this.result[i].begin, this.result[i].end, this.context.substring(this.result[i].begin - 20, this.result[i].end));
+			logger.debug(this.result[i].begin, this.result[i].end, this.context.substring(this.result[i].begin - 20, this.result[i].end));
 		}
 	};
 
@@ -167,7 +168,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			if(/([,]?[\w]{1,64}\([\w]{1,64}\)){1,32}/g.test(testStr)){
 				//测试成功
 				data = data.substring(0, _pos + 1);
-				//console.log(data);
+				//logger.debug(data);
 			}
 		}
 
@@ -243,7 +244,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		});
 		let reg = /([\w:<>,]{1,128})[\s]{1,4}([\w]{1,64})/g;
 		let result = param.match(reg);
-		//console.log(result);
+		//logger.debug(result);
 		for(let i = 0; result && i < result.length; i++) {
 			let item = result[i].trim();
 			if(item[0] == ",") {
@@ -273,11 +274,11 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			}
 			current = current.parent;
 			let _nameMap = current.nameMap;
-			//console.log("predata:", _nameMap, nameMap);
+			//logger.debug("predata:", _nameMap, nameMap);
 			nameMap = Object.assign(nameMap, _nameMap);
-			//console.log("result:", nameMap);
+			//logger.debug("result:", nameMap);
 		}
-		//console.log(nameMap);
+		//logger.debug(nameMap);
 		return nameMap;
 	};
 
@@ -334,10 +335,10 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		let reg = /^([\w]{1,64}(::[\w]{1,64}){0,10})([*&]{0,2}) ([\w]{1,64})$/g;
 		let match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let type = match[1];
 			let name = match[4];
-			//if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+			//if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
 			nameMap[name] = type;
 			return nameMap;
 		}
@@ -346,7 +347,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		reg = /^([\w]{1,64}(::[\w]{1,64}){0,10})[*&]{0,2} ([\w]{1,64})[\s]{0,16}((\()|(=[\s]{0,16}new ))/g;
 		match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let type = match[1];
 			let name = match[3];
 			nameMap[name] = type;
@@ -357,10 +358,10 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		reg = /^((([\w]{1,64}::){0,8}[\w]{1,64})<(([,]?([\w]{1,64}::){0,10}[\w]{1,64}){1,10})>)([*&]{0,2}) ([\w]{1,64})$/g;
 		match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let type = match[1];
 			let name = match[8];
-			//if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+			//if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
 			nameMap[name] = type;
 			return nameMap;
 		}
@@ -369,11 +370,11 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		reg = /^((([\w]{1,64}::){0,8}[\w]{1,64})<(([,]?([\w]{1,64}::){0,10}[\w]{1,64}){1,10})>)[*&]{0,2} ([\w]{1,64})[\s]{0,16}=[\s]{0,16}([\w.,(*&)"]{1,128})$/g;
 		match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let type = match[1];
 			let name = match[7];
 			let value = match[8];
-			//if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+			//if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
 			nameMap[name] = type;
 
 			let typeOfName = type;
@@ -381,7 +382,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			if(value.indexOf("(") != -1) {
 				//函数调用
 				valType = this.CheckFunctionParams(value, nameMap, fatherNameMap);
-				// if(name == "bitsetProperty") console.log(valType, typeOfName);
+				// if(name == "bitsetProperty") logger.debug(valType, typeOfName);
 			} else if(/^[\d]{1,25}$/g.test(value)) {
 				valType = "number";
 			} else if(/^[\d]{1,25}[.]{1,1}[\d]{1,10}$/g.test(value)) {
@@ -412,7 +413,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			if(!this.TypeCheck(typeOfName, valType)) {
 				let matchcode = match[0].replace(/[\s]{1,10}/g, "");
 				this.GetPointInSource(matchcode, type, value, "变量类型不匹配");
-				//if(name == "strInterfaceSource")console.log(match,matchcode, type, value);
+				//if(name == "strInterfaceSource")logger.debug(match,matchcode, type, value);
 				return nameMap;
 			}
 			return nameMap;
@@ -424,9 +425,9 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		match = reg.exec(code);
 		if(match) {
 			if(/MMPAY_CTIME_ELF/g.test(code)){
-				console.log(code);
+				logger.debug(code);
 			}
-			// console.log(match);
+			// logger.debug(match);
 			let type = match[1];
 			let name = match[3];
 			let value = match[4];
@@ -437,7 +438,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			if(value.indexOf("(") != -1) {
 				//函数调用
 				valType = this.CheckFunctionParams(value, nameMap, fatherNameMap);
-				if(name == "i") console.log("jjjjjjjjjjj",value,nameMap, fatherNameMap,valType, typeOfName)
+				if(name == "i") logger.debug("jjjjjjjjjjj",value,nameMap, fatherNameMap,valType, typeOfName)
 			} else if(/^[\d]{1,25}$/g.test(value)) {
 				valType = "number";
 			} else if(/^[\d]{1,25}[.]{1,1}[\d]{1,10}$/g.test(value)) {
@@ -467,7 +468,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				} else {
 					nameMap[name] = valType;
 				}
-				//if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code, name, value, type, valType, nameMap);
+				//if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code, name, value, type, valType, nameMap);
 				return nameMap;
 			}
 
@@ -483,14 +484,14 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		reg = /^([\w]{1,64})=([\w.,]{1,128})$/g;
 		match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let name = match[1];
 			let value = match[2];
-			if(name == "m_pNewIdMaker") console.log(nameMap, fatherNameMap, name, value);
+			if(name == "m_pNewIdMaker") logger.debug(nameMap, fatherNameMap, name, value);
 			let typeOfName = this.GetNameType(nameMap, fatherNameMap, name);
 			if(!typeOfName) {
 				//变量未定义
-				console.log(code, name, value, nameMap, fatherNameMap);
+				logger.debug(code, name, value, nameMap, fatherNameMap);
 				let matchcode = match[0].replace(/[\s]{1,10}/g, "");
 				this.GetPointInSource(matchcode, name, value, "变量未定义");
 				return nameMap;
@@ -504,7 +505,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				valType = "number";
 			} else if(/^\"[^"]{1,1024}\"$/g.test(value)) {
 				valType = "std::string";
-				console.log(name, value);
+				logger.debug(name, value);
 			} else if(value == "false" || value == "true"){
 				valType = "bool";
 			} else {
@@ -532,7 +533,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		reg = /^([\w]{1,64})=([\w:.]{1,64}\([\w.,():]{1,128}\))$/g;
 		match = reg.exec(code);
 		if(match) {
-			//console.log(match);
+			//logger.debug(match);
 			let name = match[1];
 			let value = match[2];
 			let typeOfName = this.GetNameType(nameMap, fatherNameMap, name);
@@ -546,7 +547,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			let _type = this.CheckFunctionParams(value, nameMap, fatherNameMap);
 			if(!this.TypeCheck(typeOfName, _type)) {
 				//let matchcode = match[0].replace(/[\s]{1,10}/g, "");
-				//console.log("function return not match!" +  typeOfName + "|" +  name + "|" + _type + "|" + value);
+				//logger.debug("function return not match!" +  typeOfName + "|" +  name + "|" + _type + "|" + value);
 				//this.GetPointInSource(matchcode, value, value);
 				return nameMap;
 			}
@@ -627,7 +628,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		];
 		let defineleve = -1;
 		for(let i = 0; i < numberType.length; i++) {
-			//if(valType == "number") console.log("ddddddd",defineType, valType,defineleve, numberType[i]);
+			//if(valType == "number") logger.debug("ddddddd",defineType, valType,defineleve, numberType[i]);
 			if(numberType[i] == defineType) {
 				defineleve = i;
 			}
@@ -668,7 +669,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		if(_params.trim().length > 0) {
 			params.push(_params);
 		}
-		//console.log(params);
+		//logger.debug(params);
 		return params;
 	};
 
@@ -699,7 +700,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		let info = this.kwdb.getByOwnNameAndNameType(_ownname, name, usens, TypeEnum.FUNCTION);
 		//测试代码//////////////////////////////////////////////////////
 		// if(name == "str"){
-		// 	console.log("xxxxxxxxxxxxx", _ownname, usens, info);
+		// 	logger.debug("xxxxxxxxxxxxx", _ownname, usens, info);
 		// }
 		if(info.length == 0) {
 			//没查到函数可能是宏定义
@@ -708,7 +709,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				let jsonData = JSON.parse(info[0].extdata);
 				if(params.length != jsonData.p.length) {
 					//宏参数不匹配
-					console.log("#define params not match!");
+					logger.debug("#define params not match!");
 				}
 				//宏定义
 				return "#define";
@@ -718,7 +719,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 		/////////////////////////////////////////////////////////////
 		if(info.length > 0) {
 			let extData = info[0].extdata;
-			//if(name == "_AddProcessFlows")console.log("xxxxxxx", info[0], params);
+			//if(name == "_AddProcessFlows")logger.debug("xxxxxxx", info[0], params);
 			let extJson = JSON.parse(extData);
 			for(let i = 0; i < extJson.length; i++) {
 				if(extJson[i].i.length >= params.length) {
@@ -729,7 +730,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 							//函数默认值处理
 							//如果超出的参数必须要有默认值，否则报错
 							if(extJson[i].i[j].v == null) {
-								console.log("params not match!", extJson[i].i[j]);
+								logger.debug("params not match!", extJson[i].i[j]);
 								isError = true;
 								continue;
 							}
@@ -753,7 +754,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 								"long", "unsigned long", "long long", "unsigned long long"]);
 							if(!numberType.has(defineType)) {
 								//非数字类型，但是匹配了数字
-								console.log("this type is number", defineType, val);
+								logger.debug("this type is number", defineType, val);
 								isError = true;
 								continue;
 							}
@@ -766,7 +767,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 							let numberType = new Set(["double", "float"]);
 							if(!numberType.has(defineType)) {
 								//非数字类型，但是匹配了数字
-								console.log("this type is number", defineType, val);
+								logger.debug("this type is number", defineType, val);
 								isError = true;
 								continue;
 							}
@@ -778,7 +779,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 							let numberType = new Set(["string", "std::string", "char*", "char *"]);
 							if(!numberType.has(defineType)) {
 								//非字符类型，使用了字符的规则
-								console.log("this type is string", defineType, val);
+								logger.debug("this type is string", defineType, val);
 								isError = true;
 								continue;
 							}
@@ -789,7 +790,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 						if(val.indexOf("(") != -1) {
 							let _type = this.CheckFunctionParams(val, nameMap, fatherNameMap);
 							if(!this.TypeCheck(defineType, _type)) {
-								console.log("this function return type is not match", defineType, _type, val);
+								logger.debug("this function return type is not match", defineType, _type, val);
 								isError = true;
 								continue;
 							}
@@ -798,7 +799,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 
 						//其他情况进行匹配
 						let _type = this.GetNameType(nameMap, fatherNameMap, val);
-						// if(name == "GetCurrentProccessByBusinessCode") console.log(nameMap, fatherNameMap,val);
+						// if(name == "GetCurrentProccessByBusinessCode") logger.debug(nameMap, fatherNameMap,val);
 						if(!_type) {
 							//变量为定义
 							//判断是否宏定义或者枚举
@@ -824,22 +825,22 @@ class AnalyseDiagnostics extends AnalyseCpp {
 								}
 							}
 							
-							//console.log(nameMap, fatherNameMap, val, this.allfunctionname);
+							//logger.debug(nameMap, fatherNameMap, val, this.allfunctionname);
 							if(!pass) {
-								console.log("this val not define！", defineType, _type, val);
+								logger.debug("this val not define！", defineType, _type, val);
 								isError = true;
 								continue;
 							}
 						}
 						if(!this.TypeCheck(defineType, _type)) {
 							//类型不匹配
-							console.log("this function return type is not match！", defineType, _type, val);
+							logger.debug("this function return type is not match！", defineType, _type, val);
 							isError = true;
 							continue;
 						}
 					}
 					if(!isError) {
-						// if(name == "GetCurrentProccessByBusinessCode") console.log(extJson[0]);
+						// if(name == "GetCurrentProccessByBusinessCode") logger.debug(extJson[0]);
 						let _retType = extJson[0].r.t;
 						if(extJson[0].r.p == 1) {
 							_retType = _retType + "*";
@@ -849,7 +850,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				}
 			}
 		}
-		console.log(type, name, paramsStr);
+		logger.debug(type, name, paramsStr);
 		return false;
 	};
 
@@ -916,7 +917,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 					if(_stack.length == 0) {
 						_params = func.substring(i, j + 1);
 						//this.CheckFunctionParams(_newfunc)
-						// console.log("_newfunc", _newfunc);
+						// logger.debug("_newfunc", _newfunc);
 						i = j;
 						break;
 					}
@@ -947,7 +948,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				funcSq = tmpSq.concat(funcSq);
 			} else {
 				this.GetPointInSource(func, funcSq[0].name, names.name, "函数参数不匹配");
-				//console.log("xxx error", names,nameMap, fatherNameMap);
+				//logger.debug("xxx error", names,nameMap, fatherNameMap);
 				return false;
 			}
 		}
@@ -963,7 +964,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				let _type = this.GetFunctionRetType(type, names.name, names.params, nameMap, fatherNameMap);
 				if(!_type) {
 					this.GetPointInSource(func, funcSq[0].name, names.name, "函数返回了未定义类型");
-					console.log("ccc error", func, names, type, _type);
+					logger.debug("ccc error", func, names, type, _type);
 					return false;
 				}
 				type = _type;
@@ -989,42 +990,42 @@ class AnalyseDiagnostics extends AnalyseCpp {
 				//异常情况
 				break;
 			}
-			//console.log(_pos, source, bname);
+			//logger.debug(_pos, source, bname);
 			let linecode = "";
 			for(let i = _pos; i < source.length; i++){
 				if(source[i] != " " && source[i] != "\t" 
 					&& source[i] != "\n" && source[i] != "\r") {
 					linecode = linecode + source[i];
-					//console.log(linecode);
+					//logger.debug(linecode);
 				}
 
 				let _findPos = func.indexOf(linecode);
 				if(_findPos == -1) {
 					//跳过继续查找
-					//console.log("linecode", func, linecode);
+					//logger.debug("linecode", func, linecode);
 					_pos = i;
 					linecode = "";
 					find = false;
 					break;
 				} else if(_findPos > 0) {
 					//异常情况，退出
-					console.log(func, bname, name);
+					logger.debug(func, bname, name);
 					return 0;
 				}
 
 				if(func == linecode){
 					//找到位置
-					//if(func=="std::stringstrErrmsg=0")console.log("dddd:",source, linecode, name);
+					//if(func=="std::stringstrErrmsg=0")logger.debug("dddd:",source, linecode, name);
 					retPos = source.indexOf(name, _pos);
 					find = true;
 					break;
 				}
 			}
 		}
-		//console.log("ss", this.context.substring(startPos + retPos, startPos + retPos + name.length), "dd", bname);
+		//logger.debug("ss", this.context.substring(startPos + retPos, startPos + retPos + name.length), "dd", bname);
 		let range = {begin: startPos + retPos, end: startPos + retPos + name.length};
 		this.result.push(range);
-		console.log("error:", msg, name, range);
+		logger.debug("error:", msg, name, range);
 		return startPos + retPos;
 	};
 
@@ -1040,7 +1041,7 @@ class AnalyseDiagnostics extends AnalyseCpp {
 			return fatherNameMap[name];
 		}
 
-		//console.log(nameMap, fatherNameMap, name);
+		//logger.debug(nameMap, fatherNameMap, name);
 		return false;
 	};
 };
@@ -1066,13 +1067,13 @@ if (cluster.isMaster) {
     worker.send(parasms);
     worker.on('message', (data) => {
         if(data.type == "result") {
-			console.log(data.data);
+			logger.debug(data.data);
             worker.kill();
         }
     });
 } else if (cluster.isWorker) {
 	process.on('message', (parasms) => {
-		//console.log(parasms);
+		//logger.debug(parasms);
 		let filecontext = parasms["filecontext"];
 		let filename = parasms["filename"];
 		let dbpath = parasms["dbpath"];

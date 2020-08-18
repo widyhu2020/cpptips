@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const KeyWordStore = require('../store/store').KeyWordStore;
 const FileType = require('../store/store').FileType;
+const logger = require('log4js').getLogger("cpptips");
 
 class CheckNeedUpdate {
     constructor(baseurl, basedir, intervaltime, callback, showversion = 0) {
@@ -43,7 +44,7 @@ class CheckNeedUpdate {
             that._getListOnLocation(filepath, "/server/out", filepath);
             // that._getSignFileInfo("/package.json");
             let versionInfo = JSON.stringify(that.filelist);
-            //console.log(versionInfo);
+            //logger.debug(versionInfo);
             let fd = fs.openSync(__dirname + "/../../../list.js", "w+");
             fs.writeSync(fd, versionInfo);
             fs.closeSync(fd);
@@ -57,7 +58,7 @@ class CheckNeedUpdate {
         //半小时(默认)执行一次
         this.timer = setInterval(() => {
             if(that.needStop) {
-                console.log("find need exit!");
+                logger.debug("find need exit!");
                 that.filelist = [];
                 clearInterval(this.timer);
                 return;
@@ -88,7 +89,7 @@ class CheckNeedUpdate {
             }
 
             let needShow = false;
-            //console.log(list, JSON.stringify(that.filelist));
+            //logger.debug(list, JSON.stringify(that.filelist));
             let serviceList = JSON.parse(list);
             for(let i = 0; i < serviceList.length; i++) {
                 let fileinfo = serviceList[i];
@@ -105,7 +106,7 @@ class CheckNeedUpdate {
                         try{
                             ret = that._saveFileToLocal(fileinfo.path, context);
                         } catch(error) {
-                            console.log("error:", error, fileinfo.path);
+                            logger.debug("error:", error, fileinfo.path);
                         }
                     });
                 }
@@ -123,7 +124,7 @@ class CheckNeedUpdate {
     };
 
     _saveFileToLocal = function(filepath, fileconext) {
-        console.log("save file! filepath:", filepath);
+        logger.debug("save file! filepath:", filepath);
         let allpath = this.basedir + filepath;
         try{
             if (fs.existsSync(allpath)) {
@@ -145,7 +146,7 @@ class CheckNeedUpdate {
             let length = fs.writeSync(fd, fileconext, 0, "utf8");
             fs.closeSync(fd);
         }catch(error){
-            console.log(error);
+            logger.debug(error);
             return false;
         }
         return true;
@@ -153,7 +154,7 @@ class CheckNeedUpdate {
 
     _getListChek = function(url, successfunction) {
         //http://9.134.38.144:8888/list.js
-        console.log(url);
+        logger.debug(url);
         try{
             let http = require('http');
             
@@ -175,10 +176,10 @@ class CheckNeedUpdate {
                     successfunction(html);
                 });
             }).on('error', function () {
-                console.log('获取数据错误');
+                logger.debug('获取数据错误');
             });
         } catch(error) {
-            console.log(error, url);
+            logger.debug(error, url);
         }
     };
 
@@ -217,7 +218,7 @@ class CheckNeedUpdate {
                 //不判断软连接
                 dataFile = fs.lstatSync(filename);
             } catch (error) {
-                console.log(error);
+                logger.debug(error);
                 return;
             }
            
@@ -280,7 +281,7 @@ if (cluster.isMaster) {
             worker.kill();
         }
         if(data == "update") {
-            console.log("need update");
+            logger.debug("need update");
         }
     });
 } else if (cluster.isWorker) {
@@ -301,7 +302,7 @@ if (cluster.isMaster) {
 
         if(!parasms.basedir || !parasms.baseurl || !parasms.intervaltime) {
             //输入参数非法
-            //console.log("input params error", parasms);
+            //logger.debug("input params error", parasms);
             return;
         }
 
@@ -327,7 +328,7 @@ if (cluster.isMaster) {
         }
     };
     process.on('message', (parasms) => {
-        //console.log("onmessage",parasms);
+        //logger.debug("onmessage",parasms);
         onMessage(parasms);
     });
 };

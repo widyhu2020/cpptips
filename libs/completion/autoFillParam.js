@@ -24,6 +24,7 @@ var FileIndexStore = require('../store/store').FileIndexStore;
 var Completion = require('../completion/completion').Completion;
 var fs = require('fs');
 var path = require('path');
+var logger = require('log4js').getLogger("cpptips");
 var AutoFillParam = /** @class */ (function (_super) {
     __extends(AutoFillParam, _super);
     function AutoFillParam() {
@@ -55,7 +56,7 @@ var AutoFillParam = /** @class */ (function (_super) {
                 }
             }
             var nameMap = this._getAllVarDefine(objName, this.filecontext, namespaces);
-            console.log(JSON.stringify(nameMap));
+            logger.debug(JSON.stringify(nameMap));
             var selectList = [];
             for (var i = 0; i < paramsType.length; i++) {
                 var type = paramsType[i].t;
@@ -126,7 +127,7 @@ var AutoFillParam = /** @class */ (function (_super) {
                 }
                 typeMap = this._getObjectFunction(typeMap, false, name_1, type, namespaces, 0);
             }
-            //console.log(JSON.stringify(typeMap));
+            //logger.debug(JSON.stringify(typeMap));
             return typeMap;
         };
         //获取对象对应的方法
@@ -173,12 +174,12 @@ var AutoFillParam = /** @class */ (function (_super) {
                 return codes;
             }
             if (ownname == "") {
-                console.log(ownname, preown, type);
+                logger.debug(ownname, preown, type);
                 return codes;
             }
-            console.time("getByOwnNameAndNs");
+            logger.mark("getByOwnNameAndNs");
             var functions = keydb.getByOwnNameAndNs(ownname, usenamespace);
-            console.timeEnd("getByOwnNameAndNs");
+            logger.mark("getByOwnNameAndNs");
             for (var i = 0; i < functions.length; i++) {
                 var func = functions[i];
                 if (!func.extdata || func.extdata.length <= 0) {
@@ -192,7 +193,7 @@ var AutoFillParam = /** @class */ (function (_super) {
                 }
                 var _displayDegree = this.similar(this.cleanProtobufWord(funcname), this.cleanProtobufWord(this.paramsName.toLowerCase()));
                 var _funcisplayDegree = this.similar(this.cleanProtobufWord(funcname), this.cleanProtobufWord(this.functionName.toLowerCase()));
-                console.log(funcname, this.paramsName, this.functionName, "相似度：", _displayDegree, _funcisplayDegree);
+                logger.debug(funcname, this.paramsName, this.functionName, "相似度：", _displayDegree, _funcisplayDegree);
                 if (_funcisplayDegree > _displayDegree) {
                     //使用匹配度高的
                     _displayDegree = _funcisplayDegree;
@@ -202,7 +203,7 @@ var AutoFillParam = /** @class */ (function (_super) {
                 for (var j = 0; j < extJson.length; j++) {
                     var funcparams = extJson[j];
                     var type_1 = funcparams.r.t;
-                    if (_displayDegree < 700
+                    if (_displayDegree < 500
                         && (sampleType.has(type_1) || type_1 == "string" || type_1 == "std::string")) {
                         //显示度小于指定值的全部忽略
                         continue;

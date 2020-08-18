@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const vscode_1 = require("vscode");
 const IndexConfig_1 = require("./IndexConfig");
+const log4js_1 = require("log4js");
+const logger = log4js_1.getLogger("cpptips");
 let myStatusBarItem;
 let showUpdataBarItem;
 //创建状态栏，用于更新加载索引进度
@@ -17,6 +19,8 @@ function initStatusBar() {
 }
 exports.initStatusBar = initStatusBar;
 function notifyProcess(context, client) {
+    //初始化diagnosic
+    let diagnosic = vscode_1.languages.createDiagnosticCollection("cpp");
     client.onNotification("show_include_process", (data) => {
         myStatusBarItem.show();
         myStatusBarItem.color = showColor;
@@ -97,7 +101,7 @@ function notifyProcess(context, client) {
     });
     //打开指定路径的文件
     client.onNotification("open_file", (message) => {
-        console.log("open_file", message);
+        logger.debug("open_file", message);
         if (message.length < 1) {
             //无效通知
             return;
@@ -120,6 +124,18 @@ function notifyProcess(context, client) {
             }
             vscode_1.window.showTextDocument(doc, options);
         });
+    });
+    client.onNotification("reflushError", (message) => {
+        logger.debug("open_file", message);
+        if (message.length <= 1) {
+            return;
+        }
+        let sourceUri = vscode_1.Uri.file(message[0]);
+        let _diagnosic = JSON.parse(message[1]);
+        diagnosic.delete(sourceUri);
+        if (_diagnosic.length > 0) {
+            diagnosic.set(sourceUri, _diagnosic);
+        }
     });
 }
 exports.notifyProcess = notifyProcess;

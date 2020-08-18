@@ -4,6 +4,7 @@
  *  Created on: 2020年4月05日
  *      Author: widyhu
  */
+var logger = require('log4js').getLogger("cpptips");
 var AnalyseDomain = /** @class */ (function () {
     //分析domain
     function AnalyseDomain(context) {
@@ -29,7 +30,7 @@ var AnalyseDomain = /** @class */ (function () {
             for (var i = 0; i < data.length; i++) {
                 var blcok = data[i];
                 blcok = blcok.trim();
-                //if(/namespace/g.test(blcok)) console.log(blcok);
+                //if(/namespace/g.test(blcok)) logger.debug(blcok);
                 if (blcok[blcok.length - 1] == '{') {
                     //最后一个为}结束，可能是函数实现
                     //判断是否为函数

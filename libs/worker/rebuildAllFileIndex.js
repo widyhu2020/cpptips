@@ -16,6 +16,7 @@ var crypto = require('crypto');
 var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var FileType = require('../store/store').FileType;
+var logger = require('log4js').getLogger("cpptips");
 var needStop = false;
 var RebuildFileIndex = /** @class */ (function () {
     function RebuildFileIndex(basedir, dbpath, issystem) {
@@ -58,7 +59,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理头文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -74,7 +75,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理源文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -99,7 +100,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理头文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -115,7 +116,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理源文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -133,7 +134,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 return that.needExit;
             }
             function _inDeleteNotExists(msg) {
-                console.log(msg);
+                logger.debug(msg);
                 return that.needExit;
             }
             //目录扫描器
@@ -165,7 +166,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理头文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -181,7 +182,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 //处理源文件
                 if (that.needExit) {
                     //退出进程
-                    console.log("main process send message, child need exit.");
+                    logger.debug("main process send message, child need exit.");
                     return that.needExit;
                 }
                 index++;
@@ -199,7 +200,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 return that.needExit;
             }
             function _inDeleteNotExists(msg) {
-                console.log(msg);
+                logger.debug(msg);
                 return that.needExit;
             }
             //目录扫描器
@@ -257,7 +258,7 @@ var RebuildFileIndex = /** @class */ (function () {
             if (this.needExit || !FileIndexStore.getInstace().islive()) {
                 //退出进程
                 this.needExit = false;
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return this.needExit;
             }
             var that = this;
@@ -306,11 +307,11 @@ var RebuildFileIndex = /** @class */ (function () {
             }
             //如果是md5值不一样，则启动分析合并
             if ((hasInDb && lastMd5 != md5) || forckReolad) {
-                console.log(lastMd5, md5, filepath);
+                logger.debug(lastMd5, md5, filepath);
                 //获取文件id
                 var fileinfo_1 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_1) {
-                    //console.log("not find file!", filepath);
+                    //logger.debug("not find file!", filepath);
                     return false;
                 }
                 var file_id = fileinfo_1.id;
@@ -333,7 +334,7 @@ var RebuildFileIndex = /** @class */ (function () {
             if (this.needExit || !FileIndexStore.getInstace().islive()) {
                 //退出进程
                 this.needExit = false;
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return this.needExit;
             }
             var that = this;
@@ -382,11 +383,11 @@ var RebuildFileIndex = /** @class */ (function () {
             }
             //如果是md5值不一样，则启动分析合并
             if ((hasInDb && lastMd5 != md5) || forckReolad) {
-                //console.log(lastMd5, md5, filepath);
+                //logger.debug(lastMd5, md5, filepath);
                 //获取文件id
                 var fileinfo_2 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_2) {
-                    //console.log("not find file!", filepath);
+                    //logger.debug("not find file!", filepath);
                     return false;
                 }
                 var file_id = fileinfo_2.id;
@@ -434,11 +435,11 @@ var RebuildFileIndex = /** @class */ (function () {
                 var analyse = new Analyse(filecontext, filename);
                 analyse.doAnalyse();
                 var nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-                //console.log(nameMap);
+                //logger.debug(nameMap);
                 return nameMap;
             }
             catch (error) {
-                console.log(filename, error);
+                logger.debug(filename, error);
                 return {};
             }
         };
@@ -462,15 +463,15 @@ var RebuildFileIndex = /** @class */ (function () {
                     onlaysavepublic = {};
                 }
                 //执行分析
-                //console.log(filecontext);
+                //logger.debug(filecontext);
                 var analyse = new Analyse(filecontext, filename);
                 analyse.doAnalyse();
                 var nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-                //console.log(nameMap);
+                //logger.debug(nameMap);
                 return nameMap;
             }
             catch (error) {
-                console.log(filename, error);
+                logger.debug(filename, error);
                 return {};
             }
         };
@@ -548,11 +549,11 @@ if (cluster.isMaster) {
     worker_1.on('message', function (data) {
         var value = data['process'];
         if (data.function == "source" || data.function == "include") {
-            console.log("当前进度：%s, %f%，总共：%d，当前：%d", data.function, value["showprocess"], value["totalNum"], value["index"]);
+            logger.debug("当前进度：%s, %f%，总共：%d，当前：%d", data.function, value["showprocess"], value["totalNum"], value["index"]);
             return;
         }
         if (data.function == "scan_ing") {
-            //console.log("当前加载目录：", data.extdata);
+            //logger.debug("当前加载目录：", data.extdata);
             return;
         }
         if (data.function == "error") {
@@ -589,8 +590,8 @@ else if (cluster.isWorker) {
             process.send(message);
         }
         catch (error) {
-            console.log(error);
-            console.log(message);
+            logger.debug(error);
+            logger.debug(message);
         }
     }
     ;
@@ -654,7 +655,7 @@ else if (cluster.isWorker) {
         if (parasms['msg_type'] === undefined
             || !parasms['data']['basepath']
             || !parasms['data']['dbpath']) {
-            console.log("input parasms error!", parasms);
+            logger.debug("input parasms error!", parasms);
             var message_1 = { "function": "error" };
             message_1['msg'] = "input parasms error!";
             process.send(JSON.stringify(message_1));
@@ -673,7 +674,7 @@ else if (cluster.isWorker) {
         if (msg_type == 0) {
             //全量扫码目录并重新加载索引
             reloadAllFile(basepath, dbpath, function () {
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 var message = { "function": "over" };
                 process.send(message);
             }, issystem);
@@ -682,7 +683,7 @@ else if (cluster.isWorker) {
         if (msg_type == 1) {
             //加载单个文件
             if (!parasms.data.filepath) {
-                console.log("input filepath error!");
+                logger.debug("input filepath error!");
                 var message_2 = { "function": "error" };
                 message_2['msg'] = "filepath not find!";
                 process.send(message_2);
@@ -697,7 +698,7 @@ else if (cluster.isWorker) {
         if (msg_type == 2) {
             //强制加载单个文件
             if (!parasms.data.filepath) {
-                console.log("input filepath error!");
+                logger.debug("input filepath error!");
                 var message_4 = { "function": "error" };
                 message_4['msg'] = "filepath not find!";
                 process.send(message_4);
@@ -712,7 +713,7 @@ else if (cluster.isWorker) {
         if (msg_type == 3) {
             //全量扫码目录并重新加载索引
             forkReloadAllFile(basepath, dbpath, function () {
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 var message = { "function": "over" };
                 process.send(message);
             }, issystem);
@@ -722,7 +723,7 @@ else if (cluster.isWorker) {
             //全量扫码目录并重新加载索引
             var filepaths = parasms.data.filepaths;
             batchReloadIncludeFiles(basepath, filepaths, dbpath, function () {
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 var message = { "function": "over" };
                 process.send(message);
             }, issystem);
@@ -733,18 +734,18 @@ else if (cluster.isWorker) {
         process.send(message);
     };
     process.on('message', function (parasms) {
-        console.log("onmessage", JSON.stringify(parasms));
+        logger.debug("onmessage", JSON.stringify(parasms));
         onMessage(parasms);
     });
     process.on('exit', function (code, signal) {
         if (signal) {
-            console.log("\u5DE5\u4F5C\u8FDB\u7A0B\u5DF2\u88AB\u4FE1\u53F7 " + signal + " \u6740\u6B7B");
+            logger.debug("\u5DE5\u4F5C\u8FDB\u7A0B\u5DF2\u88AB\u4FE1\u53F7 " + signal + " \u6740\u6B7B");
         }
         else if (code !== 0) {
-            console.log("\u5DE5\u4F5C\u8FDB\u7A0B\u9000\u51FA\uFF0C\u9000\u51FA\u7801: " + code);
+            logger.debug("\u5DE5\u4F5C\u8FDB\u7A0B\u9000\u51FA\uFF0C\u9000\u51FA\u7801: " + code);
         }
         else {
-            console.log('工作进程成功退出');
+            logger.debug('工作进程成功退出');
         }
     });
 }

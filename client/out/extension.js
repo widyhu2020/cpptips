@@ -11,9 +11,28 @@ const IndexConfig_1 = require("./IndexConfig");
 const menuProcess_1 = require("./menuProcess");
 const notifyProcess_1 = require("./notifyProcess");
 let client;
+const log4js_1 = require("log4js");
+log4js_1.configure({
+    appenders: {
+        cpptips: {
+            type: "dateFile",
+            keepFileExt: true,
+            filename: "/tmp/cpptips.client.log",
+            daysToKeep: 3,
+            pattern: '.yyyy-MM-dd'
+        }
+    },
+    categories: {
+        default: { appenders: ["cpptips"], level: "debug" }
+    }
+});
+const logger = log4js_1.getLogger("cpptips");
+logger.level = "all";
 function activate(context) {
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
+    // languages.getDiagnostics();
+    // languages.onDidChangeDiagnostics()
     let extensionPath = context.extensionPath;
     let storagePath = context.storagePath;
     let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
@@ -46,10 +65,9 @@ function activate(context) {
         }
     };
     // Create the language client and start the client.
-    client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions);
+    client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions, true);
     let bascpath = vscode_1.workspace.rootPath;
     client.onReady().then(() => {
-        //showGetContainer(context, client);
         if (IndexConfig_1.checkNeedShowDefault()) {
             //需要强制提醒
             IndexConfig_1.showIndexConfig(context, client);
@@ -58,6 +76,21 @@ function activate(context) {
         notifyProcess_1.notifyProcess(context, client);
         //右键菜单处理
         menuProcess_1.menuProcess(context, client);
+        vscode_1.tasks.onDidEndTask((listener) => {
+            if (listener.execution.task.source == "build") {
+                setTimeout(() => {
+                    let _diagnostic = vscode_1.languages.getDiagnostics();
+                    logger.debug(_diagnostic);
+                    let diagnostic = {};
+                    for (let i = 0; i < _diagnostic.length; i++) {
+                        let _path = _diagnostic[i][0];
+                        diagnostic[_path.path] = _diagnostic[i][1];
+                    }
+                    client.sendNotification("diagnosticInfo", diagnostic);
+                    logger.debug(diagnostic);
+                }, 3000);
+            }
+        });
     });
     //初始化状态呢拦
     notifyProcess_1.initStatusBar();

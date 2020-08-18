@@ -5,25 +5,39 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup} from 'vscode';
+import { workspace, Location, Range, ExtensionContext, window, languages, TextEditor, DiagnosticCollection, TextDocument, Diagnostic, Position, DiagnosticSeverity, DiagnosticRelatedInformation, DiagnosticChangeEvent, tasks, TaskEndEvent, Uri} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
     TransportKind,
-    VersionedTextDocumentIdentifier
+    VersionedTextDocumentIdentifier,
 } from 'vscode-languageclient';
 
-import { cursorTo } from 'readline';
-import { fstat } from 'fs';
-import { buildToBeta, build } from './buildProcess';
-import { showIndexConfig, checkNeedShowDefault, showGetContainer } from './IndexConfig';
+import { showIndexConfig, checkNeedShowDefault} from './IndexConfig';
 import { menuProcess } from './menuProcess';
 import { notifyProcess, initStatusBar } from './notifyProcess';
-
-
 let client: LanguageClient;
 
+import { configure, getLogger } from "log4js";
+import { reflushErrorMsg } from './buildProcess';
+import { time } from 'console';
+configure({
+    appenders: { 
+        cpptips: { 
+            type: "dateFile",
+            keepFileExt: true,
+            filename: "/tmp/cpptips.client.log", 
+            daysToKeep: 3, 
+            pattern: '.yyyy-MM-dd'
+        } 
+    },
+    categories: { 
+        default: { appenders: ["cpptips"], level: "debug"  } 
+    }
+});
+const logger = getLogger("cpptips");
+logger.level = "all";
 
 export function activate(context: ExtensionContext) {
     // The server is implemented in node
@@ -31,6 +45,8 @@ export function activate(context: ExtensionContext) {
         path.join('server', 'out', 'server.js')
     );
 
+    // languages.getDiagnostics();
+    // languages.onDidChangeDiagnostics()
 
     let extensionPath = context.extensionPath;
     let storagePath = context.storagePath;
@@ -70,12 +86,13 @@ export function activate(context: ExtensionContext) {
         'CpptipslanguageServer',
         'Cpptips Language Server',
         serverOptions,
-        clientOptions
+        clientOptions,
+        true
     );
 
     let bascpath = workspace.rootPath;
     client.onReady().then(()=>{
-        //showGetContainer(context, client);
+       
         if(checkNeedShowDefault()){
             //需要强制提醒
             showIndexConfig(context, client);
@@ -86,11 +103,26 @@ export function activate(context: ExtensionContext) {
 
         //右键菜单处理
         menuProcess(context, client);
+
+        tasks.onDidEndTask((listener:TaskEndEvent)=>{
+            if(listener.execution.task.source == "build"){
+                setTimeout(() => {
+                    let _diagnostic = languages.getDiagnostics();
+                    logger.debug(_diagnostic);
+                    let diagnostic = {};
+                    for(let i = 0; i < _diagnostic.length; i++){
+                        let _path = _diagnostic[i][0];
+                        diagnostic[_path.path] = _diagnostic[i][1];
+                    }
+                    client.sendNotification("diagnosticInfo", diagnostic);
+                    logger.debug(diagnostic);
+                }, 3000); 
+            }
+        });
     });
     
     //初始化状态呢拦
     initStatusBar();
-    
     context.subscriptions.push(client.start());
 }
 

@@ -10,6 +10,7 @@ var TypeEnum = require('../analyse/analyseCpp').TypeEnum;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var DefineMap = require('../definition/defineMap').DefineMap;
 var StdIteratorType = require('../definition/defineMap').StdIteratorType;
+var logger = require('log4js').getLogger("cpptips");
 var Completion = /** @class */ (function () {
     function Completion() {
         this.transferStlName = function (templatename, params, name) {
@@ -178,9 +179,9 @@ var Completion = /** @class */ (function () {
             namespaces = namespaces.filter(function (e) { return e != ""; });
             var showitem = [];
             this._getDocumentDefine(preKw, ownname, defineval, showitem);
-            console.time("freezFindAllByPreKeyword");
+            logger.mark("freezFindAllByPreKeyword");
             var infos = Store.getInstace().freezFindAllByPreKeyword(preKw, namespaces, ownname);
-            console.timeEnd("freezFindAllByPreKeyword");
+            logger.mark("freezFindAllByPreKeyword");
             //解释附加参数
             for (var i = 0; i < infos.length; i++) {
                 var info = infos[i];
@@ -254,9 +255,9 @@ var Completion = /** @class */ (function () {
         };
         //通过owner取下面的方法或者变量
         this.getByOwnerNameInNamespace = function (ownname, namespace) {
-            console.time("getByOwnerNameInNamespace");
+            logger.mark("getByOwnerNameInNamespace");
             var infos = Store.getInstace().getByOwnerNameInNamespace(ownname, namespace);
-            console.timeEnd("getByOwnerNameInNamespace");
+            logger.mark("getByOwnerNameInNamespace");
             var showitem = [];
             //解释附加参数
             for (var i = 0; i < infos.length; i++) {
@@ -467,12 +468,12 @@ var Completion = /** @class */ (function () {
         this._processFunction = function (infos, autoline) {
             if (autoline === void 0) { autoline = true; }
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
             var extDataJson = JSON.parse(infos.extdata);
-            //console.log(extDataJson);
+            //logger.debug(extDataJson);
             //构造函数定义
             var allfundef = "";
             for (var k = 0; k < extDataJson.length; k++) {
@@ -541,7 +542,7 @@ var Completion = /** @class */ (function () {
         //变量处理
         this._processVariable = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
@@ -571,7 +572,7 @@ var Completion = /** @class */ (function () {
         //类处理
         this._processClass = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
@@ -583,7 +584,7 @@ var Completion = /** @class */ (function () {
         //宏定义处理
         this._processDefine = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
@@ -595,7 +596,7 @@ var Completion = /** @class */ (function () {
         //枚举处理
         this._processEnumItem = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
@@ -608,7 +609,7 @@ var Completion = /** @class */ (function () {
         //枚举处理
         this._processTypedefItem = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段
@@ -771,7 +772,7 @@ var Completion = /** @class */ (function () {
         //函数处理
         this._processFunctionHelp = function (infos) {
             if (infos.extdata == "") {
-                console.error("extdata error", infos);
+                logger.error("extdata error", infos);
                 return;
             }
             //序列化附加字段

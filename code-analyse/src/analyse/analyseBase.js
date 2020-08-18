@@ -7,6 +7,7 @@
  * ------------------------------------------------------------------------------------------ */
 
 const Tree = require('./tree');
+const logger = require('log4js').getLogger("cpptips");
 
 //分析所需要的关键字,不是c++全部关键字
 let keywork = new Set([
@@ -63,7 +64,7 @@ class AnalyseBase {
         
         let fileinfo = filedb.getFileByFilePath(this.filename);
         if (!fileinfo || fileinfo === undefined) {
-            console.log("not find file index!", this.filename);
+            logger.debug("not find file index!", this.filename);
             return false;
         }
         let fileid = fileinfo.id;
@@ -108,7 +109,7 @@ class AnalyseBase {
 
         //加入到其子类中
         currentNode.child.push(result);
-        //console.log(nameMap);
+        //logger.debug(nameMap);
         return nameMap;
     };
 
@@ -123,7 +124,7 @@ class AnalyseBase {
                 //无需处理
                 return;
             }
-            //console.log(result);
+            //logger.debug(result);
             let data = Object.values(result);
             for(let i = 0; i < data.length; i++) {
                 nameMap = this.makeDefineTree(nameMap, data[i]);
@@ -131,7 +132,7 @@ class AnalyseBase {
         });
 
         let retData = JSON.stringify(nameMap);
-        //console.log(retData);
+        //logger.debug(retData);
         return nameMap;
     };
 
@@ -303,7 +304,7 @@ class AnalyseBase {
             return false;
         }
 
-        //console.log(retResult);
+        //logger.debug(retResult);
         return retResult;
    }
 
@@ -448,7 +449,7 @@ class AnalyseBase {
         
         //获取db中的数据
         let infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
-        //console.log(infos);
+        //logger.debug(infos);
         if(!infos || infos.length > 1) {
             //两个以上定义，理论上是有异常的
             return false;
@@ -510,7 +511,7 @@ class AnalyseBase {
             file_id: fileid,
             extdata: JSON.stringify(varb)
         };
-        //console.log(saveData);
+        //logger.debug(saveData);
         this.keyworddb.insert(saveData);
         let key = this._getKey(namespace, samplename, e.name);
         mapName[key] = saveData;
@@ -631,7 +632,7 @@ class AnalyseBase {
             return;
         }
 
-        //console.log(samplename + "|" + inherits + "|" + template + "|" + namespace + "|" + gtype + "|" + fileid);
+        //logger.debug(samplename + "|" + inherits + "|" + template + "|" + namespace + "|" + gtype + "|" + fileid);
         if (samplename != "" && samplename != "__global__") {
             let data = {
                 "i": inherits,
@@ -647,7 +648,7 @@ class AnalyseBase {
                 file_id: fileid,
                 extdata: JSON.stringify(data)
             };
-            //console.log(saveData);
+            //logger.debug(saveData);
             this.keyworddb.insert(saveData);
             let key = this._getKey(namespace, '', samplename);
             mapName[key] = saveData;
@@ -742,7 +743,7 @@ class AnalyseBase {
 
         //方法
         metchod.forEach(e => {
-            //console.log(e.name);
+            //logger.debug(e.name);
             if(e.name.indexOf("::") == -1) {
                 let methedName = this._saveMethod(e, samplename, namespace, fileid);
                 mergedName = Object.assign(mergedName, methedName);
@@ -813,7 +814,7 @@ class AnalyseBase {
             this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
         }
 
-        //console.log("resave over!");
+        //logger.debug("resave over!");
     };
 
     //拼接key，拼接的key用于构造返回数据

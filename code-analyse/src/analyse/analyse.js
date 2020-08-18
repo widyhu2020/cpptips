@@ -9,6 +9,7 @@
 const AnalyseCpp = require('./analyseCpp').AnalyseCpp;
 const AnalyseProtobuf = require('./analyseProtobuf').AnalyseProtobuf;
 const TypeEnum = require('../analyse/analyseCpp').TypeEnum;
+const logger = require('log4js').getLogger("cpptips");
 
 class Analyse {
     constructor(filecontext, filename = '') {
@@ -52,7 +53,7 @@ class Analyse {
         try{
             return this.analyseHandler.getDocumentStruct();
         } catch(error) {
-            console.log(error);
+            logger.debug(error);
             return [];
         }
     };

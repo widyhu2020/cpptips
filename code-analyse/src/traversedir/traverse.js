@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const FileType = require('../store/store').FileType;
-
+const logger = require('log4js').getLogger("cpptips");
 
 class Traverse {
     constructor(basedir, userConfig, isAnlyseSystemDir, analyseIncludeCallBack, analyseSourceCallBack) {
@@ -40,15 +40,15 @@ class Traverse {
         }
 
         //需要忽略的文件或者文件的匹配
-        console.log("Traverse:", JSON.stringify(userConfig));
-        console.log("isAnlyseSystemDir:", JSON.stringify(isAnlyseSystemDir));
+        logger.debug("Traverse:", JSON.stringify(userConfig));
+        logger.debug("isAnlyseSystemDir:", JSON.stringify(isAnlyseSystemDir));
         let regex = [];
         this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
         if(this.userConfig.ignoreFileAndDir
             && this.userConfig.ignoreFileAndDir instanceof Array) {
             regex = this.userConfig.ignoreFileAndDir;
             this.regexStr = "(" + regex.join(")|(") + ")";
-            console.log("user regex:", this.regexStr);
+            logger.debug("user regex:", this.regexStr);
         };
 
         //需要忽略的目录，不支持匹配
@@ -57,7 +57,7 @@ class Traverse {
             && this.userConfig.ignorDir instanceof Array) {
             this.ignorDir = this.userConfig.ignorDir;
         }
-        console.log("ignorDir:", JSON.stringify(this.ignorDir));
+        logger.debug("ignorDir:", JSON.stringify(this.ignorDir));
 
         //需要加载的目录，不支持匹配
         this.needLoadDir = [];
@@ -85,7 +85,7 @@ class Traverse {
             this.needLoadDir.push(path);
         }
 
-        console.log("needLoadDir:", JSON.stringify(this.needLoadDir));
+        logger.debug("needLoadDir:", JSON.stringify(this.needLoadDir));
     };
 
     //加载目录所有文件
@@ -95,7 +95,7 @@ class Traverse {
         //处理文件
         this.uniqueDir = new Set([]);
         this._readDir(this.basedir);
-        console.log("include process over");
+        logger.debug("include process over");
     
         //延迟10s开始分析文件
         setTimeout(this.analyseConsumer, 3000, that, resolve);
@@ -124,7 +124,7 @@ class Traverse {
         let timer = null;
         timer = setInterval(() => {
             if(that.needStop) {
-                console.log("find need exit!");
+                logger.debug("find need exit!");
                 that.includefiles = [];
                 that.sourcefiles = [];
                 clearInterval(timer);
@@ -134,7 +134,7 @@ class Traverse {
             //处理include
             let includeitem = that.includefiles.pop();
             if(includeitem) {
-                //console.log(includeitem.f);
+                //logger.debug(includeitem.f);
                 that.needStop = that.analyseIncludeCallBack(includeitem.f, includeitem.t);
                 return;
             }
@@ -142,7 +142,7 @@ class Traverse {
             //处理源文件
             let sourcefile = that.sourcefiles.pop();
             if(sourcefile) {
-                //console.log(sourcefile);
+                //logger.debug(sourcefile);
                 that.needStop = that.analyseSourceCallBack(sourcefile.f, sourcefile.t);
                 return;
             }
@@ -150,7 +150,7 @@ class Traverse {
             if(needEmptyTime > 5000) {
                 //5s内都没有数据产生
                 //处理完成
-                console.log("clearInterval");
+                logger.debug("clearInterval");
                 clearInterval(timer);
                 resolve();
             }
@@ -175,7 +175,7 @@ class Traverse {
         callback("正在获取索引库中所有文件数");
         let totalNum = this.fis.getFileTotalWhithType(types);
         callback("获取索引文件库文件完成，总共："+ totalNum);
-        console.log("begin traveseinclude... totalNum:", totalNum);
+        logger.debug("begin traveseinclude... totalNum:", totalNum);
 
         //单次获取2000个
         let batchCount = 2000;
@@ -185,7 +185,7 @@ class Traverse {
         while(beginIndex < totalNum) {
             let endIndex = beginIndex + batchCount;
             callback("正在批量获取文件：当前，"+ endIndex+ "每页2000条");
-            console.log(beginIndex, "-", batchCount);
+            logger.debug(beginIndex, "-", batchCount);
             let infos = this.fis.getFilesWhithType(types, beginIndex, batchCount);
             for (let i = 0; i < infos.length; i++) {
                 if(infos[i].systeminclude == 1) {
@@ -206,7 +206,7 @@ class Traverse {
 
         if(totalNum < needDeleteFileName.length * 2) {
             //如果文件超过一半不存在，可能存在问题
-            console.log("file not exists. list:",JSON.stringify(needDeleteFileName));
+            logger.debug("file not exists. list:",JSON.stringify(needDeleteFileName));
             callback("发现大量删除文件，可能判断有误，不进行索引清理");
             return;
         }
@@ -214,7 +214,7 @@ class Traverse {
         for(let i = 0; i < needDelete.length; i++) {
             let _id = needDelete[i];
             callback("正在清理文件及其索引:" + _id);
-            console.log("totalfile:", totalNum, "needDeleteId:", _id);
+            logger.debug("totalfile:", totalNum, "needDeleteId:", _id);
             this.fis.delete(_id);
         }
     };
@@ -224,7 +224,7 @@ class Traverse {
 
         let types = [FileType.SOURCE_FILE];
         let totalNum = this.fis.getFileTotalWhithType(types);
-        console.log("begin traverseSource... totalNum:", totalNum);
+        logger.debug("begin traverseSource... totalNum:", totalNum);
 
         //单次获取1000个
         let batchCount = 1000;
@@ -472,7 +472,7 @@ class Traverse {
                 let uniqueName = pathinfo.name + pathinfo.ext + "_" + dataFileLStat.size + "_" + dataFileLStat.mtimeMs;
                 if(that.uniqueDir.has(uniqueName)){
                     //该目录已经分析过
-                    //console.log("file cycle:", filename, uniqueName);
+                    //logger.debug("file cycle:", filename, uniqueName);
                     return total;
                 }
                 that.uniqueDir.add(uniqueName);
@@ -545,7 +545,7 @@ class Traverse {
                 && !that.analyseLinkDir.has(wkfilename)
                 && !that.analyseLinkDir.has(wkfilename + "/")) {
                 //软链接跳过,且没加入明确执行分析计划
-                //console.log("this file is symbolic link! and not in link dir!", wkfilename);
+                //logger.debug("this file is symbolic link! and not in link dir!", wkfilename);
                 return;
             }
         
@@ -563,7 +563,7 @@ class Traverse {
                     && !that.sourceExt.has(ext) 
                     && !that._checkIsSystem(filename)) {
                     //非系统这里暂时不考虑没有后缀的头文件
-                    //console.log(filename);
+                    //logger.debug(filename);
                     return;
                 }
 
@@ -578,7 +578,7 @@ class Traverse {
                 let uniqueName = pathinfo.name + pathinfo.ext + "_" + dataFileLStat.size + "_" + dataFileLStat.mtimeMs;
                 if(that.uniqueDir.has(uniqueName)){
                     //该目录已经分析过
-                    //console.log("file cycle:", filename, uniqueName);
+                    //logger.debug("file cycle:", filename, uniqueName);
                     return;
                 }
                 that.uniqueDir.add(uniqueName);

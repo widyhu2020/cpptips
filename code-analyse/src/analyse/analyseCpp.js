@@ -13,6 +13,7 @@ const Tree = require('./tree');
 const AnalyseBase = require('./analyseBase').AnalyseBase;
 const TypeEnum = require('./analyseBase').TypeEnum;
 const keywork = require('./analyseBase').keywork;
+const logger = require('log4js').getLogger("cpptips");
 
 class AnalyseCpp extends AnalyseBase {
     
@@ -30,66 +31,66 @@ class AnalyseCpp extends AnalyseBase {
 
     //执行分析，重新实现父类的方法
     doAnalyse = function() {
-        //console.time("total")
+        //logger.mark("total")
         //文档处理
-        //console.time("_splitContext")
+        //logger.mark("_splitContext")
         this.lines = this._splitContext();
-        //console.timeEnd("_splitContext");
+        //logger.mark("_splitContext");
 
         //预处理
-        //console.time("_preProcess")
+        //logger.mark("_preProcess")
         this._preProcess(this.lines);
-        //console.timeEnd("_preProcess");
+        //logger.mark("_preProcess");
 
         //分析作用域
-        //console.time("_analyseDomain")
+        //logger.mark("_analyseDomain")
         this._analyseDomain(this.lines);
-        //console.timeEnd("_analyseDomain");
+        //logger.mark("_analyseDomain");
 
         //构建命名空间
-        //console.time("_makeNamespace")
+        //logger.mark("_makeNamespace")
         this._makeNamespace();
-        //console.timeEnd("_makeNamespace");
+        //logger.mark("_makeNamespace");
 
         //生产访问权限
-        //console.time("_analysePermission")
+        //logger.mark("_analysePermission")
         this._analysePermission(this.lines);
-        //console.timeEnd("_analysePermission");
+        //logger.mark("_analysePermission");
 
         //遍历树其他代码快分析函数
-        //console.time("_analyseCodeBlockForFunction")
+        //logger.mark("_analyseCodeBlockForFunction")
         this.tree.traverseBF((current) => {
             for (let i = 0; i < current.data.length; i++) {
-                //console.time("_analyseCodeBlockForFunction:" + i)
+                //logger.mark("_analyseCodeBlockForFunction:" + i)
                 this._analyseCodeBlockForFunction(current, this.lines, current.data[i], i);
-                //console.timeEnd("_analyseCodeBlockForFunction:" + i);
+                //logger.mark("_analyseCodeBlockForFunction:" + i);
             }
         });
-        //console.timeEnd("_analyseCodeBlockForFunction");
+        //logger.mark("_analyseCodeBlockForFunction");
         
         //分析变量-只分析成员变量和全局变量
-        //console.time("_analyseVariable")
+        //logger.mark("_analyseVariable")
         this.tree.traverseBF((current) => {
-            //console.log(current.domain_level, current.namespace);
+            //logger.debug(current.domain_level, current.namespace);
             for (let i = 0; i < current.data.length; i++) {
-                //console.time("_analyseVariable:" + i)
+                //logger.mark("_analyseVariable:" + i)
                 this._analyseVariable(current, this.lines, current.data[i], i);
-                //console.timeEnd("_analyseVariable:" + i);
+                //logger.mark("_analyseVariable:" + i);
             }
         });
-        //console.timeEnd("_analyseVariable");
+        //logger.mark("_analyseVariable");
 
         //分析枚举
-        //console.time("_analyseVariable")
+        //logger.mark("_analyseVariable")
         this.tree.traverseBF((current) => {
-            //console.log(current.domain_level, current.namespace);
+            //logger.debug(current.domain_level, current.namespace);
             for (let i = 0; i < current.data.length; i++) {
-                //console.time("_analyseVariable:" + i)
+                //logger.mark("_analyseVariable:" + i)
                 this._analyseEnum(current, this.lines, current.data[i], i);
-                //console.timeEnd("_analyseVariable:" + i);
+                //logger.mark("_analyseVariable:" + i);
             }
         });
-        //console.timeEnd("_analyseVariable");
+        //logger.mark("_analyseVariable");
     };
 
     //分析枚举
@@ -101,7 +102,7 @@ class AnalyseCpp extends AnalyseBase {
             return;
         }
         
-        //console.log(lines[index - 1]);
+        //logger.debug(lines[index - 1]);
         if (lines[index - 1] == "{") {
             //枚举的前一段一定为{
             let pos = lines[index - 2].lastIndexOf(';');
@@ -159,7 +160,7 @@ class AnalyseCpp extends AnalyseBase {
             enumvar.permission = permission;
             node.enum.push(enumvar);
         }
-        //console.log(node.enum);
+        //logger.debug(node.enum);
     };
 
     //分析类中的公开属性（public\private\protected）
@@ -172,7 +173,7 @@ class AnalyseCpp extends AnalyseBase {
         //第0快肯定是公共的
         this.tree.traverseBF((current) => {
             let blockinde = current.data.sort(sortNumber);
-            //console.log(JSON.stringify(blockinde));
+            //logger.debug(JSON.stringify(blockinde));
             current.permission = new Array(blockinde.length).fill(0);
             if(current.ownname != null
                 && current.ownname.type == TypeEnum.CALSS) {
@@ -186,24 +187,24 @@ class AnalyseCpp extends AnalyseBase {
                     let publicpos = lines[blockinde[i]].lastIndexOf(" public:");
                     let protectedpos = lines[blockinde[i]].lastIndexOf(" protected:");
                     let privatepos = lines[blockinde[i]].lastIndexOf(" private:");
-                    //console.log("_analysePermission xxxxxx:",publicpos, protectedpos, privatepos);
+                    //logger.debug("_analysePermission xxxxxx:",publicpos, protectedpos, privatepos);
                     if (publicpos > index) {
-                        //console.log("public:", i, lines[blockinde[i]]);
+                        //logger.debug("public:", i, lines[blockinde[i]]);
                         index = publicpos;
                         current.permission[i] = 0;
                     }
                     if (protectedpos > index) {
-                        //console.log("protecte:", lines[blockinde[i]]);
+                        //logger.debug("protecte:", lines[blockinde[i]]);
                         index = protectedpos;
                         current.permission[i] = 1;
                     }
                     if (privatepos > index) {
-                        //console.log("private:", lines[blockinde[i]]);
+                        //logger.debug("private:", lines[blockinde[i]]);
                         index = privatepos;
-                        //console.log("_analysePermission ssssssss:", publicpos, protectedpos, privatepos);
+                        //logger.debug("_analysePermission ssssssss:", publicpos, protectedpos, privatepos);
                         current.permission[i] = 2;
                     }
-                    //console.log("show permission: ", current.namespace, JSON.stringify(current.permission));
+                    //logger.debug("show permission: ", current.namespace, JSON.stringify(current.permission));
                 }
                 return;
             }
@@ -224,7 +225,7 @@ class AnalyseCpp extends AnalyseBase {
             && node.namespace == node.parent.namespace) {
             //命名空间域父区域命名空间一致，表示该区域代码里面的变量无需关注
             //代码为 if/for/while或者函数引入
-            //console.log(node.namespace, " | ", node.parent.namespace);
+            //logger.debug(node.namespace, " | ", node.parent.namespace);
             return;
         } 
 
@@ -259,7 +260,7 @@ class AnalyseCpp extends AnalyseBase {
             //去掉空格项
             return v != "";
         });
-        //console.log(item);
+        //logger.debug(item);
 
         let stopkeyword = new Set([
             'struct', 'class', 'namespace', '__extension__', '__typeof__', '#if',
@@ -343,7 +344,7 @@ class AnalyseCpp extends AnalyseBase {
 
             if (!isInValue && valuenotkeyword.has(item[i])) {
                 //非值区域不允许出现这些字符
-                //console.log(item);
+                //logger.debug(item);
                 return { 'v': false, 'p': permission };
             }
 
@@ -378,7 +379,7 @@ class AnalyseCpp extends AnalyseBase {
                         'permission': permission,
                         'variableisarray': variableisarray ? true : false
                     };
-                    //console.log("=:", variableitem);
+                    //logger.debug("=:", variableitem);
                     namedata.push(variableitem);
                     nowVarible = '';
                     ispoint = 0;
@@ -403,7 +404,7 @@ class AnalyseCpp extends AnalyseBase {
                         'permission': permission,
                         'variableisarray': variableisarray ? true : false
                     };
-                    //console.log(",:", variableitem);
+                    //logger.debug(",:", variableitem);
                     namedata.push(variableitem);
                     nowVarible = '';
                     ispoint = 0;
@@ -464,7 +465,7 @@ class AnalyseCpp extends AnalyseBase {
             if (variableisarray) {
                 variableitem['variableisarray'] = true;
             }
-            //console.log(code, variableitem);
+            //logger.debug(code, variableitem);
             namedata.push(variableitem);
             nowVarible = '';
             ispoint = 0;
@@ -499,7 +500,7 @@ class AnalyseCpp extends AnalyseBase {
                     _varibles.type = type + "[]";
                 }
                 if (type != "" && namedata[i].name != "") {
-                    //console.log("dddd", _varibles);
+                    //logger.debug("dddd", _varibles);
                     varibles.push(_varibles);
                 }
             }
@@ -605,7 +606,7 @@ class AnalyseCpp extends AnalyseBase {
             return;
         }
 
-        //console.log(lines[index-2]);
+        //logger.debug(lines[index-2]);
         if (lines[index - 1] == "{") {
             //当前代码块绝大部分可能对我们的功能没有用处，
             //如：for、if、do、while 函数实现
@@ -625,7 +626,7 @@ class AnalyseCpp extends AnalyseBase {
                 || (passKeywork.has(item[1]) && item[0] == ';')) {
                 //命中for、if、do、while
                 //这里无法排除for循环
-                //console.log("find if/while/do/for: " + lastcode);
+                //logger.debug("find if/while/do/for: " + lastcode);
                 return;
             }
 
@@ -641,7 +642,7 @@ class AnalyseCpp extends AnalyseBase {
             });
             if (icountleft != icountright) {
                 //原括号不成对匹配，表示不为完整的函数定义，可能是for循环的最后一步
-                //console.log("find for:" + lastcode);
+                //logger.debug("find for:" + lastcode);
                 return;
             }
         }
@@ -674,7 +675,7 @@ class AnalyseCpp extends AnalyseBase {
             
             if (method != false && method != []) {
                 //写入方法
-                //console.log(method.name);
+                //logger.debug(method.name);
                 method.permission = permission;
                 node.addMethod(method);
             }
@@ -709,7 +710,7 @@ class AnalyseCpp extends AnalyseBase {
  
                     for (let i = data.length - 1; i >= 0; i--) {
                         if (isNum == 2) {
-                            //console.log(tmpData);
+                            //logger.debug(tmpData);
                             tmpData.push(data[i]);
                             continue;
                         }
@@ -777,7 +778,7 @@ class AnalyseCpp extends AnalyseBase {
 
             //一定会失败的符号
             if (faildkeyword.has(item[i])) {
-                //console.log("xxxxx");
+                //logger.debug("xxxxx");
                 //一旦出现则表示匹配失败的字符
                 return false;
             }
@@ -793,7 +794,7 @@ class AnalyseCpp extends AnalyseBase {
                 while (!stack.isEmpty() && popnum < 500) {
                     //弹出数据
                     let data = stack.pop();
-                    //if (showlog == 1) console.log("dddd", data);
+                    //if (showlog == 1) logger.debug("dddd", data);
                     if(data == ')') {
                         stack.push(')');
                         break;
@@ -803,7 +804,7 @@ class AnalyseCpp extends AnalyseBase {
 
                 if (popnum != 1 && popnum != 2) {
                     //参数类型不正确
-                    //if (showlog == 1) console.log("xxxxx", popnum, item);
+                    //if (showlog == 1) logger.debug("xxxxx", popnum, item);
                     return false;
                 }
                 continue;
@@ -837,7 +838,7 @@ class AnalyseCpp extends AnalyseBase {
                 if (popnum > 2) {
                     //参数类型不正确
                     //这里可以为0，表示没有参数
-                    //console.log("xxxx void");
+                    //logger.debug("xxxx void");
                     return false;
                 }
                 continue;
@@ -876,7 +877,7 @@ class AnalyseCpp extends AnalyseBase {
         //     return false;
         // }
 
-        //console.log(item);
+        //logger.debug(item);
         return true;
     };
 
@@ -977,7 +978,7 @@ class AnalyseCpp extends AnalyseBase {
                     || name == "") {
                     //函数名称不符合规范
                     //函数名称必须是符合标准
-                    //console.log(name, item, this.filename);
+                    //logger.debug(name, item, this.filename);
                     return -1;
                 }
                 method.name = name;
@@ -1075,7 +1076,7 @@ class AnalyseCpp extends AnalyseBase {
         let templateDefine = item[index + 1];
         if(/^template<[a-z0-9,_=( )]{1,128}>$/ig.test(templateDefine)) {
             method.templatefunctiondef = templateDefine;
-            //console.log(method);
+            //logger.debug(method);
         }
         return index + 1;
     };
@@ -1121,7 +1122,7 @@ class AnalyseCpp extends AnalyseBase {
         if (!this._judgeCodeisfunction(item, ownname)) {
             //非函数定义
             // if (/operator/ig.test(str))
-            //console.log("_judgeCodeisfunction faild!codelin:" , item.reverse().join(' '));
+            //logger.debug("_judgeCodeisfunction faild!codelin:" , item.reverse().join(' '));
             return false;
         }
 
@@ -1142,7 +1143,7 @@ class AnalyseCpp extends AnalyseBase {
             }
             return true;
         });
-        //console.log(item);
+        //logger.debug(item);
         
         let method = new MateData.MethodMet();
         let index = 0;
@@ -1297,7 +1298,7 @@ class AnalyseCpp extends AnalyseBase {
         for(let i = 0; i < item.length; i++) {
             if (item[i] == "#include") {
                 //获取到头文件
-                //console.log(item);
+                //logger.debug(item);
                 let tmpinclude = "";
                 let j = i + 1;
                 while (j < maxindex) {
@@ -1321,13 +1322,13 @@ class AnalyseCpp extends AnalyseBase {
 
             if (item[i] == "#define") {
                 //获取宏定义
-                //console.log(item.slice(i));
+                //logger.debug(item.slice(i));
                 let definename = "";
                 let definerealname = "";
                 if (i < maxindex) {
                     definename = item[i + 1];
                 }
-                //console.log(item);
+                //logger.debug(item);
                 if (i + 2 >= item.length
                     || (i + 2 < item.length && keywork.has(item[i + 2]))
                     || (i + 2 < item.length && item[i + 2] == '')) {
@@ -1356,7 +1357,7 @@ class AnalyseCpp extends AnalyseBase {
                     definemet.params = params;
                     definemet.rawline = "#define " + definename + " " + definerealname;
                     definemet.realName = definerealname;
-                    //console.log(definemet);
+                    //logger.debug(definemet);
                     node.addDefine(definemet);
                     continue;
                 }
@@ -1369,7 +1370,7 @@ class AnalyseCpp extends AnalyseBase {
                 let j = i + 2;
                 let beginrand = 0;
                 for (; j < item.length; j++) {
-                    //console.log(item[j], params);
+                    //logger.debug(item[j], params);
                     if(j > maxindex) {
                         break;
                     }
@@ -1402,7 +1403,7 @@ class AnalyseCpp extends AnalyseBase {
                     }
                 }
                 i = j - 1;
-                //console.log(rawArray);
+                //logger.debug(rawArray);
                 if(params.length > 3) {
                     let lastIndex = params.length - 1;
                     if (params[lastIndex] == '.' 
@@ -1439,7 +1440,7 @@ class AnalyseCpp extends AnalyseBase {
             let find_context = "";
             if (current.domain_level > 0) {
                 find_context = lines[current.domain_level - 1];
-                //console.log("find context:" + find_context);
+                //logger.debug("find context:" + find_context);
                 //类中的结构体和类不需要
                 if (current.parent != null 
                     && current.parent.ownname
@@ -1447,10 +1448,10 @@ class AnalyseCpp extends AnalyseBase {
                     || current.parent.ownname.type == TypeEnum.STRUCT
                     || current.parent.ownname.type == TypeEnum.ENUM)){
                     //无需处理
-                    //console.log(current);
+                    //logger.debug(current);
                     return;     
                 }
-                //console.log(find_context);
+                //logger.debug(find_context);
             }
 
             let domain_name = find_context;
@@ -1459,7 +1460,7 @@ class AnalyseCpp extends AnalyseBase {
                 domain_name = find_context.substr(pos);
             }
             domain_name = domain_name.trim();
-            //console.log("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
+            //logger.debug("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
             this._getDomainNameAndType(domain_name, current);
         });
     };
@@ -1512,7 +1513,7 @@ class AnalyseCpp extends AnalyseBase {
                     }
                     i = j;
                     continue;
-                    //console.log(items, i,j);
+                    //logger.debug(items, i,j);
                 }
                 this._saveClassNode(treeNode, items, i);
                 return;
@@ -1629,7 +1630,7 @@ class AnalyseCpp extends AnalyseBase {
         }
 
         index = 0;
-        //console.log(newItems, index);
+        //logger.debug(newItems, index);
         if (newItems.length > (index + 1)) {
             //获取名称
             name = newItems[index + 1];
@@ -1685,7 +1686,7 @@ class AnalyseCpp extends AnalyseBase {
         if (inheritsname != ""){
             inherits.push({ 'p': promise, 'n': inheritsname });
         }
-        //console.log(newItems, index, name, inheritsname, classfullname);
+        //logger.debug(newItems, index, name, inheritsname, classfullname);
         let realline = templatenamestr + " " + newItems.join(' ');
         
         let data = new MateData.BaseData(name, TypeEnum.CALSS, newItems.join(' '), inherits);
@@ -1742,7 +1743,7 @@ class AnalyseCpp extends AnalyseBase {
         //B0A1-F7FE gbk
         //
         filecontext = filecontext.replace(/\/\/[^\n]*\n/g, "\n");
-        //console.log(filecontext);
+        //logger.debug(filecontext);
         
         //宏定义替换
         filecontext = filecontext.replace(/(#define ([^\n]*)?)|(#if ([^\n]*)?)|(#endif([^\n]*)?)|(public:)|(private:)|(protected:)/g, function (kw) {
@@ -1752,16 +1753,16 @@ class AnalyseCpp extends AnalyseBase {
         //格式化空格，多个全部转化为1个
         filecontext = filecontext.replace(/([\s\n\t\r]+)/g, function(kw) {
             let datalenth = kw.trim();
-            //console.log("|"+kw+"|");
+            //logger.debug("|"+kw+"|");
             if (datalenth.length > 0){
-                //console.log("|" + kw + "|");
+                //logger.debug("|" + kw + "|");
                 return datalenth;
             }
             return " ";
         });
        
         ////去掉注释/* */格式
-        //console.log(filecontext.match(/\/ \*.+?(\* \/){1,1}/g));
+        //logger.debug(filecontext.match(/\/ \*.+?(\* \/){1,1}/g));
         filecontext = filecontext.replace(/\/\*.+?(\*\/){1,1}/g, "");
         
         filecontext = filecontext.replace(/[\s\t]{0,5}[*]{1,1}[\s\t]{0,5}/g, " * ");
@@ -1778,8 +1779,8 @@ class AnalyseCpp extends AnalyseBase {
             //this.analyseLine(this.context[i], i, this.context);
             if (lines[i] == '{') {
                 //this.slevel.push(SymbolEnum.BEGIN);
-                //console.log(this.point_domain);
-                //console.log("domin:" + i);
+                //logger.debug(this.point_domain);
+                //logger.debug("domin:" + i);
                 this.tree.add(i, this.point_domain);
                 this.point_domain = i;
                 continue;
@@ -1787,16 +1788,16 @@ class AnalyseCpp extends AnalyseBase {
 
             if (lines[i] == '}') {
                 //this.slevel.push(SymbolEnum.END);
-                //console.log("before getFatherDomain:" + this.point_domain);
-                //console.time("getFatherDomain");
+                //logger.debug("before getFatherDomain:" + this.point_domain);
+                //logger.mark("getFatherDomain");
                 this.point_domain = this.tree.getFatherDomain(this.point_domain);
-                //console.timeEnd("getFatherDomain");
-                //console.log("getFatherDomain:" + this.point_domain);
+                //logger.mark("getFatherDomain");
+                //logger.debug("getFatherDomain:" + this.point_domain);
                 continue;
             }
 
             //将数据挂载到当前作用域下
-            //console.log(i);
+            //logger.debug(i);
             this.tree.addDataToNode(this.point_domain, i);
 
             //this.block.push(this.context[i]);

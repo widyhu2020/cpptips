@@ -11,6 +11,7 @@ const TypeEnum = require('../analyse/analyseCpp').TypeEnum;
 const KeyWordStore = require('../store/store').KeyWordStore;
 const DefineMap = require('../definition/defineMap').DefineMap;
 const StdIteratorType = require('../definition/defineMap').StdIteratorType;
+const logger = require('log4js').getLogger("cpptips");
 
 class Completion {
     constructor(){
@@ -200,9 +201,9 @@ class Completion {
         namespaces = namespaces.filter((e)=>{ return e != ""; });
         let showitem = [];
         this._getDocumentDefine(preKw, ownname, defineval, showitem);
-        console.time("freezFindAllByPreKeyword");
+        logger.mark("freezFindAllByPreKeyword");
         let infos = Store.getInstace().freezFindAllByPreKeyword(preKw, namespaces, ownname);
-        console.timeEnd("freezFindAllByPreKeyword");
+        logger.mark("freezFindAllByPreKeyword");
         //解释附加参数
         for (let i = 0; i < infos.length; i++) {
             let info = infos[i];
@@ -282,9 +283,9 @@ class Completion {
 
     //通过owner取下面的方法或者变量
     getByOwnerNameInNamespace = function (ownname, namespace) {
-        console.time("getByOwnerNameInNamespace");
+        logger.mark("getByOwnerNameInNamespace");
         let infos = Store.getInstace().getByOwnerNameInNamespace(ownname, namespace);
-        console.timeEnd("getByOwnerNameInNamespace");
+        logger.mark("getByOwnerNameInNamespace");
         let showitem = [];
         //解释附加参数
         for (let i = 0; i < infos.length; i++) {
@@ -509,13 +510,13 @@ class Completion {
     //函数处理
     _processFunction = function(infos, autoline = true) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos );
+            logger.error("extdata error", infos );
             return;
         }
 
         //序列化附加字段
         let extDataJson = JSON.parse(infos.extdata);
-        //console.log(extDataJson);
+        //logger.debug(extDataJson);
         //构造函数定义
         let allfundef = "";
         
@@ -594,7 +595,7 @@ class Completion {
     //变量处理
     _processVariable = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 
@@ -628,7 +629,7 @@ class Completion {
     //类处理
     _processClass = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 
@@ -643,7 +644,7 @@ class Completion {
     //宏定义处理
     _processDefine = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 
@@ -658,7 +659,7 @@ class Completion {
     //枚举处理
     _processEnumItem = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 
@@ -674,7 +675,7 @@ class Completion {
     //枚举处理
     _processTypedefItem = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 
@@ -852,7 +853,7 @@ class Completion {
     //函数处理
     _processFunctionHelp = function (infos) {
         if (infos.extdata == "") {
-            console.error("extdata error", infos);
+            logger.error("extdata error", infos);
             return;
         }
 

@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup} from 'vscode';
+import { ExtensionContext, window, commands, ViewColumn, Range, env} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -9,7 +9,9 @@ import {
     VersionedTextDocumentIdentifier
 } from 'vscode-languageclient';
 import { showIndexConfig } from './IndexConfig';
-import { buildToBeta, build } from './buildProcess';
+import { build, GetBuildCmd } from './buildProcess';
+import { configure, getLogger } from "log4js";
+const logger = getLogger("cpptips");
 
 export function menuProcess(context:ExtensionContext, client:LanguageClient) {
 	context.subscriptions.push(commands.registerCommand('cpp.changeType', (uri) => {
@@ -159,19 +161,19 @@ export function menuProcess(context:ExtensionContext, client:LanguageClient) {
 
 	//索引处理
 	context.subscriptions.push(commands.registerCommand('cpp.addIndexDir', (infos) => {
-		console.log(infos);
+		logger.debug(infos);
 		client.sendNotification("addDirToIndex", infos);
 	}));
 
 	//索引处理
 	context.subscriptions.push(commands.registerCommand('cpp.delIndexDir', (infos) => {
-		console.log(infos);
+		logger.debug(infos);
 		client.sendNotification("delDirToIndex", infos);
 	}));
 
 	//刷新所有索引
 	context.subscriptions.push(commands.registerCommand('cpp.reflushAllIdex', (infos) => {
-		console.log(infos);
+		logger.debug(infos);
 		client.sendNotification("reflushAllIdex", infos);
 	}));
 
@@ -183,50 +185,27 @@ export function menuProcess(context:ExtensionContext, client:LanguageClient) {
 
 	//刷新该文件的索引
 	context.subscriptions.push(commands.registerCommand('cpp.reflushOneIdex', (infos) => {
-		console.log(infos);
+		logger.debug(infos);
 		client.sendNotification("reflushOneIdex", infos);
 	}));
 
 	//复制文件名称处理
 	context.subscriptions.push(commands.registerCommand('cpp.copyfilename', (infos) => {
-		console.log(infos);
+		logger.debug(infos);
 		let filepath: string = infos.path;
 		let pathinfo = path.parse(filepath);
-		console.log(pathinfo.base);
+		logger.debug(pathinfo.base);
 		let filename = pathinfo.base;
-		const os = require('os');
-		let systemname = process.platform;
-		if (systemname == "linux") {
-			//linux操作系统
-			let exec = require('child_process').exec;
-			exec('printf "' + filename + '" | xsel --input --clipboard');
-			return;
-		}
-
-		if (systemname == "darwin") {
-			//linux操作系统
-			let exec = require('child_process').exec;
-			let cmd = 'printf "' + filename + '" | pbcopy';
-			console.log(cmd);
-			exec(cmd);
-			return;
-		}
-
-		if (systemname == "win32") {
-			//windows操作系统
-			let exec = require('child_process').exec;
-			exec('<nul (set/p z="' + filename + '") | clip');
-			return;
-		}
+		env.clipboard.writeText(filename);
 	}));
 
 	//提交编译
 	context.subscriptions.push(commands.registerCommand('cpp.build', (infos) => {
-		build(infos);
+		build(context);
 	}));
 
 	//提交编译到容器
 	context.subscriptions.push(commands.registerCommand('cpp.buildfordocker', (infos) => {
-		buildToBeta(infos);
+		GetBuildCmd(context);
 	}));
 }

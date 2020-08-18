@@ -8,6 +8,7 @@
 var AnalyseCpp = require('./analyseCpp').AnalyseCpp;
 var AnalyseProtobuf = require('./analyseProtobuf').AnalyseProtobuf;
 var TypeEnum = require('../analyse/analyseCpp').TypeEnum;
+var logger = require('log4js').getLogger("cpptips");
 var Analyse = /** @class */ (function () {
     function Analyse(filecontext, filename) {
         if (filename === void 0) { filename = ''; }
@@ -31,7 +32,7 @@ var Analyse = /** @class */ (function () {
                 return this.analyseHandler.getDocumentStruct();
             }
             catch (error) {
-                console.log(error);
+                logger.debug(error);
                 return [];
             }
         };

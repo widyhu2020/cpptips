@@ -13,6 +13,7 @@ const Completion = require('../completion/completion').Completion;
 const DefineMap = require('../definition/defineMap').DefineMap;
 const fs = require('fs');
 const path = require('path');
+const logger = require('log4js').getLogger("cpptips");
 
 class Definition extends Completion{
     constructor(basepath, extpath) {
@@ -117,7 +118,7 @@ class Definition extends Completion{
         console.time("getFileByFileName");
         let fileList = fdb.getFileByFileName(fileName);
         console.timeEnd("getFileByFileName");
-        //console.log(fileList);
+        //logger.debug(fileList);
         for(let i = 0; i < fileList.length; i++) {
             let filePath = fileList[i];
             let _pos = filePath.filepath.indexOf(includeFile);
@@ -291,11 +292,11 @@ class Definition extends Completion{
         if (info.systeminclude == 1) {
             //系统目录
             let fileallpath = this.extpath + path.sep + "data" + info.filepath;
-            console.info("filepath:", fileallpath);
+            logger.info("filepath:", fileallpath);
             return fileallpath;
         }
         let fileallpath = this.basepath + info.filepath;
-        console.info("filepath:", fileallpath);
+        logger.info("filepath:", fileallpath);
         return fileallpath;
     };
 
@@ -309,11 +310,11 @@ class Definition extends Completion{
         if (info.systeminclude == 1) {
             //系统目录
             let fileallpath = this.extpath + path.sep + "data" + info.filepath;
-            console.info("filepath:", fileallpath);
+            logger.info("filepath:", fileallpath);
             return fileallpath;
         }
         let fileallpath = this.basepath + info.filepath;
-        console.info("filepath:", fileallpath);
+        logger.info("filepath:", fileallpath);
         return fileallpath;
     };
 
@@ -430,7 +431,7 @@ class Definition extends Completion{
     _readFileFindAchieveFromCpp = function(result, sourcefilepath, ownname, name, type) {
         if(!fs.existsSync(sourcefilepath)){
             //文件不存在
-            console.log("file not exits:",sourcefilepath);
+            logger.debug("file not exits:",sourcefilepath);
             return false;
         }
 
@@ -448,7 +449,7 @@ class Definition extends Completion{
             let _name = regResult[0];
             let lineinfo = this._getDefinePost(filecontext, namepos);
             let linecode = lineinfo.c;
-            console.log("lineinfo:", lineinfo);
+            logger.debug("lineinfo:", lineinfo);
             // linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
             let prelinecode = lineinfo.p;
             let bpos = linecode.indexOf(_name);
@@ -462,10 +463,10 @@ class Definition extends Completion{
             result.bcols = bpos;
             result.eline = lineinfo.l;
             result.ecols = epos;
-            //console.log(result);
+            //logger.debug(result);
             return;
         }
-        //console.log(type);
+        //logger.debug(type);
     };
 
     _findValInStr = function(source, val, bpos, issmall = false) {

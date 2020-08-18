@@ -31,7 +31,7 @@
 		{
 			"type": "node",
 			"request": "attach",
-			"name": "serice",
+			"name": "service",
 			"port": 6009,
 			"restart": true,
 			"outFiles": [
@@ -44,7 +44,7 @@
 			"name": "客户端 + 服务器调试",
 			"configurations": [
 				"client",
-				"serice"
+				"service"
 			]
 		}
 	]

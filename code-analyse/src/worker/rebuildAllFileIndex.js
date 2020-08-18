@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const FileIndexStore = require('../store/store').FileIndexStore;
 const KeyWordStore = require('../store/store').KeyWordStore;
 const FileType = require('../store/store').FileType;
+const logger = require('log4js').getLogger("cpptips");
 
 let needStop = false;
 class RebuildFileIndex {
@@ -82,7 +83,7 @@ class RebuildFileIndex {
             //处理头文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
 
@@ -101,7 +102,7 @@ class RebuildFileIndex {
             //处理源文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
             index++;
@@ -127,7 +128,7 @@ class RebuildFileIndex {
             //处理头文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
 
@@ -146,7 +147,7 @@ class RebuildFileIndex {
             //处理源文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
             index++;
@@ -166,7 +167,7 @@ class RebuildFileIndex {
         }
 
         function _inDeleteNotExists(msg){
-            console.log(msg);
+            logger.debug(msg);
             return that.needExit;
         }
 
@@ -203,7 +204,7 @@ class RebuildFileIndex {
             //处理头文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
 
@@ -221,7 +222,7 @@ class RebuildFileIndex {
             //处理源文件
             if(that.needExit) {
                 //退出进程
-                console.log("main process send message, child need exit.");
+                logger.debug("main process send message, child need exit.");
                 return that.needExit;
             }
 
@@ -242,7 +243,7 @@ class RebuildFileIndex {
         }
 
         function _inDeleteNotExists(msg){
-            console.log(msg);
+            logger.debug(msg);
             return that.needExit;
         }
 
@@ -306,7 +307,7 @@ class RebuildFileIndex {
         if(this.needExit || !FileIndexStore.getInstace().islive()) {
             //退出进程
             this.needExit = false;
-            console.log("main process send message, child need exit.");
+            logger.debug("main process send message, child need exit.");
             return this.needExit;
         }
 
@@ -362,11 +363,11 @@ class RebuildFileIndex {
 
         //如果是md5值不一样，则启动分析合并
         if ((hasInDb && lastMd5 != md5) || forckReolad) {
-            console.log(lastMd5, md5, filepath);
+            logger.debug(lastMd5, md5, filepath);
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
-                //console.log("not find file!", filepath);
+                //logger.debug("not find file!", filepath);
                 return false;
             }
             let file_id = fileinfo.id;
@@ -394,7 +395,7 @@ class RebuildFileIndex {
         if(this.needExit || !FileIndexStore.getInstace().islive()) {
             //退出进程
             this.needExit = false;
-            console.log("main process send message, child need exit.");
+            logger.debug("main process send message, child need exit.");
             return this.needExit;
         }
 
@@ -450,11 +451,11 @@ class RebuildFileIndex {
 
         //如果是md5值不一样，则启动分析合并
         if ((hasInDb && lastMd5 != md5) || forckReolad) {
-            //console.log(lastMd5, md5, filepath);
+            //logger.debug(lastMd5, md5, filepath);
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
-                //console.log("not find file!", filepath);
+                //logger.debug("not find file!", filepath);
                 return false;
             }
             let file_id = fileinfo.id;
@@ -513,10 +514,10 @@ class RebuildFileIndex {
             let analyse = new Analyse(filecontext, filename);
             analyse.doAnalyse();
             let nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-            //console.log(nameMap);
+            //logger.debug(nameMap);
             return nameMap;
         } catch (error) {
-            console.log(filename, error);
+            logger.debug(filename, error);
             return {};
         }
     };
@@ -544,14 +545,14 @@ class RebuildFileIndex {
             }
             
             //执行分析
-            //console.log(filecontext);
+            //logger.debug(filecontext);
             let analyse = new Analyse(filecontext, filename);
             analyse.doAnalyse();
             let nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-            //console.log(nameMap);
+            //logger.debug(nameMap);
             return nameMap;
         } catch (error) {
-            console.log(filename, error);
+            logger.debug(filename, error);
             return {};
         }
     };
@@ -616,11 +617,11 @@ if (cluster.isMaster) {
     worker.on('message', (data) => {
         let value = data['process'];
         if (data.function == "source" || data.function == "include") {
-            console.log("当前进度：%s, %f%，总共：%d，当前：%d",data.function, value["showprocess"], value["totalNum"], value["index"]);
+            logger.debug("当前进度：%s, %f%，总共：%d，当前：%d",data.function, value["showprocess"], value["totalNum"], value["index"]);
             return;
         }
         if(data.function == "scan_ing") {
-            //console.log("当前加载目录：", data.extdata);
+            //logger.debug("当前加载目录：", data.extdata);
             return;
         }
 
@@ -656,8 +657,8 @@ if (cluster.isMaster) {
         try{
             process.send(message);
         }catch(error){
-            console.log(error);
-            console.log(message);
+            logger.debug(error);
+            logger.debug(message);
         }
     };
 
@@ -718,7 +719,7 @@ if (cluster.isMaster) {
         if (parasms['msg_type'] === undefined
             || !parasms['data']['basepath']
             || !parasms['data']['dbpath']) {
-            console.log("input parasms error!", parasms);
+            logger.debug("input parasms error!", parasms);
             let message = { "function": "error" };
             message['msg'] = "input parasms error!";
             process.send(JSON.stringify(message));
@@ -740,7 +741,7 @@ if (cluster.isMaster) {
         if (msg_type == 0) {
             //全量扫码目录并重新加载索引
             reloadAllFile(basepath, dbpath,()=>{
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 let message = {"function": "over"};
                 process.send(message);
             }, issystem);
@@ -750,7 +751,7 @@ if (cluster.isMaster) {
         if (msg_type == 1) {
             //加载单个文件
             if (!parasms.data.filepath) {
-                console.log("input filepath error!");
+                logger.debug("input filepath error!");
                 let message = { "function": "error" };
                 message['msg'] = "filepath not find!";
                 process.send(message);
@@ -766,7 +767,7 @@ if (cluster.isMaster) {
         if (msg_type == 2) {
             //强制加载单个文件
             if (!parasms.data.filepath) {
-                console.log("input filepath error!");
+                logger.debug("input filepath error!");
                 let message = { "function": "error" };
                 message['msg'] = "filepath not find!";
                 process.send(message);
@@ -782,7 +783,7 @@ if (cluster.isMaster) {
         if (msg_type == 3) {
             //全量扫码目录并重新加载索引
             forkReloadAllFile(basepath, dbpath, ()=>{
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 let message = {"function": "over"};
                 process.send(message);
             }, issystem);
@@ -793,7 +794,7 @@ if (cluster.isMaster) {
             //全量扫码目录并重新加载索引
             let filepaths = parasms.data.filepaths;
             batchReloadIncludeFiles(basepath, filepaths, dbpath, ()=>{
-                console.log("analyse over and exit!");
+                logger.debug("analyse over and exit!");
                 let message = {"function": "over"};
                 process.send(message);
             }, issystem);
@@ -806,17 +807,17 @@ if (cluster.isMaster) {
     };
 
     process.on('message', (parasms) => {
-        console.log("onmessage", JSON.stringify(parasms));
+        logger.debug("onmessage", JSON.stringify(parasms));
         onMessage(parasms);
     });
 
     process.on('exit', (code, signal) => {
         if (signal) {
-            console.log(`工作进程已被信号 ${signal} 杀死`);
+            logger.debug(`工作进程已被信号 ${signal} 杀死`);
         } else if (code !== 0) {
-            console.log(`工作进程退出，退出码: ${code}`);
+            logger.debug(`工作进程退出，退出码: ${code}`);
         } else {
-            console.log('工作进程成功退出');
+            logger.debug('工作进程成功退出');
         }
     });
 }

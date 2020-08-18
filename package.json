@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.2.3",
+	"version": "0.2.7",
 	"repository": {
 		"url": "https://github.com/widyhu2020/cpptips"
 	},
@@ -74,6 +74,12 @@
 					"default": 600000,
 					"description": "配置更新检查的间隔时间"
 				},
+				"cpptips.defaultbuildscript": {
+					"type": "string",
+					"default": "function GetBuildCommands(hander, dirname, isCommd = true){\n\tlet commids = {\n\t\t'make':'make clean; make -j 8;mv a.out /tmp/;'\n\t};\n\thander.CallBack(0, commids, dirname);\n}",
+					"description": "编译时调用到这份代码，你可以实现编译脚本，自定义自己的编译指令。",
+					"readOnly": true
+				},
 				"cpptips.updateCheckUrl": {
 					"type": "string",
 					"default": "http://9.134.38.144:8888",
@@ -103,14 +109,6 @@
 				"title": "复制名称"
 			},
 			{
-				"command": "cpp.addIndexDir",
-				"title": "加入索引范围"
-			},
-			{
-				"command": "cpp.delIndexDir",
-				"title": "移除索引范围"
-			},
-			{
 				"command": "cpp.reflushAllIdex",
 				"title": "刷新全部索引"
 			},
@@ -124,11 +122,11 @@
 			},
 			{
 				"command": "cpp.build",
-				"title": "仅提交编译"
+				"title": "提交普通编译"
 			},
 			{
 				"command": "cpp.buildfordocker",
-				"title": "提交编译到容器(pay专用)"
+				"title": "提交编译并重启"
 			}
 		],
 		"languages": [
@@ -227,18 +225,6 @@
 					"group": "6_copypath"
 				},
 				{
-					"when": "resourceScheme == file && resourceExtname == ",
-					"command": "cpp.addIndexDir",
-					"alt": "cpp.addIndexDir",
-					"group": "2_workspace@1"
-				},
-				{
-					"when": "resourceScheme == file && resourceExtname == ",
-					"command": "cpp.delIndexDir",
-					"alt": "cpp.delIndexDir",
-					"group": "2_workspace@2"
-				},
-				{
 					"when": "true",
 					"command": "cpp.reflushAllIdex",
 					"alt": "cpp.reflushAllIdex",
@@ -260,39 +246,51 @@
 		},
 		"views": {
 			"explorer": [
-			  {
-				"id": "nodeDependencies",
-				"name": "分析目录",
-				"icon": "media/dep.svg",
-				"contextualTitle": "Package Explorer"
-			  }
+				{
+					"id": "nodeDependencies",
+					"name": "分析目录",
+					"icon": "media/dep.svg",
+					"contextualTitle": "Package Explorer"
+				}
 			]
 		},
 		"problemMatchers": [
 			{
 				"owner": "cpp",
 				"name": "cpp_gcc",
-				"fileLocation": ["relative", "${workspaceFolder}"],
+				"source": "cpptips",
+				"label": "cpptips",
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				],
 				"pattern": {
-				  "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
-				  "file": 1,
-				  "line": 2,
-				  "column": 3,
-				  "severity": 4,
-				  "message": 5
+					"regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5,
+					"code": 0
 				}
 			},
 			{
 				"owner": "cpp",
 				"name": "cpp_build",
-				"fileLocation": ["relative", "${workspaceFolder}"],
+				"source": "cpptips",
+				"label": "cpptips",
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				],
 				"pattern": {
-				  "regexp": "^(.*):(\\d+):(\\d+): .* (error): (.*)$",
-				  "file": 1,
-				  "line": 2,
-				  "column": 3,
-				  "severity": 4,
-				  "message": 5
+					"regexp": "^(.*):(\\d+):(\\d+): .* (error): (.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5,
+					"code": 0
 				}
 			}
 		],
@@ -308,6 +306,12 @@
 				"key": "f5",
 				"mac": "f5",
 				"when": "editorTextFocus"
+			}
+		],
+		"snippets": [
+			{
+				"language": "cpp",
+				"path": "./snippets/cpptip_ssnippets.json"
 			}
 		]
 	},
@@ -327,9 +331,11 @@
 	"dependencies": {
 		"@types/lodash": "^4.14.149",
 		"better-sqlite3": "^6.0.1",
-		"events": "^3.1.0",
-		"unzipper": "^0.10.10",
 		"electron-rebuild": "^1.10.0",
-		"node-gyp": "^6.1.0"
+		"events": "^3.1.0",
+		"log4js": "^6.3.0",
+		"node-gyp": "^6.1.0",
+		"open": "^7.1.0",
+		"unzipper": "^0.10.10"
 	}
 }

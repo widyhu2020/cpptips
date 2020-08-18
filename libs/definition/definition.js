@@ -25,6 +25,7 @@ var Completion = require('../completion/completion').Completion;
 var DefineMap = require('../definition/defineMap').DefineMap;
 var fs = require('fs');
 var path = require('path');
+var logger = require('log4js').getLogger("cpptips");
 var Definition = /** @class */ (function (_super) {
     __extends(Definition, _super);
     function Definition(basepath, extpath) {
@@ -121,7 +122,7 @@ var Definition = /** @class */ (function (_super) {
             console.time("getFileByFileName");
             var fileList = fdb.getFileByFileName(fileName);
             console.timeEnd("getFileByFileName");
-            //console.log(fileList);
+            //logger.debug(fileList);
             for (var i = 0; i < fileList.length; i++) {
                 var filePath = fileList[i];
                 var _pos = filePath.filepath.indexOf(includeFile);
@@ -281,11 +282,11 @@ var Definition = /** @class */ (function (_super) {
             if (info.systeminclude == 1) {
                 //系统目录
                 var fileallpath_1 = this.extpath + path.sep + "data" + info.filepath;
-                console.info("filepath:", fileallpath_1);
+                logger.info("filepath:", fileallpath_1);
                 return fileallpath_1;
             }
             var fileallpath = this.basepath + info.filepath;
-            console.info("filepath:", fileallpath);
+            logger.info("filepath:", fileallpath);
             return fileallpath;
         };
         //通过文件id获取文件名称（相对路径）
@@ -297,11 +298,11 @@ var Definition = /** @class */ (function (_super) {
             if (info.systeminclude == 1) {
                 //系统目录
                 var fileallpath_2 = this.extpath + path.sep + "data" + info.filepath;
-                console.info("filepath:", fileallpath_2);
+                logger.info("filepath:", fileallpath_2);
                 return fileallpath_2;
             }
             var fileallpath = this.basepath + info.filepath;
-            console.info("filepath:", fileallpath);
+            logger.info("filepath:", fileallpath);
             return fileallpath;
         };
         //读取文件查找内容
@@ -409,7 +410,7 @@ var Definition = /** @class */ (function (_super) {
         _this._readFileFindAchieveFromCpp = function (result, sourcefilepath, ownname, name, type) {
             if (!fs.existsSync(sourcefilepath)) {
                 //文件不存在
-                console.log("file not exits:", sourcefilepath);
+                logger.debug("file not exits:", sourcefilepath);
                 return false;
             }
             if (type == TypeEnum.FUNCTION) {
@@ -425,7 +426,7 @@ var Definition = /** @class */ (function (_super) {
                 var _name = regResult[0];
                 var lineinfo = this._getDefinePost(filecontext, namepos);
                 var linecode = lineinfo.c;
-                console.log("lineinfo:", lineinfo);
+                logger.debug("lineinfo:", lineinfo);
                 // linecode = linecode.replace(/[\s\t]{0,10}::[\s\t]{0,10}/g, "::");
                 var prelinecode = lineinfo.p;
                 var bpos = linecode.indexOf(_name);
@@ -438,10 +439,10 @@ var Definition = /** @class */ (function (_super) {
                 result.bcols = bpos;
                 result.eline = lineinfo.l;
                 result.ecols = epos;
-                //console.log(result);
+                //logger.debug(result);
                 return;
             }
-            //console.log(type);
+            //logger.debug(type);
         };
         _this._findValInStr = function (source, val, bpos, issmall) {
             //全部转为小写查找

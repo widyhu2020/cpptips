@@ -23,6 +23,7 @@ var AnalyseCpp = require('../analyse/analyseCpp').AnalyseCpp;
 var TypeEnum = require('../analyse/analyseBase').TypeEnum;
 var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
+var logger = require('log4js').getLogger("cpptips");
 var AnalyseDiagnostics = /** @class */ (function (_super) {
     __extends(AnalyseDiagnostics, _super);
     function AnalyseDiagnostics(filecontext, dbpath, filename) {
@@ -52,7 +53,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             });
             //遍历树结构，分析具体语法规则
             this.tree.traverseDF(function (current) {
-                //console.log(current);
+                //logger.debug(current);
                 var fatherNameMap = {};
                 //获取父节点的定义
                 fatherNameMap = _this.GetFatherNameMap(current);
@@ -75,7 +76,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 current.nameMap = Object.assign(current.nameMap, nameMap);
             });
             for (var i = 0; i < this.result.length; i++) {
-                console.log(this.result[i].begin, this.result[i].end, this.context.substring(this.result[i].begin - 20, this.result[i].end));
+                logger.debug(this.result[i].begin, this.result[i].end, this.context.substring(this.result[i].begin - 20, this.result[i].end));
             }
         };
         //分析代码快在整个文档中的位置
@@ -155,7 +156,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 if (/([,]?[\w]{1,64}\([\w]{1,64}\)){1,32}/g.test(testStr)) {
                     //测试成功
                     data = data.substring(0, _pos + 1);
-                    //console.log(data);
+                    //logger.debug(data);
                 }
             }
             for (var i = data.length; i > 0; i--) {
@@ -224,7 +225,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             });
             var reg = /([\w:<>,]{1,128})[\s]{1,4}([\w]{1,64})/g;
             var result = param.match(reg);
-            //console.log(result);
+            //logger.debug(result);
             for (var i = 0; result && i < result.length; i++) {
                 var item = result[i].trim();
                 if (item[0] == ",") {
@@ -252,11 +253,11 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 }
                 current = current.parent;
                 var _nameMap = current.nameMap;
-                //console.log("predata:", _nameMap, nameMap);
+                //logger.debug("predata:", _nameMap, nameMap);
                 nameMap = Object.assign(nameMap, _nameMap);
-                //console.log("result:", nameMap);
+                //logger.debug("result:", nameMap);
             }
-            //console.log(nameMap);
+            //logger.debug(nameMap);
             return nameMap;
         };
         //分析代码块
@@ -309,10 +310,10 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             var reg = /^([\w]{1,64}(::[\w]{1,64}){0,10})([*&]{0,2}) ([\w]{1,64})$/g;
             var match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var type = match[1];
                 var name_2 = match[4];
-                //if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+                //if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
                 nameMap[name_2] = type;
                 return nameMap;
             }
@@ -320,7 +321,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             reg = /^([\w]{1,64}(::[\w]{1,64}){0,10})[*&]{0,2} ([\w]{1,64})[\s]{0,16}((\()|(=[\s]{0,16}new ))/g;
             match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var type = match[1];
                 var name_3 = match[3];
                 nameMap[name_3] = type;
@@ -330,10 +331,10 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             reg = /^((([\w]{1,64}::){0,8}[\w]{1,64})<(([,]?([\w]{1,64}::){0,10}[\w]{1,64}){1,10})>)([*&]{0,2}) ([\w]{1,64})$/g;
             match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var type = match[1];
                 var name_4 = match[8];
-                //if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+                //if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
                 nameMap[name_4] = type;
                 return nameMap;
             }
@@ -341,18 +342,18 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             reg = /^((([\w]{1,64}::){0,8}[\w]{1,64})<(([,]?([\w]{1,64}::){0,10}[\w]{1,64}){1,10})>)[*&]{0,2} ([\w]{1,64})[\s]{0,16}=[\s]{0,16}([\w.,(*&)"]{1,128})$/g;
             match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var type = match[1];
                 var name_5 = match[7];
                 var value = match[8];
-                //if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code);
+                //if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code);
                 nameMap[name_5] = type;
                 var typeOfName = type;
                 var valType = false;
                 if (value.indexOf("(") != -1) {
                     //函数调用
                     valType = this.CheckFunctionParams(value, nameMap, fatherNameMap);
-                    // if(name == "bitsetProperty") console.log(valType, typeOfName);
+                    // if(name == "bitsetProperty") logger.debug(valType, typeOfName);
                 }
                 else if (/^[\d]{1,25}$/g.test(value)) {
                     valType = "number";
@@ -386,7 +387,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 if (!this.TypeCheck(typeOfName, valType)) {
                     var matchcode = match[0].replace(/[\s]{1,10}/g, "");
                     this.GetPointInSource(matchcode, type, value, "变量类型不匹配");
-                    //if(name == "strInterfaceSource")console.log(match,matchcode, type, value);
+                    //if(name == "strInterfaceSource")logger.debug(match,matchcode, type, value);
                     return nameMap;
                 }
                 return nameMap;
@@ -396,9 +397,9 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             match = reg.exec(code);
             if (match) {
                 if (/MMPAY_CTIME_ELF/g.test(code)) {
-                    console.log(code);
+                    logger.debug(code);
                 }
-                // console.log(match);
+                // logger.debug(match);
                 var type = match[1];
                 var name_6 = match[3];
                 var value = match[4];
@@ -409,7 +410,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     //函数调用
                     valType = this.CheckFunctionParams(value, nameMap, fatherNameMap);
                     if (name_6 == "i")
-                        console.log("jjjjjjjjjjj", value, nameMap, fatherNameMap, valType, typeOfName);
+                        logger.debug("jjjjjjjjjjj", value, nameMap, fatherNameMap, valType, typeOfName);
                 }
                 else if (/^[\d]{1,25}$/g.test(value)) {
                     valType = "number";
@@ -443,7 +444,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     else {
                         nameMap[name_6] = valType;
                     }
-                    //if(code == "auto i=0") console.log("dfdfdfdfdfdfdfdfdf", code, name, value, type, valType, nameMap);
+                    //if(code == "auto i=0") logger.debug("dfdfdfdfdfdfdfdfdf", code, name, value, type, valType, nameMap);
                     return nameMap;
                 }
                 if (!this.TypeCheck(typeOfName, valType)) {
@@ -457,15 +458,15 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             reg = /^([\w]{1,64})=([\w.,]{1,128})$/g;
             match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var name_7 = match[1];
                 var value = match[2];
                 if (name_7 == "m_pNewIdMaker")
-                    console.log(nameMap, fatherNameMap, name_7, value);
+                    logger.debug(nameMap, fatherNameMap, name_7, value);
                 var typeOfName = this.GetNameType(nameMap, fatherNameMap, name_7);
                 if (!typeOfName) {
                     //变量未定义
-                    console.log(code, name_7, value, nameMap, fatherNameMap);
+                    logger.debug(code, name_7, value, nameMap, fatherNameMap);
                     var matchcode = match[0].replace(/[\s]{1,10}/g, "");
                     this.GetPointInSource(matchcode, name_7, value, "变量未定义");
                     return nameMap;
@@ -480,7 +481,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 }
                 else if (/^\"[^"]{1,1024}\"$/g.test(value)) {
                     valType = "std::string";
-                    console.log(name_7, value);
+                    logger.debug(name_7, value);
                 }
                 else if (value == "false" || value == "true") {
                     valType = "bool";
@@ -509,7 +510,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             reg = /^([\w]{1,64})=([\w:.]{1,64}\([\w.,():]{1,128}\))$/g;
             match = reg.exec(code);
             if (match) {
-                //console.log(match);
+                //logger.debug(match);
                 var name_8 = match[1];
                 var value = match[2];
                 var typeOfName = this.GetNameType(nameMap, fatherNameMap, name_8);
@@ -523,7 +524,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 var _type = this.CheckFunctionParams(value, nameMap, fatherNameMap);
                 if (!this.TypeCheck(typeOfName, _type)) {
                     //let matchcode = match[0].replace(/[\s]{1,10}/g, "");
-                    //console.log("function return not match!" +  typeOfName + "|" +  name + "|" + _type + "|" + value);
+                    //logger.debug("function return not match!" +  typeOfName + "|" +  name + "|" + _type + "|" + value);
                     //this.GetPointInSource(matchcode, value, value);
                     return nameMap;
                 }
@@ -595,7 +596,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             ];
             var defineleve = -1;
             for (var i = 0; i < numberType.length; i++) {
-                //if(valType == "number") console.log("ddddddd",defineType, valType,defineleve, numberType[i]);
+                //if(valType == "number") logger.debug("ddddddd",defineType, valType,defineleve, numberType[i]);
                 if (numberType[i] == defineType) {
                     defineleve = i;
                 }
@@ -634,7 +635,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             if (_params.trim().length > 0) {
                 params.push(_params);
             }
-            //console.log(params);
+            //logger.debug(params);
             return params;
         };
         //分析函数并获取返回类型
@@ -662,7 +663,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             var info = this.kwdb.getByOwnNameAndNameType(_ownname, name, usens, TypeEnum.FUNCTION);
             //测试代码//////////////////////////////////////////////////////
             // if(name == "str"){
-            // 	console.log("xxxxxxxxxxxxx", _ownname, usens, info);
+            // 	logger.debug("xxxxxxxxxxxxx", _ownname, usens, info);
             // }
             if (info.length == 0) {
                 //没查到函数可能是宏定义
@@ -671,7 +672,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     var jsonData = JSON.parse(info_1[0].extdata);
                     if (params.length != jsonData.p.length) {
                         //宏参数不匹配
-                        console.log("#define params not match!");
+                        logger.debug("#define params not match!");
                     }
                     //宏定义
                     return "#define";
@@ -680,7 +681,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             /////////////////////////////////////////////////////////////
             if (info.length > 0) {
                 var extData = info[0].extdata;
-                //if(name == "_AddProcessFlows")console.log("xxxxxxx", info[0], params);
+                //if(name == "_AddProcessFlows")logger.debug("xxxxxxx", info[0], params);
                 var extJson = JSON.parse(extData);
                 for (var i = 0; i < extJson.length; i++) {
                     if (extJson[i].i.length >= params.length) {
@@ -691,7 +692,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                                 //函数默认值处理
                                 //如果超出的参数必须要有默认值，否则报错
                                 if (extJson[i].i[j].v == null) {
-                                    console.log("params not match!", extJson[i].i[j]);
+                                    logger.debug("params not match!", extJson[i].i[j]);
                                     isError = true;
                                     continue;
                                 }
@@ -712,7 +713,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                                     "long", "unsigned long", "long long", "unsigned long long"]);
                                 if (!numberType.has(defineType)) {
                                     //非数字类型，但是匹配了数字
-                                    console.log("this type is number", defineType, val);
+                                    logger.debug("this type is number", defineType, val);
                                     isError = true;
                                     continue;
                                 }
@@ -724,7 +725,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                                 var numberType = new Set(["double", "float"]);
                                 if (!numberType.has(defineType)) {
                                     //非数字类型，但是匹配了数字
-                                    console.log("this type is number", defineType, val);
+                                    logger.debug("this type is number", defineType, val);
                                     isError = true;
                                     continue;
                                 }
@@ -735,7 +736,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                                 var numberType = new Set(["string", "std::string", "char*", "char *"]);
                                 if (!numberType.has(defineType)) {
                                     //非字符类型，使用了字符的规则
-                                    console.log("this type is string", defineType, val);
+                                    logger.debug("this type is string", defineType, val);
                                     isError = true;
                                     continue;
                                 }
@@ -745,7 +746,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                             if (val.indexOf("(") != -1) {
                                 var _type_1 = this.CheckFunctionParams(val, nameMap, fatherNameMap);
                                 if (!this.TypeCheck(defineType, _type_1)) {
-                                    console.log("this function return type is not match", defineType, _type_1, val);
+                                    logger.debug("this function return type is not match", defineType, _type_1, val);
                                     isError = true;
                                     continue;
                                 }
@@ -753,7 +754,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                             }
                             //其他情况进行匹配
                             var _type = this.GetNameType(nameMap, fatherNameMap, val);
-                            // if(name == "GetCurrentProccessByBusinessCode") console.log(nameMap, fatherNameMap,val);
+                            // if(name == "GetCurrentProccessByBusinessCode") logger.debug(nameMap, fatherNameMap,val);
                             if (!_type) {
                                 //变量为定义
                                 //判断是否宏定义或者枚举
@@ -778,22 +779,22 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                                         }
                                     }
                                 }
-                                //console.log(nameMap, fatherNameMap, val, this.allfunctionname);
+                                //logger.debug(nameMap, fatherNameMap, val, this.allfunctionname);
                                 if (!pass) {
-                                    console.log("this val not define！", defineType, _type, val);
+                                    logger.debug("this val not define！", defineType, _type, val);
                                     isError = true;
                                     continue;
                                 }
                             }
                             if (!this.TypeCheck(defineType, _type)) {
                                 //类型不匹配
-                                console.log("this function return type is not match！", defineType, _type, val);
+                                logger.debug("this function return type is not match！", defineType, _type, val);
                                 isError = true;
                                 continue;
                             }
                         }
                         if (!isError) {
-                            // if(name == "GetCurrentProccessByBusinessCode") console.log(extJson[0]);
+                            // if(name == "GetCurrentProccessByBusinessCode") logger.debug(extJson[0]);
                             var _retType = extJson[0].r.t;
                             if (extJson[0].r.p == 1) {
                                 _retType = _retType + "*";
@@ -803,7 +804,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     }
                 }
             }
-            console.log(type, name, paramsStr);
+            logger.debug(type, name, paramsStr);
             return false;
         };
         //分析成员变量类型
@@ -867,7 +868,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                         if (_stack.length == 0) {
                             _params = func.substring(i, j + 1);
                             //this.CheckFunctionParams(_newfunc)
-                            // console.log("_newfunc", _newfunc);
+                            // logger.debug("_newfunc", _newfunc);
                             i = j;
                             break;
                         }
@@ -897,7 +898,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                 }
                 else {
                     this.GetPointInSource(func, funcSq[0].name, names.name, "函数参数不匹配");
-                    //console.log("xxx error", names,nameMap, fatherNameMap);
+                    //logger.debug("xxx error", names,nameMap, fatherNameMap);
                     return false;
                 }
             }
@@ -913,7 +914,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     var _type = this.GetFunctionRetType(type, names.name, names.params, nameMap, fatherNameMap);
                     if (!_type) {
                         this.GetPointInSource(func, funcSq[0].name, names.name, "函数返回了未定义类型");
-                        console.log("ccc error", func, names, type, _type);
+                        logger.debug("ccc error", func, names, type, _type);
                         return false;
                     }
                     type = _type;
@@ -936,18 +937,18 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     //异常情况
                     break;
                 }
-                //console.log(_pos, source, bname);
+                //logger.debug(_pos, source, bname);
                 var linecode = "";
                 for (var i = _pos; i < source.length; i++) {
                     if (source[i] != " " && source[i] != "\t"
                         && source[i] != "\n" && source[i] != "\r") {
                         linecode = linecode + source[i];
-                        //console.log(linecode);
+                        //logger.debug(linecode);
                     }
                     var _findPos = func.indexOf(linecode);
                     if (_findPos == -1) {
                         //跳过继续查找
-                        //console.log("linecode", func, linecode);
+                        //logger.debug("linecode", func, linecode);
                         _pos = i;
                         linecode = "";
                         find = false;
@@ -955,22 +956,22 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
                     }
                     else if (_findPos > 0) {
                         //异常情况，退出
-                        console.log(func, bname, name);
+                        logger.debug(func, bname, name);
                         return 0;
                     }
                     if (func == linecode) {
                         //找到位置
-                        //if(func=="std::stringstrErrmsg=0")console.log("dddd:",source, linecode, name);
+                        //if(func=="std::stringstrErrmsg=0")logger.debug("dddd:",source, linecode, name);
                         retPos = source.indexOf(name, _pos);
                         find = true;
                         break;
                     }
                 }
             }
-            //console.log("ss", this.context.substring(startPos + retPos, startPos + retPos + name.length), "dd", bname);
+            //logger.debug("ss", this.context.substring(startPos + retPos, startPos + retPos + name.length), "dd", bname);
             var range = { begin: startPos + retPos, end: startPos + retPos + name.length };
             this.result.push(range);
-            console.log("error:", msg, name, range);
+            logger.debug("error:", msg, name, range);
             return startPos + retPos;
         };
         //获取变量的类型
@@ -983,7 +984,7 @@ var AnalyseDiagnostics = /** @class */ (function (_super) {
             if (fatherNameMap.hasOwnProperty(name)) {
                 return fatherNameMap[name];
             }
-            //console.log(nameMap, fatherNameMap, name);
+            //logger.debug(nameMap, fatherNameMap, name);
             return false;
         };
         _this.filedb = FileIndexStore.getInstace().connect(dbpath, 0);
@@ -1023,14 +1024,14 @@ if (cluster.isMaster) {
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
         if (data.type == "result") {
-            console.log(data.data);
+            logger.debug(data.data);
             worker_1.kill();
         }
     });
 }
 else if (cluster.isWorker) {
     process.on('message', function (parasms) {
-        //console.log(parasms);
+        //logger.debug(parasms);
         var filecontext = parasms["filecontext"];
         var filename = parasms["filename"];
         var dbpath = parasms["dbpath"];

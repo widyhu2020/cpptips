@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const unzipper = require("unzipper");
 const FileIndexStore = require('../store/store').FileIndexStore;
+const logger = require('log4js').getLogger("cpptips");
 
 class UnzipSystemIncludeWorker {
     constructor() {
@@ -24,10 +25,10 @@ class UnzipSystemIncludeWorker {
             filedb.connect(dbpath, 0);
             let totalRow = filedb.checkHasRowData();
             filedb.close();
-            console.info("file index toatl row:", totalRow);
+            logger.info("file index toatl row:", totalRow);
             if (totalRow >= 1) {
                 //已经存在文件，不进行分析
-                console.info("无需初始化系统db文件");
+                logger.info("无需初始化系统db文件");
                 callback("success");
                 return;
             }
@@ -41,7 +42,7 @@ class UnzipSystemIncludeWorker {
                 callback("success");
                 return;
             }
-            console.log(`progress: ${((t - r) / t * 100).toFixed(1)}%`);
+            logger.debug(`progress: ${((t - r) / t * 100).toFixed(1)}%`);
         });        
     };
 
@@ -50,11 +51,11 @@ class UnzipSystemIncludeWorker {
         let pos = zipfile.lastIndexOf("/");
         let filepath = zipfile.substring(0, pos);
         let unzipPath = filepath;
-        console.log(zipfile, unzipPath);
+        logger.debug(zipfile, unzipPath);
 
         if (fs.existsSync(unzipPath + "/" + "usr")) {
             //如果文件已经存在了，直接不进行处理
-            console.info("无需初始化系统头文件文件");
+            logger.info("无需初始化系统头文件文件");
             callback("success");
             return;
         }
@@ -63,11 +64,11 @@ class UnzipSystemIncludeWorker {
         const stream = fs.createReadStream(zipfile);
         stream.pipe(unzipper.Extract({ path: unzipPath }));
         stream.on('end', function(){
-            console.log("解压公共头文件成功!");
+            logger.debug("解压公共头文件成功!");
             callback("faild");
         });
         stream.on('error', function (err) {
-            console.log("解压公共头文件发生错误!", err);
+            logger.debug("解压公共头文件发生错误!", err);
             callback("success");
         });
     };
@@ -83,7 +84,7 @@ if (cluster.isMaster) {
     }
     worker.send(parasms);
     worker.on('message', (data) => {
-        console.log(JSON.stringify(data));
+        logger.debug(JSON.stringify(data));
         //关闭子进程
         worker.kill();
     });
@@ -112,7 +113,7 @@ if (cluster.isMaster) {
             unzipWorker.unzipInclude(zipfile, unzipInclude_process_over);
             
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             process.kill(process.pid);
         }
     });

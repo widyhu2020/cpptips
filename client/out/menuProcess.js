@@ -4,6 +4,8 @@ const path = require("path");
 const vscode_1 = require("vscode");
 const IndexConfig_1 = require("./IndexConfig");
 const buildProcess_1 = require("./buildProcess");
+const log4js_1 = require("log4js");
+const logger = log4js_1.getLogger("cpptips");
 function menuProcess(context, client) {
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.changeType', (uri) => {
         let select = vscode_1.window.activeTextEditor.selection;
@@ -139,17 +141,17 @@ function menuProcess(context, client) {
     }));
     //索引处理
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.addIndexDir', (infos) => {
-        console.log(infos);
+        logger.debug(infos);
         client.sendNotification("addDirToIndex", infos);
     }));
     //索引处理
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.delIndexDir', (infos) => {
-        console.log(infos);
+        logger.debug(infos);
         client.sendNotification("delDirToIndex", infos);
     }));
     //刷新所有索引
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.reflushAllIdex', (infos) => {
-        console.log(infos);
+        logger.debug(infos);
         client.sendNotification("reflushAllIdex", infos);
     }));
     //显示可视化索引配置
@@ -159,46 +161,25 @@ function menuProcess(context, client) {
     }));
     //刷新该文件的索引
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.reflushOneIdex', (infos) => {
-        console.log(infos);
+        logger.debug(infos);
         client.sendNotification("reflushOneIdex", infos);
     }));
     //复制文件名称处理
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.copyfilename', (infos) => {
-        console.log(infos);
+        logger.debug(infos);
         let filepath = infos.path;
         let pathinfo = path.parse(filepath);
-        console.log(pathinfo.base);
+        logger.debug(pathinfo.base);
         let filename = pathinfo.base;
-        const os = require('os');
-        let systemname = process.platform;
-        if (systemname == "linux") {
-            //linux操作系统
-            let exec = require('child_process').exec;
-            exec('printf "' + filename + '" | xsel --input --clipboard');
-            return;
-        }
-        if (systemname == "darwin") {
-            //linux操作系统
-            let exec = require('child_process').exec;
-            let cmd = 'printf "' + filename + '" | pbcopy';
-            console.log(cmd);
-            exec(cmd);
-            return;
-        }
-        if (systemname == "win32") {
-            //windows操作系统
-            let exec = require('child_process').exec;
-            exec('<nul (set/p z="' + filename + '") | clip');
-            return;
-        }
+        vscode_1.env.clipboard.writeText(filename);
     }));
     //提交编译
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.build', (infos) => {
-        buildProcess_1.build(infos);
+        buildProcess_1.build(context);
     }));
     //提交编译到容器
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.buildfordocker', (infos) => {
-        buildProcess_1.buildToBeta(infos);
+        buildProcess_1.GetBuildCmd(context);
     }));
 }
 exports.menuProcess = menuProcess;

@@ -16,6 +16,7 @@ var crypto = require('crypto');
 var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var FileType = require('../store/store').FileType;
+var logger = require('log4js').getLogger("cpptips");
 var CheckNeedUpdate = /** @class */ (function () {
     function CheckNeedUpdate(baseurl, basedir, intervaltime, callback, showversion) {
         if (showversion === void 0) { showversion = 0; }
@@ -32,7 +33,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                 that._getListOnLocation(filepath, "/server/out", filepath);
                 // that._getSignFileInfo("/package.json");
                 var versionInfo = JSON.stringify(that.filelist);
-                //console.log(versionInfo);
+                //logger.debug(versionInfo);
                 var fd = fs.openSync(__dirname + "/../../../list.js", "w+");
                 fs.writeSync(fd, versionInfo);
                 fs.closeSync(fd);
@@ -44,7 +45,7 @@ var CheckNeedUpdate = /** @class */ (function () {
             //半小时(默认)执行一次
             this.timer = setInterval(function () {
                 if (that.needStop) {
-                    console.log("find need exit!");
+                    logger.debug("find need exit!");
                     that.filelist = [];
                     clearInterval(_this.timer);
                     return;
@@ -72,7 +73,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                     filemap[fileinfo.path] = fileinfo.md5;
                 }
                 var needShow = false;
-                //console.log(list, JSON.stringify(that.filelist));
+                //logger.debug(list, JSON.stringify(that.filelist));
                 var serviceList = JSON.parse(list);
                 var _loop_1 = function (i) {
                     var fileinfo = serviceList[i];
@@ -90,7 +91,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                                 ret = that._saveFileToLocal(fileinfo.path, context);
                             }
                             catch (error) {
-                                console.log("error:", error, fileinfo.path);
+                                logger.debug("error:", error, fileinfo.path);
                             }
                         });
                     }
@@ -108,7 +109,7 @@ var CheckNeedUpdate = /** @class */ (function () {
             this._getListChek(url, successfunction);
         };
         this._saveFileToLocal = function (filepath, fileconext) {
-            console.log("save file! filepath:", filepath);
+            logger.debug("save file! filepath:", filepath);
             var allpath = this.basedir + filepath;
             try {
                 if (fs.existsSync(allpath)) {
@@ -132,14 +133,14 @@ var CheckNeedUpdate = /** @class */ (function () {
                 fs.closeSync(fd);
             }
             catch (error) {
-                console.log(error);
+                logger.debug(error);
                 return false;
             }
             return true;
         };
         this._getListChek = function (url, successfunction) {
             //http://9.134.38.144:8888/list.js
-            console.log(url);
+            logger.debug(url);
             try {
                 var http = require('http');
                 // 参数url和回调函数
@@ -159,11 +160,11 @@ var CheckNeedUpdate = /** @class */ (function () {
                         successfunction(html);
                     });
                 }).on('error', function () {
-                    console.log('获取数据错误');
+                    logger.debug('获取数据错误');
                 });
             }
             catch (error) {
-                console.log(error, url);
+                logger.debug(error, url);
             }
         };
         //获取单个文件
@@ -199,7 +200,7 @@ var CheckNeedUpdate = /** @class */ (function () {
                     dataFile = fs.lstatSync(filename);
                 }
                 catch (error) {
-                    console.log(error);
+                    logger.debug(error);
                     return;
                 }
                 //一定得fstatSync方法
@@ -270,7 +271,7 @@ if (cluster.isMaster) {
             worker_1.kill();
         }
         if (data == "update") {
-            console.log("need update");
+            logger.debug("need update");
         }
     });
 }
@@ -291,7 +292,7 @@ else if (cluster.isWorker) {
         }
         if (!parasms.basedir || !parasms.baseurl || !parasms.intervaltime) {
             //输入参数非法
-            //console.log("input params error", parasms);
+            //logger.debug("input params error", parasms);
             return;
         }
         function needTips() {
@@ -317,7 +318,7 @@ else if (cluster.isWorker) {
         }
     };
     process.on('message', function (parasms) {
-        //console.log("onmessage",parasms);
+        //logger.debug("onmessage",parasms);
         onMessage(parasms);
     });
 }

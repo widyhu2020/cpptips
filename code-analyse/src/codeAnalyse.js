@@ -19,6 +19,7 @@ const AutoFillParam = require('./completion/autoFillParam').AutoFillParam;
 const TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 const fs = require('fs');
 const __path = require('path');
+const logger = require('log4js').getLogger("cpptips");
 
 class CodeAnalyse {
     //单例方法
@@ -50,7 +51,7 @@ class CodeAnalyse {
         if (this.isinit) {
             return this;
         }
-        console.info("config:", configs);
+        logger.info("config:", configs);
         let basedir = configs.basedir;
         this.basedir = basedir;
         let dbpath = configs.dbpath
@@ -65,10 +66,10 @@ class CodeAnalyse {
 
         let lastpos = dbpath.lastIndexOf("/");
         let path = dbpath.substring(0, lastpos);
-        console.info("db path!", dbpath, path);
+        logger.info("db path!", dbpath, path);
         if (!fs.existsSync(path)) {
             //文件夹不存
-            console.info("mkdir db path!", path);
+            logger.info("mkdir db path!", path);
             fs.mkdirSync(path, { recursive: true});
         }
 
@@ -127,13 +128,13 @@ class CodeAnalyse {
                     callback("success", filepath, usingnamespace, include, showTree);
                 }
             } catch (err) {
-                console.log(err);
+                logger.debug(err);
             }
             worker.kill();
         });
         //退出工作进程
         worker.on('exit', (code, signal) => {
-            console.info("获取cpp文件头文件依赖工作进程退出", code, signal);
+            logger.info("获取cpp文件头文件依赖工作进程退出", code, signal);
         });
     };
 
@@ -143,7 +144,7 @@ class CodeAnalyse {
         let totalSouorceTree = null;
         for (let i = 0; i < files.length; i++) {
             let filename = files[i];
-            //console.log(filename);
+            //logger.debug(filename);
             let strjson = this.store.get(filename);
             if (strjson == "") {
                 continue;
@@ -343,7 +344,7 @@ class CodeAnalyse {
             codes.push(_code);
         }
         
-        //console.log(codes);
+        //logger.debug(codes);
         for(let i = 0; i < codes.length; i++) {
             let _code = codes[i].trim();
             let epos = _code.length - 1;
@@ -533,7 +534,7 @@ class CodeAnalyse {
                     }
                     if(_pos != -1) {
                         let ownname = _tmpstr.substring(_pos + 6, _posend).trim();
-                        console.log(ownname);
+                        logger.debug(ownname);
                         return ownname;
                     }
 
@@ -600,7 +601,7 @@ class CodeAnalyse {
         worker.on('message', (data) => {
             let value = data['process'];
             if (data.function == "rebuild") {
-                console.log("当前进度：%f%，总共：%d，当前：%d", value["showprocess"],
+                logger.debug("当前进度：%f%，总共：%d，当前：%d", value["showprocess"],
                     value["totalNum"], value["index"]);
                 return;
             }
@@ -650,7 +651,7 @@ class CodeAnalyse {
         worker.on('exit', (code, signal) => {
             //恢复正常功能
             //这里不需要恢复正常功能，否则导致变量被设置成false
-            // console.log("xxxxxxxxxx:exit");
+            // logger.debug("xxxxxxxxxx:exit");
             // that.loadindex = false;
         });
     };
@@ -676,7 +677,7 @@ class CodeAnalyse {
                 userConfig: this.userConfig
             }
         }
-        console.log("_reloadAllIncludeFile", JSON.stringify(parasms));
+        logger.debug("_reloadAllIncludeFile", JSON.stringify(parasms));
         worker.send(parasms);
         worker.on('message', (data) => {
             let value = data['process'];
@@ -756,7 +757,7 @@ class CodeAnalyse {
         worker.on('message', (data) => {
             let value = data['process'];
             if (data.function == "rebuild") {
-                //console.log("当前进度：%f%，总共：%d，当前：%d", value["showprocess"],
+                //logger.debug("当前进度：%f%，总共：%d，当前：%d", value["showprocess"],
                 //value["totalNum"], value["index"]);
                 callback("process", value["showprocess"], value["totalNum"], value["index"]);
                 return;
@@ -1369,7 +1370,7 @@ class CodeAnalyse {
         }
 
         let functionName = names[0];
-        console.log(valetype);
+        logger.debug(valetype);
 
         //获取方法的定义
         afp.setParamsInfo(filecontext, preParams, paramsPos);
@@ -1548,13 +1549,13 @@ class CodeAnalyse {
             //兼容proto
             fileName = fileName.replace(".pb.h", ".proto");
             includeFile = includeFile.replace(".pb.h", ".proto");
-            console.log("process proto:", fileName);
+            logger.debug("process proto:", fileName);
         }
 
         let findIncludeFile = df.getIncludeInfo(sourceFile, includeFile, fileName);
         if(findIncludeFile == "") {
             //未找到头文件
-            console.log("find include file error", includeFile);
+            logger.debug("find include file error", includeFile);
             return false;
         }
     
@@ -1564,7 +1565,7 @@ class CodeAnalyse {
             _filename = __dirname + "/../data/" + findIncludeFile;
             if(!fs.existsSync(_filename)) {
                 //未找到头文件
-                console.log("find real include file error", includeFile, _filename);
+                logger.debug("find real include file error", includeFile, _filename);
                 return false;
             }
         }
@@ -1588,12 +1589,12 @@ class CodeAnalyse {
     //获取文档结构
     _getDocumentTree = function(filename, filecontext) {
         let analyse = new AnalyseTree.Analyse(filecontext, filename);
-        console.time("Analyse");
+        logger.mark("Analyse");
         analyse.doAnalyse();
-        console.timeEnd("Analyse");
-        console.time("getDocumentStruct");
+        logger.mark("Analyse");
+        logger.mark("getDocumentStruct");
         showTree = analyse.getDocumentStruct();
-        console.timeEnd("getDocumentStruct");
+        logger.mark("getDocumentStruct");
         if(showTree
             && showTree["name"] == "" 
             && showTree["child"].length == 0
@@ -1633,11 +1634,11 @@ class CodeAnalyse {
             filename: filepath,
             dbpath: this.dbpath
         }
-        console.log("_diagnostics", JSON.stringify(parasms));
+        logger.debug("_diagnostics", JSON.stringify(parasms));
         worker.send(parasms);
         worker.on('message', (data) => {
             if(data.type == "result") {
-                console.log(data.data);
+                logger.debug(data.data);
                 //其他函数
                 diagnosticscallback(data.data);
                 worker.kill();
@@ -1787,7 +1788,7 @@ class CodeAnalyse {
         let endclos = begincols + valetype.length;
         let df = new Definition(this.basedir, this.extPath);
         let _filename = df.getFileInfoByFullName(filepath);
-        console.info("_filename:", _filename);
+        logger.info("_filename:", _filename);
         let result = {
             filename: _filename,
             bline: beginlines,
@@ -1989,7 +1990,7 @@ class CodeAnalyse {
             if (cachesfunctiondef['length'] == filecontext.length
                 && cachesfunctiondef['filename'] == filepath) {
                 //找到cache，直接用
-                console.log("use cache info");
+                logger.debug("use cache info");
                 let fundef = cachesfunctiondef.fundef;
                 //获取参数个数
                 let countmap = this._getCharCountInStr(laststr, 0, new Set([',']));
@@ -2021,9 +2022,9 @@ class CodeAnalyse {
         let usingnamespace = this._getUsingNamespace(lines, filepath, owns);
         //先找到最后一行的变量名称
         let lastline = lines[lines.length - 1];
-        console.time("_getValName");
+        logger.mark("_getValName");
         let names = this._getValName(lastline);
-        console.timeEnd("_getValName");
+        logger.mark("_getValName");
         let info = null;
         if(names.length == 0) {
             //有可能是静态函数，或者命名空间下的全局函数
@@ -2051,26 +2052,26 @@ class CodeAnalyse {
             
             //弹出最顶的，用来找定义
             let name = names.pop();
-            console.time("_getValDefineOwn");
+            logger.mark("_getValDefineOwn");
             let _valetype = this._getValDefineOwn(lines, name.n);
-            console.timeEnd("_getValDefineOwn");
+            logger.mark("_getValDefineOwn");
 
             if(_valetype.t == "") {
                 //未找到变量类型，可能是函数或者宏定义
                 let ownname = this._getPosOwner(data);
                 info = completion._GetFunctionDefineByOwnAndName(name.n, ownname, usingnamespace);
             } else {
-                console.time("_GetFunctionDefine");
+                logger.mark("_GetFunctionDefine");
                 info = completion._GetFunctionDefine(names, _valetype.t, usingnamespace);
-                console.timeEnd("_GetFunctionDefine");
+                logger.mark("_GetFunctionDefine");
             }
         }
         if (!info) {
             return false;
         }
-        console.time("_getSignatureHelp");
+        logger.mark("_getSignatureHelp");
         let result = completion._getSignatureHelp(filepath, info);
-        console.timeEnd("_getSignatureHelp");
+        logger.mark("_getSignatureHelp");
         if(result != false) {
             //加入缓存
             //保存缓存
@@ -2142,7 +2143,7 @@ class CodeAnalyse {
             intervaltime: 180000,
             maketools: 0
         }
-        console.log(JSON.stringify(parasms));
+        logger.debug(JSON.stringify(parasms));
         const path = require('path');
         let basedir = __dirname;
         basedir = path.resolve(basedir, '../');
@@ -2158,7 +2159,7 @@ class CodeAnalyse {
                 worker.kill();
             }
             if(data == "update") {
-                console.log("need update");
+                logger.debug("need update");
                 updatecallback("update");
             }
         });
@@ -2181,16 +2182,16 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("getAllNameByObj file type not match!");
+                logger.debug("getAllNameByObj file type not match!");
                 return [];
             }
             //test
-            console.time("_getAllNameByObj");
+            logger.mark("_getAllNameByObj");
             let result = this._getAllNameByObj(filepath, filecontext, owns);
-            console.timeEnd("_getAllNameByObj");
+            logger.mark("_getAllNameByObj");
             return result;
         } catch (error) {
-            console.log("call getAllNameByObj faild!", error);
+            logger.debug("call getAllNameByObj faild!", error);
             return [];
         }
     };
@@ -2210,12 +2211,12 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("getAllNameByNamespace file type not match!");
+                logger.debug("getAllNameByNamespace file type not match!");
                 return [];
             }
             return this._getAllNameByNamespace(filepath, filecontext, owns);
         } catch (error) {
-            console.log("call getAllNameByObj faild!", error);
+            logger.debug("call getAllNameByObj faild!", error);
             return [];
         }
     };
@@ -2230,7 +2231,7 @@ class CodeAnalyse {
             }
             return this._getShowTips(filepath, data);
         } catch (error) {
-            console.log("call _getShowTips faild!", error);
+            logger.debug("call _getShowTips faild!", error);
             return false;
         }
     }
@@ -2251,12 +2252,12 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("searchKeyWord file type not match!");
+                logger.debug("searchKeyWord file type not match!");
                 return [];
             }
             return this._searchKeyWord(filepath, prekeyworld, filecontext, owns);
         } catch (error) {
-            console.log("call _searchKeyWord faild!", error);
+            logger.debug("call _searchKeyWord faild!", error);
             return [];
         }
     };
@@ -2273,13 +2274,13 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".proto", ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("reloadOneIncludeFile this file not include.");
+                logger.debug("reloadOneIncludeFile this file not include.");
                 callback("error");
                 return;
             }
             return this._reloadOneIncludeFile(filepath, callback);
         } catch (error) {
-            console.log("call _reloadOneIncludeFile faild!", error);
+            logger.debug("call _reloadOneIncludeFile faild!", error);
             return;
         }
     };
@@ -2297,7 +2298,7 @@ class CodeAnalyse {
             }
             return this._reloadBatchIncludeFile(filepaths, callback);
         } catch (error) {
-            console.log("call _reloadOneIncludeFile faild!", error);
+            logger.debug("call _reloadOneIncludeFile faild!", error);
         }
         return true;
     };
@@ -2307,21 +2308,21 @@ class CodeAnalyse {
         try {
             if (!this.isinit || this.loadindex) {
                 //索引加载中，功能暂时不可用
-                console.log("索引加载中，功能暂时不可用");
+                logger.debug("索引加载中，功能暂时不可用");
                 return;
             }
             let that = this;
             function initSystemIncludeOver(){
                 //加载工程头文件
-                console.info("begin _reloadAllIncludeFile!");
+                logger.info("begin _reloadAllIncludeFile!");
                 //初始化db
                 return that._reloadAllIncludeFile(callback);
             }
             //初始化系统头文件库
-            console.info("begin _initSystemIncludeIndex!");
+            logger.info("begin _initSystemIncludeIndex!");
             this._initSystemIncludeIndex(initSystemIncludeOver);
         } catch (error) {
-            console.log("call _reloadOneIncludeFile faild!", error);
+            logger.debug("call _reloadOneIncludeFile faild!", error);
         }
     };
 
@@ -2343,11 +2344,11 @@ class CodeAnalyse {
                 callback("fileerror", filepath, [], []);
                 return;
             }
-            console.log("dddd", this.isinit, this.loadindex);
+            logger.debug("dddd", this.isinit, this.loadindex);
             return that._getDependentByCpp(filepath, callback);
         } catch (error) {
             callback("error", filepath, [], []);
-            console.log("call getDependentByCpp faild!", error);
+            logger.debug("call getDependentByCpp faild!", error);
             return;
         }
     };
@@ -2367,12 +2368,12 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("getDefinePoint file type not match!");
+                logger.debug("getDefinePoint file type not match!");
                 return false;
             }
             return this._getDefinePoint(filepath, filecontext, linelast, owns);
         } catch (error) {
-            console.log("call getDefinePoint faild!", error);
+            logger.debug("call getDefinePoint faild!", error);
             return false;
         }
     };
@@ -2390,12 +2391,12 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
             if (!includeExt.has(fileExt)) {
-                console.log("getIncludeDefine file type not match!");
+                logger.debug("getIncludeDefine file type not match!");
                 return false;
             }
             return this._getIncludeDefine(sourceFile, includeFile, filename);
         } catch (error) {
-            console.log("call getDefinePoint faild!", error);
+            logger.debug("call getDefinePoint faild!", error);
             return false;
         }
     };
@@ -2415,12 +2416,12 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("getSignatureHelp file type not match!");
+                logger.debug("getSignatureHelp file type not match!");
                 return false;
             }
             return this._getSignatureHelp(filepath, filecontext, owns);
         } catch (error) {
-            console.log("call getSignatureHelp faild!", error);
+            logger.debug("call getSignatureHelp faild!", error);
             return [];
         }
     };
@@ -2437,12 +2438,12 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ""]); 
             if (!includeExt.has(fileExt)) {
-                console.log("getDocumentTree file type not match!");
+                logger.debug("getDocumentTree file type not match!");
                 return false;
             }
             return this._getDocumentTree(filepath, filecontext);
         } catch (error) {
-            console.log("call getDefinePoint faild!", error);
+            logger.debug("call getDefinePoint faild!", error);
             return false;
         }
     };
@@ -2460,16 +2461,16 @@ class CodeAnalyse {
             let fileExt = filepath.substring(pos);
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
             if (!includeExt.has(fileExt)) {
-                console.log("autoFillParams file type not match!");
+                logger.debug("autoFillParams file type not match!");
                 return [];
             }
             //test
-            console.time("_getAllNameByObj");
+            logger.mark("_getAllNameByObj");
             let result = this._autoFillParams(filepath, filecontext, preParams);
-            console.timeEnd("_getAllNameByObj");
+            logger.mark("_getAllNameByObj");
             return result;
         } catch (error) {
-            console.log("call getAllNameByObj faild!", error);
+            logger.debug("call getAllNameByObj faild!", error);
             return [];
         }  
     };
@@ -2479,11 +2480,11 @@ class CodeAnalyse {
         try {
             this._updateCheck(updatecallback);
         } catch (error) {
-            console.log("call updateCheck faild!", error);
+            logger.debug("call updateCheck faild!", error);
         }
     };
 
-    //进行语法检查
+    //进行语法检查 -- 废弃
     diagnostics = function(filepath, filecontext, diagnosticscallback) {
         try {
             if (!this.isinit) {
@@ -2495,12 +2496,12 @@ class CodeAnalyse {
             let fileExt = fileinfo.ext;
             let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]); 
             if (!includeExt.has(fileExt)) {
-                console.log("diagnostics file type not match!");
+                logger.debug("diagnostics file type not match!");
                 return false;
             }
             return this._diagnostics(filepath, filecontext, diagnosticscallback);
         } catch (error) {
-            console.log("call getDefinePoint faild!", error);
+            logger.debug("call getDefinePoint faild!", error);
             return false;
         }
     };

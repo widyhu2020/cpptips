@@ -12,6 +12,7 @@ const FileIndexStore = require('../store/store').FileIndexStore;
 const Completion = require('../completion/completion').Completion;
 const fs = require('fs');
 const path = require('path');
+const logger = require('log4js').getLogger("cpptips");
 
 class AutoFillParam extends Completion{
 	constructor() {
@@ -48,7 +49,7 @@ class AutoFillParam extends Completion{
 		}
 
 		let nameMap = this._getAllVarDefine(objName, this.filecontext, namespaces);
-		console.log(JSON.stringify(nameMap));
+		logger.debug(JSON.stringify(nameMap));
 		let selectList = [];
 		for(let i = 0; i < paramsType.length; i++) {
 			let type = paramsType[i].t;
@@ -125,7 +126,7 @@ class AutoFillParam extends Completion{
 			typeMap = this._getObjectFunction(typeMap, false, name, type, namespaces, 0);
 		}
 
-		//console.log(JSON.stringify(typeMap));
+		//logger.debug(JSON.stringify(typeMap));
 		return typeMap;
 	};
 
@@ -175,12 +176,12 @@ class AutoFillParam extends Completion{
 			return codes;
 		}
 		if(ownname == "") {
-			console.log(ownname, preown, type);
+			logger.debug(ownname, preown, type);
 			return codes;
 		}
-		console.time("getByOwnNameAndNs");
+		logger.mark("getByOwnNameAndNs");
 		let functions = keydb.getByOwnNameAndNs(ownname, usenamespace);
-		console.timeEnd("getByOwnNameAndNs");
+		logger.mark("getByOwnNameAndNs");
 		for(let i = 0; i < functions.length; i++) {
 			let func = functions[i];
 			if(!func.extdata || func.extdata.length <= 0) {
@@ -196,7 +197,7 @@ class AutoFillParam extends Completion{
 
 			let _displayDegree = this.similar(this.cleanProtobufWord(funcname), this.cleanProtobufWord(this.paramsName.toLowerCase()));
 			let _funcisplayDegree = this.similar(this.cleanProtobufWord(funcname), this.cleanProtobufWord(this.functionName.toLowerCase()));
-			console.log(funcname, this.paramsName, this.functionName, "相似度：", _displayDegree, _funcisplayDegree);
+			logger.debug(funcname, this.paramsName, this.functionName, "相似度：", _displayDegree, _funcisplayDegree);
 			if(_funcisplayDegree > _displayDegree ) {
 				//使用匹配度高的
 				_displayDegree = _funcisplayDegree;
@@ -207,7 +208,7 @@ class AutoFillParam extends Completion{
 			for(let j = 0; j < extJson.length; j++) {
 				let funcparams = extJson[j];
 				let type = funcparams.r.t;
-				if(_displayDegree < 700 
+				if(_displayDegree < 500 
 					&& (sampleType.has(type) || type == "string" || type == "std::string" )){
 					//显示度小于指定值的全部忽略
 					continue;

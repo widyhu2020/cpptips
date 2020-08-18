@@ -6,6 +6,7 @@
  *
  * ------------------------------------------------------------------------------------------ */
 var Tree = require('./tree');
+var logger = require('log4js').getLogger("cpptips");
 //分析所需要的关键字,不是c++全部关键字
 var keywork = new Set([
     '#define', 'if', 'for', 'int', 'int32_t', 'int64_t', '#include',
@@ -44,7 +45,7 @@ var AnalyseBase = /** @class */ (function () {
             this.savepublic = savepublic;
             var fileinfo = filedb.getFileByFilePath(this.filename);
             if (!fileinfo || fileinfo === undefined) {
-                console.log("not find file index!", this.filename);
+                logger.debug("not find file index!", this.filename);
                 return false;
             }
             var fileid = fileinfo.id;
@@ -86,7 +87,7 @@ var AnalyseBase = /** @class */ (function () {
             }
             //加入到其子类中
             currentNode.child.push(result);
-            //console.log(nameMap);
+            //logger.debug(nameMap);
             return nameMap;
         };
         //获取文档结构
@@ -101,14 +102,14 @@ var AnalyseBase = /** @class */ (function () {
                     //无需处理
                     return;
                 }
-                //console.log(result);
+                //logger.debug(result);
                 var data = Object.values(result);
                 for (var i = 0; i < data.length; i++) {
                     nameMap = _this.makeDefineTree(nameMap, data[i]);
                 }
             });
             var retData = JSON.stringify(nameMap);
-            //console.log(retData);
+            //logger.debug(retData);
             return nameMap;
         };
         //获取函数位置信息
@@ -268,7 +269,7 @@ var AnalyseBase = /** @class */ (function () {
                 //如果没有任何数据，直接返回false
                 return false;
             }
-            //console.log(retResult);
+            //logger.debug(retResult);
             return retResult;
         };
         //
@@ -399,7 +400,7 @@ var AnalyseBase = /** @class */ (function () {
             });
             //获取db中的数据
             var infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos.length > 1) {
                 //两个以上定义，理论上是有异常的
                 return false;
@@ -458,7 +459,7 @@ var AnalyseBase = /** @class */ (function () {
                 file_id: fileid,
                 extdata: JSON.stringify(varb)
             };
-            //console.log(saveData);
+            //logger.debug(saveData);
             this.keyworddb.insert(saveData);
             var key = this._getKey(namespace, samplename, e.name);
             mapName[key] = saveData;
@@ -564,7 +565,7 @@ var AnalyseBase = /** @class */ (function () {
                 //确定不保存私有和保护方法的情况下不保存_开头的方法
                 return;
             }
-            //console.log(samplename + "|" + inherits + "|" + template + "|" + namespace + "|" + gtype + "|" + fileid);
+            //logger.debug(samplename + "|" + inherits + "|" + template + "|" + namespace + "|" + gtype + "|" + fileid);
             if (samplename != "" && samplename != "__global__") {
                 var data = {
                     "i": inherits,
@@ -579,7 +580,7 @@ var AnalyseBase = /** @class */ (function () {
                     file_id: fileid,
                     extdata: JSON.stringify(data)
                 };
-                //console.log(saveData);
+                //logger.debug(saveData);
                 this.keyworddb.insert(saveData);
                 var key = this._getKey(namespace, '', samplename);
                 mapName[key] = saveData;
@@ -667,7 +668,7 @@ var AnalyseBase = /** @class */ (function () {
             mergedName = Object.assign(mergedName, gname);
             //方法
             metchod.forEach(function (e) {
-                //console.log(e.name);
+                //logger.debug(e.name);
                 if (e.name.indexOf("::") == -1) {
                     var methedName = _this._saveMethod(e, samplename, namespace, fileid);
                     mergedName = Object.assign(mergedName, methedName);
@@ -732,7 +733,7 @@ var AnalyseBase = /** @class */ (function () {
                 var vals = _keys[i].split("|");
                 this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
             }
-            //console.log("resave over!");
+            //logger.debug("resave over!");
         };
         //拼接key，拼接的key用于构造返回数据
         this._getKey = function (namespace, ownname, samplename, other) {

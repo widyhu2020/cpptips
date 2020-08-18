@@ -1,10 +1,16 @@
-import { Uri, ViewColumn, window, ExtensionContext, workspace } from 'vscode';
+import { Uri, ViewColumn, window, ExtensionContext, workspace, ConfigurationTarget } from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LanguageClient, MessageActionItem } from 'vscode-languageclient';
+import { clearInterval } from 'timers';
+import { configure, getLogger } from "log4js";
+const logger = getLogger("cpptips");
 
+var cookite = "";
 let projectPath = workspace.rootPath;
+
 let setPath = projectPath + "/.vscode/settings.json";
+
 /**
  * 获取某个扩展文件相对于webview需要的一种特殊路径格式
  * 形如：vscode-resource:/Users/toonces/projects/vscode-cat-coding/media/cat.gif
@@ -29,22 +35,8 @@ function getWebViewContent(context, templatePath) {
     html = html.replace(/(<link.+?href="|<script.+?src="|<img.+?src=")(.+?)"/g, (m, $1, $2) => {
         return $1 + Uri.file(path.resolve(dirPath, $2)).with({ scheme: 'vscode-resource' }).toString() + '"';
 	});
-	// console.log(html);
+	// logger.debug(html);
     return html;
-}
-
-export function showGetContainer(context: ExtensionContext, client:LanguageClient){
-	//测试获取容器
-	const panel = window.createWebviewPanel(
-		'indexWebview1', // viewType
-		"配置分析索引目录", // 视图标题
-		ViewColumn.One, // 显示在编辑器的哪个部位
-		{
-			enableScripts: true, // 启用JS，默认禁用
-			retainContextWhenHidden: true, // webview被隐藏时保持状态，避免被重置
-		}
-	);
-	panel.webview.html = getWebViewContent(context, 'webview/getdocker.html');
 }
 
 export function showIndexConfig(context: ExtensionContext, client:LanguageClient){
@@ -92,44 +84,50 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 			let basePath = projectPath + "/" + message.path;
 			let config = this.getConfig();
 			let dirname = this.getTreeNode(basePath, config, 0);
-			// console.log(dirname);
 			invokeCallback(global.panel, message, dirname);
+		},
+		ignoreFileAndDir(global, message){
+			let configuration = workspace.getConfiguration();
+			let config = configuration["cpptips"];
+			logger.debug(config);
+			invokeCallback(global.panel, message, config['ignoreFileAndDir']);
+		},
+		addIgnoreRegx(global, message){
+			let configuration = workspace.getConfiguration();
+			let config = configuration["cpptips"];
+			config['ignoreFileAndDir'].push(message.path);
+			logger.debug(config);
+			if(workspace.getConfiguration().update('cpptips.ignoreFileAndDir', config['ignoreFileAndDir'], ConfigurationTarget.Workspace)){
+				invokeCallback(global.panel, message, "success");
+			} else {
+				invokeCallback(global.panel, message, "faild");
+			}
+		},
+		removeIgnoreRegx(global, message){
+			let configuration = workspace.getConfiguration();
+			let config = configuration["cpptips"]['ignoreFileAndDir'];
+			let newConfig = [];
+			for(let i = 0; i < config.length; i++){
+				if(config[i] != message.path){
+					newConfig.push(config[i]);
+				}
+			}
+			logger.debug(config);
+			if(workspace.getConfiguration().update('cpptips.ignoreFileAndDir', newConfig, ConfigurationTarget.Workspace)){
+				invokeCallback(global.panel, message, "success");
+			} else {
+				invokeCallback(global.panel, message, "faild");
+			}
 		},
 		getConfig(){
 			//获取目录名称
-			let seting:any = {};
-			if(fs.existsSync(setPath)){
-				let fd = fs.openSync(setPath, 'r');
-				const buffer = Buffer.alloc(1024 * 1024 * 2);
-				let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, null);
-				fs.closeSync(fd);
-				let filecontext = buffer.toString('utf8', 0, bytesRead);
-				seting = JSON.parse(filecontext);
-			}
-			if(!seting['cpptips.needLoadDir']){
-				//无配置
-				return [];
-			}
-			let needLoadDir = seting['cpptips.needLoadDir'];
-			console.log(seting, needLoadDir);
-			console.log(needLoadDir);
+			let configuration = workspace.getConfiguration();
+			let needLoadDir = configuration['cpptips']['needLoadDir'];
+			logger.debug("needLoadDir:" , needLoadDir);
 			return needLoadDir;
 		},
 		saveConfig(needLoadDir){
-			let seting:any = {};
-			if(fs.existsSync(setPath)){
-				let fd = fs.openSync(setPath, 'r');
-				const buffer = Buffer.alloc(1024 * 1024 * 2);
-				let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024 * 2, null);
-				fs.closeSync(fd);
-				let filecontext = buffer.toString('utf8', 0, bytesRead);
-				seting = JSON.parse(filecontext);
-			}
-			seting['cpptips.needLoadDir'] = needLoadDir;
-			//保存配置文件
-			let newSetting = JSON.stringify(seting);
-			console.log("newsetting:", newSetting);
-			fs.writeFileSync(setPath, newSetting, {encoding: "utf8"});
+			workspace.getConfiguration().update('cpptips.needLoadDir', needLoadDir, ConfigurationTarget.Workspace)
 		},
 		checkIsInConfig(config, dirname){
 			for(let i = 0; i < config.length; i++){
@@ -148,7 +146,7 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 			// 这个data数组中装的是当前文件夹下所有的文件名(包括文件夹)
 			var that = this;
 			let dirname = [];
-			console.log(dirf);
+			logger.debug(dirf);
 			dirf.forEach(function (el, _index) {
 				let fullpath = basePath + path.sep + el.name;
 				if(/[.]{1,1}.*/.test(el.name) || !el.isDirectory()){
@@ -157,7 +155,6 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 				}
 				let check = false;
 				let relativePath = fullpath.replace(projectPath + "/", "") + "/";
-				// console.log("xxxx", relativePath);
 				if(that.checkIsInConfig(config, relativePath)){
 					check = true;
 				}
@@ -166,7 +163,7 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 					'state': { "opened" : false, "checked":check },
 					'children':[]
 				}
-				// console.log("xxxx", node);
+				// logger.debug("xxxx", node);
 				node['children'] = that.getTreeNode(fullpath, config, depth + 1);
 				dirname.push(node);
 			});
@@ -187,11 +184,11 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 			});
 		},
 		saveIndexConfig(global, message){
-			console.log(message);
+			logger.debug(message);
 			let indexConfig = message.config;
-			console.log("_newIndexConfig:",indexConfig);
+			logger.debug("_newIndexConfig:",indexConfig);
 			this.saveConfig(indexConfig);
-			console.log("save config.");
+			logger.debug("save config.");
 			this.showTipMessage("配置已经保存成功，请问你现在是否需要增量创建索引（索引分析不能并行，如果当前索引分析中，你可以重启来生效）！", 
 				["重建索引", "不需要拉"], (selection:string)=>{
 				if(selection == "重建索引") {
@@ -199,7 +196,7 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 					//重新加载配置
 					client.sendNotification("reflushAllIdex", {});
 				}
-				console.log("close webview.");
+				logger.debug("close webview.");
 				//关掉网页配置
 				global.panel.dispose();
 			});
@@ -215,7 +212,7 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 	 * @param {*} resp 
 	 */
 	function invokeCallback(panel, message, resp) {
-		console.log('回调消息：', resp);
+		logger.debug('回调消息：', resp);
 		// 错误码在400-600之间的，默认弹出错误提示
 		if (typeof resp == 'object' && resp.code && resp.code >= 400 && resp.code < 600) {
 			window.showErrorMessage(resp.message || '发生未知错误！');

@@ -22,6 +22,7 @@ var MateData = require('./tree_node');
 var Tree = require('./tree');
 var AnalyseBase = require('../analyse/analyseBase').AnalyseBase;
 var TypeEnum = require('../analyse/analyseBase').TypeEnum;
+var logger = require('log4js').getLogger("cpptips");
 var AnalyseProtobuf = /** @class */ (function (_super) {
     __extends(AnalyseProtobuf, _super);
     function AnalyseProtobuf(filecontext, filename) {
@@ -31,35 +32,35 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         _this.doAnalyse = function () {
             var _this = this;
             //文档处理
-            //console.time("splitContext")
+            //logger.mark("splitContext")
             var lines = this._splitContextProto();
-            //console.timeEnd("splitContext");
-            //console.log(lines);
+            //logger.mark("splitContext");
+            //logger.debug(lines);
             this._preProcessProto(lines);
             //分析作用域
-            //console.time("analyseDomain")
+            //logger.mark("analyseDomain")
             this._analyseDomainProto(lines);
-            //console.timeEnd("analyseDomain");
+            //logger.mark("analyseDomain");
             //构建命名空间
-            //console.time("makeNamespace")
+            //logger.mark("makeNamespace")
             this._makeNamespaceProto();
-            //console.timeEnd("makeNamespace");
+            //logger.mark("makeNamespace");
             //遍历树其他代码快分析函数
-            //console.time("analyseCodeBlock")
+            //logger.mark("analyseCodeBlock")
             this.tree.traverseBF(function (current) {
                 for (var i = 0; i < current.data.length; i++) {
                     _this._analyseCodeBlockProtoFunction(current, lines, current.data[i]);
                 }
             });
-            //console.timeEnd("analyseCodeBlock");
+            //logger.mark("analyseCodeBlock");
             //遍历树其他代码快分析枚举
-            //console.time("analyseCodeBlock")
+            //logger.mark("analyseCodeBlock")
             this.tree.traverseBF(function (current) {
                 for (var i = 0; i < current.data.length; i++) {
                     _this._analyseCodeBlockProtoEnum(current, lines, current.data[i]);
                 }
             });
-            //console.timeEnd("analyseCodeBlock");
+            //logger.mark("analyseCodeBlock");
         };
         //预处理-分析作用域
         _this._preProcessProto = function (lines) {
@@ -76,7 +77,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     continue;
                 }
                 //将数据挂载到当前作用域下
-                //console.log(i);
+                //logger.debug(i);
                 this.tree.addDataToNode(this.point_domain, i);
                 //this.block.push(this.context[i]);
             }
@@ -104,9 +105,9 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             //格式化空格，多个全部转化为1个
             filecontext = filecontext.replace(/([\s\n\t\r]+)/g, function (kw) {
                 var datalenth = kw.trim();
-                //console.log("|"+kw+"|");
+                //logger.debug("|"+kw+"|");
                 if (datalenth.length > 0) {
-                    //console.log("|" + kw + "|");
+                    //logger.debug("|" + kw + "|");
                     return datalenth;
                 }
                 return " ";
@@ -128,7 +129,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             }
             if (namespace == "") {
                 //没有命名空间，表示定义不正确
-                //console.log("proto context error!", this.filename);
+                //logger.debug("proto context error!", this.filename);
                 //return false;
             }
             this.basenamespace = namespace;
@@ -137,7 +138,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 var find_context = "";
                 if (current.domain_level > 0) {
                     find_context = lines[current.domain_level - 1];
-                    //console.log("find context:" + find_context);
+                    //logger.debug("find context:" + find_context);
                 }
                 var domain_name = find_context;
                 var pos = find_context.lastIndexOf(';');
@@ -178,7 +179,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     var inherits = [{ 'p': 0, 'n': "google::protobuf::Message" }];
                     var realLine = "class " + items[i + 1] + " : public google::protobuf::Message";
                     var data = new MateData.BaseData(items[i + 1], TypeEnum.CALSS, realLine, inherits);
-                    //console.log(data);
+                    //logger.debug(data);
                     Tree.setType(treeNode, data);
                     return;
                 }
@@ -186,7 +187,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     //枚举定义
                     var realLine = "enum " + items[i + 1];
                     var data = new MateData.BaseData(items[i + 1], TypeEnum.ENUM, realLine);
-                    //console.log(data);
+                    //logger.debug(data);
                     Tree.setType(treeNode, data);
                     return;
                 }
@@ -208,7 +209,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 if (current.ownname == null) {
                     //子没有产生命名空间，则为父亲的命名空间
                     current.namespace = parentnamespace;
-                    //console.log(current.namespace);
+                    //logger.debug(current.namespace);
                     return;
                 }
                 if (parentnamespace != "") {
@@ -221,11 +222,11 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     else {
                         current.namespace = parentnamespace; // + "::" + current.ownname.name;
                     }
-                    //console.log(current.namespace);
+                    //logger.debug(current.namespace);
                 }
                 else {
                     current.namespace = current.ownname.name;
-                    //console.log(current.namespace);
+                    //logger.debug(current.namespace);
                 }
             });
         };
@@ -268,7 +269,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     for (; k < items.length; k++) {
                         if (prekeywords.has(items[k])) {
                             //可能没有注释，结束
-                            //console.log("ddd", items[k], items, k);
+                            //logger.debug("ddd", items[k], items, k);
                             break;
                         }
                         if (items[k] == ';') {
@@ -369,23 +370,23 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         };
         //单个字段分析
         _this._analyseFildProto = function (node, prename, type, name, annotate) {
-            //console.log(prename, type, name, annotate);
+            //logger.debug(prename, type, name, annotate);
             //protobuf生产的方法，会将大些转成小写
             //获取父区域的名称
             if (node.parent
                 && node.parent.ownname) {
                 var _name = node.parent.ownname.name;
                 var _key = node.ownname.name + "_" + type;
-                //console.log("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
+                //logger.debug("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
                 if (this.innerNameMap[_key]) {
                     type = _key;
-                    //console.log("ddddddddd",type);
+                    //logger.debug("ddddddddd",type);
                 }
             }
             name = name.toLowerCase();
             //非数组处理
             if (prename == "optional" || prename == "required") {
-                //console.log(prename, type, name, annotate);
+                //logger.debug(prename, type, name, annotate);
                 this._analyseFildNormal(node, type, name, annotate);
                 return;
             }
@@ -797,7 +798,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             //         continue;
             //     }
             //     if (node.children[i].ownname.name == prototype) {
-            //         console.log("dfdfdfd",node.children[i].ownname.name , prototype, node.children[i].namespace);
+            //         logger.debug("dfdfdfd",node.children[i].ownname.name , prototype, node.children[i].namespace);
             //         return node.children[i].namespace;
             //     }
             // }

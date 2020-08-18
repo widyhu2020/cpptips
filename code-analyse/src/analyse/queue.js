@@ -5,7 +5,7 @@
  *      Author: widyhu
  * 
  * ------------------------------------------------------------------------------------------ */
-
+const logger = require('log4js').getLogger("cpptips");
 module.exports = class Queue {
     constructor(items) {
         this.items = items || [];
@@ -35,6 +35,6 @@ module.exports = class Queue {
         return !this.items.length;
     }
     print() {
-        console.log(this.items.toString());
+        logger.debug(this.items.toString());
     }
 };

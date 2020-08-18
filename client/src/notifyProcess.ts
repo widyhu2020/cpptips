@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup} from 'vscode';
+import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup, languages, DiagnosticCollection, Diagnostic} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -9,7 +9,10 @@ import {
     VersionedTextDocumentIdentifier
 } from 'vscode-languageclient';
 import { showIndexConfig } from './IndexConfig';
-import { buildToBeta, build } from './buildProcess';
+import { configure, getLogger } from "log4js";
+import { reflushErrorMsg } from './buildProcess';
+import { pathToFileURL } from 'url';
+const logger = getLogger("cpptips");
 
 let myStatusBarItem: StatusBarItem;
 let showUpdataBarItem: StatusBarItem;
@@ -28,6 +31,9 @@ export function initStatusBar(){
 }
 
 export function notifyProcess(context:ExtensionContext, client: LanguageClient) {
+    //初始化diagnosic
+    let diagnosic:DiagnosticCollection = languages.createDiagnosticCollection("cpp");
+
     client.onNotification("show_include_process", (data: Array<number>) => {
         myStatusBarItem.show();
         myStatusBarItem.color = showColor;
@@ -121,7 +127,7 @@ export function notifyProcess(context:ExtensionContext, client: LanguageClient) 
 
     //打开指定路径的文件
     client.onNotification("open_file", (message: Array<string>) => {
-        console.log("open_file", message);
+        logger.debug("open_file", message);
         if (message.length < 1) {
             //无效通知
             return;
@@ -144,5 +150,18 @@ export function notifyProcess(context:ExtensionContext, client: LanguageClient) 
             }
             window.showTextDocument(doc, options);
         });
+    });
+
+    client.onNotification("reflushError", (message:Array<string>)=>{
+        logger.debug("open_file", message);
+        if(message.length <= 1) {
+            return;
+        }
+        let sourceUri:Uri = Uri.file(message[0]);
+        let _diagnosic:Diagnostic[] = JSON.parse(message[1]);
+        diagnosic.delete(sourceUri);
+        if(_diagnosic.length > 0) {
+            diagnosic.set(sourceUri, _diagnosic);
+        }
     });
 }

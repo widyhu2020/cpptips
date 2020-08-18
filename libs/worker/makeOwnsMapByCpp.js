@@ -13,6 +13,7 @@ var crypto = require('crypto');
 var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var cluster = require('cluster');
+var logger = require('log4js').getLogger("cpptips");
 var MakeOwnsMapByCpp = /** @class */ (function () {
     function MakeOwnsMapByCpp(basedir, dbpath, sysdir) {
         //目录匹配
@@ -53,7 +54,7 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             }
             if (this.fileNameMap[filename]) {
                 var listRealName = this.fileNameMap[filename];
-                //console.log("listRealName", listRealName);
+                //logger.debug("listRealName", listRealName);
                 //找后缀匹配的全部头文件
                 var retInclude = listRealName.length > 0 ? listRealName[0] : '';
                 var gSameProportion = 0;
@@ -71,12 +72,12 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
                     }
                 }
                 if (retInclude != '') {
-                    //console.log("return path:",retInclude);
+                    //logger.debug("return path:",retInclude);
                     return retInclude;
                 }
                 return inputfilename;
             }
-            //console.log("return source failename:", inputfilename, filename);
+            //logger.debug("return source failename:", inputfilename, filename);
             return inputfilename;
         };
         //获取cpp文件头文件依赖
@@ -215,7 +216,7 @@ if (cluster.isMaster) {
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
-        //console.log(data);
+        //logger.debug(data);
         //关闭子进程
         worker_1.kill();
     });
@@ -224,7 +225,7 @@ else if (cluster.isWorker) {
     process.on('message', function (parasms) {
         try {
             //子线程
-            console.log(parasms.basedir, parasms.dbpath, parasms.cppfilename);
+            logger.debug(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
             console.time("makeSearchTreeByCpp");
             var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
@@ -239,19 +240,19 @@ else if (cluster.isWorker) {
             console.timeEnd("postMessage");
         }
         catch (err) {
-            console.log(err);
+            logger.debug(err);
             process.kill(process.pid);
         }
     });
     process.on('exit', function (code, signal) {
         if (signal) {
-            console.log("\u5DE5\u4F5C\u8FDB\u7A0B\u5DF2\u88AB\u4FE1\u53F7 " + signal + " \u6740\u6B7B");
+            logger.debug("\u5DE5\u4F5C\u8FDB\u7A0B\u5DF2\u88AB\u4FE1\u53F7 " + signal + " \u6740\u6B7B");
         }
         else if (code !== 0) {
-            console.log("\u5DE5\u4F5C\u8FDB\u7A0B\u9000\u51FA\uFF0C\u9000\u51FA\u7801: " + code);
+            logger.debug("\u5DE5\u4F5C\u8FDB\u7A0B\u9000\u51FA\uFF0C\u9000\u51FA\u7801: " + code);
         }
         else {
-            console.log('工作进程成功退出');
+            logger.debug('工作进程成功退出');
         }
     });
 }

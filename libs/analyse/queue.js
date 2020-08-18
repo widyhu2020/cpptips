@@ -5,6 +5,7 @@
  *      Author: widyhu
  *
  * ------------------------------------------------------------------------------------------ */
+var logger = require('log4js').getLogger("cpptips");
 module.exports = /** @class */ (function () {
     function Queue(items) {
         this.items = items || [];
@@ -42,7 +43,7 @@ module.exports = /** @class */ (function () {
         configurable: true
     });
     Queue.prototype.print = function () {
-        console.log(this.items.toString());
+        logger.debug(this.items.toString());
     };
     return Queue;
 }());
