@@ -28,7 +28,7 @@ var Traverse = /** @class */ (function () {
             for (var i = 0; i < files.length; i++) {
                 //判断是否需要忽略的文件夹
                 if (that._checkIsIgnorDir(files[0])) {
-                    console.debug("need ignor dir!", files[0]);
+                    logger.debug("need ignor dir!", files[0]);
                     continue;
                 }
                 this._judgeFileTypeAndSave(files[0]);
@@ -147,7 +147,7 @@ var Traverse = /** @class */ (function () {
                     var needStop = callback(infos[i]);
                     if (needStop) {
                         //需要退出，不再处理
-                        console.debug("need stop and exit!");
+                        logger.debug("need stop and exit!");
                         return;
                     }
                     var nowshowprocess = ((beginIndex + i) / totalNum) * 100;
@@ -287,7 +287,7 @@ var Traverse = /** @class */ (function () {
             dirf.forEach(function (el, index) {
                 if (that.needStop) {
                     //需要退出，不再处理
-                    //console.debug("need stop and exit!");
+                    //logger.debug("need stop and exit!");
                     return total;
                 }
                 // 加上父级访问更深层的文件夹
@@ -311,7 +311,7 @@ var Traverse = /** @class */ (function () {
                 //系统文件不需要分析，安装插件包里面包含
                 if (!that.isAnlyseSystemDir
                     && that._checkIsSystem(filename)) {
-                    //console.debug("system file, not analyse!");
+                    //logger.debug("system file, not analyse!");
                     return total;
                 }
                 var dataFile = null;
@@ -411,7 +411,7 @@ var Traverse = /** @class */ (function () {
                 //系统文件不需要分析，安装插件包里面包含
                 if (!that.isAnlyseSystemDir
                     && that._checkIsSystem(filename)) {
-                    //console.debug("system file, not analyse!");
+                    //logger.debug("system file, not analyse!");
                     return;
                 }
                 var dataFile = null;
@@ -452,7 +452,7 @@ var Traverse = /** @class */ (function () {
                     }
                     if (that.needStop) {
                         //需要退出，不再处理
-                        //console.debug("need stop and exit!");
+                        //logger.debug("need stop and exit!");
                         return;
                     }
                     //防止重复分析

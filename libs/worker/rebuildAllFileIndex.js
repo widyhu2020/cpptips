@@ -140,9 +140,9 @@ var RebuildFileIndex = /** @class */ (function () {
             //目录扫描器
             var tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
             //清楚已经删除了的文件
-            console.time("traverseFilesDelNotExists");
+            console.debug("traverseFilesDelNotExists");
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
-            console.timeEnd("traverseFilesDelNotExists");
+            console.debug("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
             if (totalNum > 200000) {
                 //大于200000个文件将不创建索引，强制引导指定索引目录
@@ -206,9 +206,9 @@ var RebuildFileIndex = /** @class */ (function () {
             //目录扫描器
             var tr = new Traverse.Traverse(this.basedir, this.userConfig, this.isSystemDir, __readIncludeFile, __readSourceFile);
             //清楚已经删除了的文件
-            console.time("traverseFilesDelNotExists");
+            console.debug("traverseFilesDelNotExists");
             tr.traverseFilesDelNotExists(_inDeleteNotExists);
-            console.timeEnd("traverseFilesDelNotExists");
+            console.debug("traverseFilesDelNotExists");
             totalNum = tr.getFileNumInDir(_inDirTipsShow);
             if (totalNum > 200000) {
                 //大于200000个文件将不创建索引，强制引导指定索引目录

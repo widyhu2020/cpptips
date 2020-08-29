@@ -108,7 +108,7 @@ class Traverse {
         for(let i = 0; i < files.length; i++) {
             //判断是否需要忽略的文件夹
             if(that._checkIsIgnorDir(files[0])) {
-                console.debug("need ignor dir!", files[0]);
+                logger.debug("need ignor dir!", files[0]);
                 continue;
             }
             this._judgeFileTypeAndSave(files[0]);
@@ -238,7 +238,7 @@ class Traverse {
                 let needStop = callback(infos[i]);
                 if(needStop) {
                     //需要退出，不再处理
-                    console.debug("need stop and exit!");
+                    logger.debug("need stop and exit!");
                     return;
                 }
                 let nowshowprocess = ((beginIndex + i) / totalNum) * 100;
@@ -395,7 +395,7 @@ class Traverse {
         dirf.forEach(function (el, index) {
             if(that.needStop) {
                 //需要退出，不再处理
-                //console.debug("need stop and exit!");
+                //logger.debug("need stop and exit!");
                 return total;
             }
             // 加上父级访问更深层的文件夹
@@ -420,7 +420,7 @@ class Traverse {
             //系统文件不需要分析，安装插件包里面包含
             if(!that.isAnlyseSystemDir
                 && that._checkIsSystem(filename)) {
-                //console.debug("system file, not analyse!");
+                //logger.debug("system file, not analyse!");
                 return total;
             }
 
@@ -527,7 +527,7 @@ class Traverse {
             //系统文件不需要分析，安装插件包里面包含
             if(!that.isAnlyseSystemDir
                 && that._checkIsSystem(filename)) {
-                //console.debug("system file, not analyse!");
+                //logger.debug("system file, not analyse!");
                 return;
             }
 
@@ -569,7 +569,7 @@ class Traverse {
 
                 if(that.needStop) {
                     //需要退出，不再处理
-                    //console.debug("need stop and exit!");
+                    //logger.debug("need stop and exit!");
                     return;
                 }
 

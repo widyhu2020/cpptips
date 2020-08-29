@@ -66,8 +66,7 @@ configure({
             filename: "/tmp/cpptips.server.log", 
             daysToKeep: 3, 
             pattern: '.yyyy-MM-dd'
-        },
-        server: { type: 'tcp-server', host: '0.0.0.0' }
+        }
     },
     categories: { 
         default: { appenders: ["cpptips"], level: "debug"  } 
@@ -523,6 +522,10 @@ connection.onNotification("diagnosticInfo", (infos:any)=>{
             let obj = infos[key][i];
             let start = obj['range'][0];
             let end = obj['range'][1];
+            if(start === undefined || end === undefined){
+                console.log("onNotification", infos);
+                continue;
+            }
             let _range = Range.create(start, end);
             let _diagnostics = Diagnostic.create(_range, obj['message'], obj['severity'], undefined, undefined, undefined);
             _diagnostics.code = undefined;
@@ -1268,7 +1271,7 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
 
 function updateDiagnostic(uri:string, change:TextDocumentContentChangeEvent, context:string, newContext:string){
     let _path = uriToFilePath(uri);
-    console.info(_path, diagnostic);
+    //console.info(_path, diagnostic);
     if(!change.range || !_path){
         return;
     }

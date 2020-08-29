@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { ExtensionContext, window, commands, ViewColumn, Range, env} from 'vscode';
+import { ExtensionContext, window, commands, ViewColumn, Range, env, workspace, Uri} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -12,6 +12,7 @@ import { showIndexConfig } from './IndexConfig';
 import { build, GetBuildCmd } from './buildProcess';
 import { configure, getLogger } from "log4js";
 const logger = getLogger("cpptips");
+let projectPath = workspace.rootPath;
 
 export function menuProcess(context:ExtensionContext, client:LanguageClient) {
 	context.subscriptions.push(commands.registerCommand('cpp.changeType', (uri) => {
@@ -207,5 +208,16 @@ export function menuProcess(context:ExtensionContext, client:LanguageClient) {
 	//提交编译到容器
 	context.subscriptions.push(commands.registerCommand('cpp.buildfordocker', (infos) => {
 		GetBuildCmd(context);
+	}));
+
+	//编译过程配置
+	context.subscriptions.push(commands.registerCommand('cpp.buildconfig', (infos) => {
+		let jsPath = projectPath + "/.vscode/build.js";
+		if(!fs.existsSync(jsPath)){
+			let extensionPath = context.extensionPath;
+			let _helpfile = extensionPath + "/webview/buildHelp.txt";
+			fs.copyFileSync(_helpfile, jsPath);
+		}
+		window.showTextDocument(Uri.file(jsPath));
 	}));
 }

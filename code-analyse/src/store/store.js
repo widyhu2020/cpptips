@@ -9,6 +9,7 @@
 const NativeForTestValid = require('./makeNativeModel');
 const Database = require('better-sqlite3');
 const os = require('os');
+const logger = require('log4js').getLogger("cpptips");
 
 class KeyWordStore {
     //单例方法
@@ -31,7 +32,7 @@ class KeyWordStore {
             return this;
         }
         this.dbname = dbname;
-        let options = { verbose: console.log, fileMustExist: false };
+        let options = { verbose: logger.debug, fileMustExist: false };
         if (showsql == 0) {
             options = {};
         }
@@ -59,7 +60,7 @@ class KeyWordStore {
         
         let row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
         if (row.total == 0) {
-            console.error("not find t_keyword, create table now");
+            logger.error("not find t_keyword, create table now");
             //创建表/索引
             const createtable = this.db.prepare(
                 'CREATE TABLE t_keyword(\
@@ -101,7 +102,7 @@ class KeyWordStore {
             return this._insert(data);
         }catch(erryr) {
             this.db.err
-            console.error(erryr);
+            logger.error(erryr);
             return false;
         }
     };
@@ -113,7 +114,7 @@ class KeyWordStore {
             || data['namespace'] === undefined || data['type'] === undefined 
             || data['file_id'] === undefined  || data['extdata'] === undefined 
             || data['permission'] === undefined) {
-            console.error("input data error!", data);
+            logger.error("input data error!", data);
             return false;
         }
         
@@ -121,32 +122,32 @@ class KeyWordStore {
         //查看db是否已经存在
         let info = this.getByFullnameAndType(data['ownname'], data['namespace'], data['name'], data['type']);
         if(info) {
-            //console.error("data is in db!", info);
+            //logger.error("data is in db!", info);
             //文件id不一样，则更新
             if (info.file_id != data['file_id']) {
                 if(!this.modifyFileId(info.id, data['file_id'])){
-                    console.error("file_id faild!", info.id, data['file_id']);
+                    logger.error("file_id faild!", info.id, data['file_id']);
                     return false;
                 }
             }
             //更新附加数据
             if (info.extdata != data['extdata']) {
                 if(!this.modifyExdata(info.id, data['extdata'])){
-                    console.error("modifyExdata faild!", info.id, data['extdata']);
+                    logger.error("modifyExdata faild!", info.id, data['extdata']);
                     return false;
                 }
             }
             //更新权限
             if (info.permission != data['permission']) {
                 if(!this.modifyPermission(info.id, data['permission'])){
-                    console.error("modifyPermission faild!", info.id, data['permission']);
+                    logger.error("modifyPermission faild!", info.id, data['permission']);
                     return false;
                 }
             }
             //修改类型
             if (info.type != data['type']) {
                 if(!this.modifyType(info.id, data['type'])){
-                    console.error("modifyType faild!", info.id, data['type']);
+                    logger.error("modifyType faild!", info.id, data['type']);
                     return false;
                 }
             }
@@ -157,10 +158,10 @@ class KeyWordStore {
             const stmt = this.db.prepare('INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
                 VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)');
             const info = stmt.run(data);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         } catch(error) {
-            console.log("insert faild", error);
+            logger.debug("insert faild", error);
             return false;
         }
     };
@@ -176,7 +177,7 @@ class KeyWordStore {
     modifyNamespace = function (id, namespace) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET namespace=? WHERE id=?');
         const info = stmt.run(namespace, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -184,7 +185,7 @@ class KeyWordStore {
     modifyFileId = function (id, file_id) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET file_id=? WHERE id=?');
         const info = stmt.run(file_id, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -192,7 +193,7 @@ class KeyWordStore {
     modifyExdata = function (id, extdata) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE id=?');
         const info = stmt.run(extdata, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -200,7 +201,7 @@ class KeyWordStore {
     modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?');
         const info = stmt.run(extdata, namespace, ownname, name, type);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -208,7 +209,7 @@ class KeyWordStore {
     modifyPermission = function (id, permission) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET permission=? WHERE id=?');
         const info = stmt.run(permission, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -216,7 +217,7 @@ class KeyWordStore {
     modifyType = function (id, type) {
         const stmt = this.db.prepare('UPDATE t_keyword  SET type=? WHERE id=?');
         const info = stmt.run(type, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -224,7 +225,7 @@ class KeyWordStore {
     delete = function (id) {
         const stmt = this.db.prepare('DELETE FROM t_keyword WHERE id=? LIMIT 0,1');
         const info = stmt.run(id);
-        console.log(info);
+        logger.debug(info);
         return info.changes == 1;
     };
 
@@ -237,7 +238,7 @@ class KeyWordStore {
         let sqlids = ids.join(',');
         const stmt = this.db.prepare('DELETE FROM t_keyword WHERE id IN (' + sqlids +')');
         const info = stmt.run();
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -245,7 +246,7 @@ class KeyWordStore {
     deleteByFileId = function (file_id) {
         const stmt = this.db.prepare('DELETE FROM t_keyword WHERE file_id=?');
         const info = stmt.run(file_id);
-        console.log(info);
+        logger.debug(info);
         return info.changes == 1;
     };
 
@@ -253,10 +254,10 @@ class KeyWordStore {
     getAllByFileId = function (file_id) {
         const stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
         const infos = stmt.all(file_id);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined) {
             //未查询到结果
-            console.error("not find result. namespace:", namespace);
+            logger.error("not find result. namespace:", namespace);
             return [];
         }
 
@@ -267,10 +268,10 @@ class KeyWordStore {
     findByNamespace = function(namespace) {
         const stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
         const infos = stmt.all(namespace);
-        console.log(infos);
+        logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            console.error("not find result. namespace:", namespace);
+            logger.error("not find result. namespace:", namespace);
             return [];
         }
 
@@ -308,13 +309,13 @@ class KeyWordStore {
                         AND permission IN (' + sqlpermission + ') \
                         AND type IN (' + sqltype + ')';
         
-        //console.log(sql);
+        //logger.debug(sql);
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", keyword, namepsaces);
+            //logger.error("not find result. namespace:", keyword, namepsaces);
             return [];
         }
         return infos;
@@ -360,22 +361,22 @@ class KeyWordStore {
                                     )\
                                 ) ORDER BY namelength ASC,type ASC LIMIT 0,20';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");                          
-            //console.log(sql);
+            //logger.debug(sql);
             let begintime = new Date().getTime();
             const stmt = this.db.prepare(sql);
             const infos = stmt.all();
             let endtime = new Date().getTime();
             if(endtime - begintime > 2000){
-                console.log(sql);
+                logger.debug(sql);
             }
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", keyword, namepsaces);
+                //logger.error("not find result. namespace:", keyword, namepsaces);
                 return [];
             }
             return infos;
         }catch(error) {
-            console.error("time out!", error);
+            logger.error("time out!", error);
             return [];
         }
     };
@@ -394,10 +395,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -432,14 +433,14 @@ class KeyWordStore {
                         AND type IN (' + sqltype + ') \
                         LIMIT 0,10';
 
-        //console.log(sql);
+        //logger.debug(sql);
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", keyword, namepsaces);
+            //logger.error("not find result. namespace:", keyword, namepsaces);
             return [];
         }
         return infos;
@@ -472,14 +473,14 @@ class KeyWordStore {
                         AND type IN (' + sqltype + ') \
                         LIMIT 0,10';
 
-        //console.log(sql);
+        //logger.debug(sql);
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", keyword, namepsaces);
+            //logger.error("not find result. namespace:", keyword, namepsaces);
             return [];
         }
         return infos;
@@ -500,10 +501,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all(ownname, namespace);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -522,10 +523,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -543,10 +544,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -569,10 +570,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " ");
         const stmt = this.db.prepare(sql);
         const infos = stmt.all(ownname, namespace);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -591,10 +592,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -614,10 +615,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " ");
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -634,10 +635,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all(name);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -660,10 +661,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all(ownname, namespace, name);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return [];
         }
 
@@ -681,10 +682,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all(ownname, namespace, name, type);
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return false;
         }
 
@@ -703,10 +704,10 @@ class KeyWordStore {
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
         const stmt = this.db.prepare(sql);
         const infos = stmt.all();
-        //console.log(infos);
+        //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. namespace:", ownname, namespace, name);
+            //logger.error("not find result. namespace:", ownname, namespace, name);
             return false;
         }
 
@@ -759,7 +760,7 @@ class FileIndexStore {
             return this;
         }
         this.dbname = dbname;
-        let options = { verbose: console.log, fileMustExist: false };
+        let options = { verbose: logger.debug, fileMustExist: false };
         if (showsql == 0) { 
             options = {};
         }
@@ -782,7 +783,7 @@ class FileIndexStore {
             //完成
             showprogress(0, 0);
         }).catch((err)=>{
-            console.log('backup failed:', err);
+            logger.debug('backup failed:', err);
         });
     };
 
@@ -805,7 +806,7 @@ class FileIndexStore {
     initKeyWordFileIndex = function () {
         let row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_fileindex');
         if (row.total == 0) {
-            console.error("not find t_fileindex, create table now");
+            logger.error("not find t_fileindex, create table now");
             //创建表/索引
             //filename为文件名称
             //filepath为文件相对路径全名，包括目录
@@ -842,7 +843,7 @@ class FileIndexStore {
                     BEGIN \
                         DELETE FROM t_keyword WHERE file_id=old.id; \
                     END;').run();
-            console.log("create trigger. on delete");
+            logger.debug("create trigger. on delete");
         }
 
         this.db.pragma('cache_size = 50000');//50000*1.5k
@@ -859,7 +860,7 @@ class FileIndexStore {
         if (data['filepath'] === undefined || data['filename'] === undefined 
             || data['md5'] === undefined  || data['type'] === undefined 
             || data['extdata'] === undefined || data['updatetime'] === undefined) {
-            //console.error("input data error!", data);
+            //logger.error("input data error!", data);
             return false;
         }
         if(os.platform() == "win32" 
@@ -875,10 +876,10 @@ class FileIndexStore {
                     VALUES \
                 (@filepath, @filename, @md5, @updatetime, @type, @systeminclude, 1, @extdata)');
             const info = stmt.run(data);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         } catch (error) {
-            console.log("insert faild", error);
+            logger.debug("insert faild", error);
             return false;
         }
     };
@@ -888,10 +889,10 @@ class FileIndexStore {
         try {
             const stmt = this.db.prepare('DELETE FROM t_fileindex WHERE id=?');
             const info = stmt.run(id);
-            console.log(info);
+            logger.debug(info);
             return info.changes == 1;
         } catch (error) {
-            console.log("delete faild", error);
+            logger.debug("delete faild", error);
             return false;
         }
     };
@@ -902,7 +903,7 @@ class FileIndexStore {
         if (data['id'] === undefined
             || data['md5'] === undefined || data['updatetime'] === undefined
             || data['extdata'] === undefined) {
-            //console.error("input data error!", data);
+            //logger.error("input data error!", data);
             return false;
         }
         //获取时间戳
@@ -916,10 +917,10 @@ class FileIndexStore {
                 extdata=@extdata \
             WHERE id=@id');
             const info = stmt.run(data);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         } catch (error) {
-            console.log("update faild", error);
+            logger.debug("update faild", error);
             return false;
         }
     };
@@ -929,7 +930,7 @@ class FileIndexStore {
         const stmt = this.db.prepare('UPDATE t_fileindex  SET md5=?,updatetime=? WHERE id=?');
         //let time = (new Date()).getTime();
         const info = stmt.run(md5, time, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -938,13 +939,13 @@ class FileIndexStore {
         //获取数据
         let fileinfo = this.getFileById(id);
         if(!fileinfo || fileinfo === undefined) {
-            console.error("not find file id", id);
+            logger.error("not find file id", id);
             return false;
         }
         let filepath = fileinfo.filepath.replace(fileinfo.filename, filename);
         const stmt = this.db.prepare('UPDATE t_fileindex  SET filename=?,filepath=? WHERE id=?');
         const info = stmt.run(filename, filepath, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -952,7 +953,7 @@ class FileIndexStore {
     modifyExtdata = function (id, extdata) {
         const stmt = this.db.prepare('UPDATE t_fileindex  SET extdata=? WHERE id=?');
         const info = stmt.run(extdata, id);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -960,7 +961,7 @@ class FileIndexStore {
     delete = function (id) {
         const stmt = this.db.prepare('DELETE FROM t_fileindex WHERE id=?');
         const info = stmt.run(id);
-        console.log(info);
+        logger.debug(info);
         return info.changes == 1;
     };
 
@@ -968,7 +969,7 @@ class FileIndexStore {
     deleteByFilename = function (filename) {
         const stmt = this.db.prepare('DELETE FROM t_fileindex WHERE filename=?');
         const info = stmt.run(filename);
-        //console.log(info);
+        //logger.debug(info);
         return info.changes == 1;
     };
 
@@ -979,7 +980,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. filename:", filename);
+            //logger.error("not find result. filename:", filename);
             return [];
         }
 
@@ -1024,7 +1025,7 @@ class FileIndexStore {
         //console.info(begin, end);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. filepath:", filepath);
+            //logger.error("not find result. filepath:", filepath);
             return false;
         }
 
@@ -1049,7 +1050,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            //console.error("not find result. filepath:", filepath);
+            //logger.error("not find result. filepath:", filepath);
             return false;
         }
 
@@ -1070,7 +1071,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            console.error("not find result. ids:", ids);
+            logger.error("not find result. ids:", ids);
             return [];
         }
 
@@ -1094,7 +1095,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            console.error("not find result. id:", id);
+            logger.error("not find result. id:", id);
             return false;
         }
 
@@ -1114,7 +1115,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            console.error("get all data faild!");
+            logger.error("get all data faild!");
             return [];
         }
 
@@ -1138,7 +1139,7 @@ class FileIndexStore {
         //console.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
-            console.error("get all data faild!");
+            logger.error("get all data faild!");
             return 0;
         }
 
@@ -1276,7 +1277,7 @@ class Store{
         //合并文件名称
         for (let i = 0; i < infos.length; i++) {
             if (!filemap[infos[i].file_id]) {
-                console.error("fileid error!", infos[i]);
+                logger.error("fileid error!", infos[i]);
                 infos[i]['filepath'] = "";
                 continue;
             }

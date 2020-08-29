@@ -1,11 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const path = require("path");
+const fs = require("fs");
 const vscode_1 = require("vscode");
 const IndexConfig_1 = require("./IndexConfig");
 const buildProcess_1 = require("./buildProcess");
 const log4js_1 = require("log4js");
 const logger = log4js_1.getLogger("cpptips");
+let projectPath = vscode_1.workspace.rootPath;
 function menuProcess(context, client) {
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.changeType', (uri) => {
         let select = vscode_1.window.activeTextEditor.selection;
@@ -180,6 +182,16 @@ function menuProcess(context, client) {
     //提交编译到容器
     context.subscriptions.push(vscode_1.commands.registerCommand('cpp.buildfordocker', (infos) => {
         buildProcess_1.GetBuildCmd(context);
+    }));
+    //编译过程配置
+    context.subscriptions.push(vscode_1.commands.registerCommand('cpp.buildconfig', (infos) => {
+        let jsPath = projectPath + "/.vscode/build.js";
+        if (!fs.existsSync(jsPath)) {
+            let extensionPath = context.extensionPath;
+            let _helpfile = extensionPath + "/webview/buildHelp.txt";
+            fs.copyFileSync(_helpfile, jsPath);
+        }
+        vscode_1.window.showTextDocument(vscode_1.Uri.file(jsPath));
     }));
 }
 exports.menuProcess = menuProcess;

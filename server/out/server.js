@@ -23,8 +23,7 @@ log4js_1.configure({
             filename: "/tmp/cpptips.server.log",
             daysToKeep: 3,
             pattern: '.yyyy-MM-dd'
-        },
-        server: { type: 'tcp-server', host: '0.0.0.0' }
+        }
     },
     categories: {
         default: { appenders: ["cpptips"], level: "debug" }
@@ -165,12 +164,12 @@ function reloadIncludeFileCallBack(msg, showprocess, total, nowIndex, extdata) {
         showErrorMessage("文件索引加载失败！");
     }
     if (msg == "stop_load_index") {
-        showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请在右侧资源管理器中，选择目录右键“加入索引范围”指定需要计算的目录！");
+        showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请选择创建索引的范围，也可以在右侧资源管理器中，选择目录右键“去可视化配置索引”打开配置界面！");
         //显示可视化配置
         sendMsgToVscode('open_index_config', []);
     }
     if (msg == "show_file_more") {
-        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
+        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“去可视化配置索引”打开配置界面！");
     }
     sendMsgToVscode("close_show_process", data);
     //重新加载文件
@@ -423,6 +422,10 @@ connection.onNotification("diagnosticInfo", (infos) => {
             let obj = infos[key][i];
             let start = obj['range'][0];
             let end = obj['range'][1];
+            if (start === undefined || end === undefined) {
+                console.log("onNotification", infos);
+                continue;
+            }
             let _range = vscode_languageserver_1.Range.create(start, end);
             let _diagnostics = vscode_languageserver_1.Diagnostic.create(_range, obj['message'], obj['severity'], undefined, undefined, undefined);
             _diagnostics.code = undefined;
@@ -1099,7 +1102,7 @@ connection.onDidOpenTextDocument((params) => {
 });
 function updateDiagnostic(uri, change, context, newContext) {
     let _path = files_1.uriToFilePath(uri);
-    console.info(_path, diagnostic);
+    //console.info(_path, diagnostic);
     if (!change.range || !_path) {
         return;
     }

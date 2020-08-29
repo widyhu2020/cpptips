@@ -127,6 +127,10 @@
 			{
 				"command": "cpp.buildfordocker",
 				"title": "提交编译并重启"
+			},
+			{
+				"command":"cpp.buildconfig",
+				"title":"配置编译过程"
 			}
 		],
 		"languages": [
@@ -214,6 +218,12 @@
 					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
 					"command": "cpp.buildfordocker",
 					"alt": "cpp.buildfordocker",
+					"group": "z_commands@1"
+				},
+				{
+					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"command": "cpp.buildconfig",
+					"alt": "cpp.buildconfig",
 					"group": "z_commands@1"
 				}
 			],

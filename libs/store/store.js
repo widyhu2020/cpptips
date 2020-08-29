@@ -8,6 +8,7 @@
 var NativeForTestValid = require('./makeNativeModel');
 var Database = require('better-sqlite3');
 var os = require('os');
+var logger = require('log4js').getLogger("cpptips");
 var KeyWordStore = /** @class */ (function () {
     function KeyWordStore() {
         this.connect = function (dbname, showsql, memorydb) {
@@ -18,7 +19,7 @@ var KeyWordStore = /** @class */ (function () {
                 return this;
             }
             this.dbname = dbname;
-            var options = { verbose: console.log, fileMustExist: false };
+            var options = { verbose: logger.debug, fileMustExist: false };
             if (showsql == 0) {
                 options = {};
             }
@@ -43,7 +44,7 @@ var KeyWordStore = /** @class */ (function () {
         this.initKeyWordTable = function () {
             var row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
             if (row.total == 0) {
-                console.error("not find t_keyword, create table now");
+                logger.error("not find t_keyword, create table now");
                 //创建表/索引
                 var createtable = this.db.prepare('CREATE TABLE t_keyword(\
                     id INTEGER PRIMARY KEY AUTOINCREMENT,\
@@ -82,7 +83,7 @@ var KeyWordStore = /** @class */ (function () {
             }
             catch (erryr) {
                 this.db.err;
-                console.error(erryr);
+                logger.error(erryr);
                 return false;
             }
         };
@@ -93,39 +94,39 @@ var KeyWordStore = /** @class */ (function () {
                 || data['namespace'] === undefined || data['type'] === undefined
                 || data['file_id'] === undefined || data['extdata'] === undefined
                 || data['permission'] === undefined) {
-                console.error("input data error!", data);
+                logger.error("input data error!", data);
                 return false;
             }
             data['namelength'] = data['name'].length;
             //查看db是否已经存在
             var info = this.getByFullnameAndType(data['ownname'], data['namespace'], data['name'], data['type']);
             if (info) {
-                //console.error("data is in db!", info);
+                //logger.error("data is in db!", info);
                 //文件id不一样，则更新
                 if (info.file_id != data['file_id']) {
                     if (!this.modifyFileId(info.id, data['file_id'])) {
-                        console.error("file_id faild!", info.id, data['file_id']);
+                        logger.error("file_id faild!", info.id, data['file_id']);
                         return false;
                     }
                 }
                 //更新附加数据
                 if (info.extdata != data['extdata']) {
                     if (!this.modifyExdata(info.id, data['extdata'])) {
-                        console.error("modifyExdata faild!", info.id, data['extdata']);
+                        logger.error("modifyExdata faild!", info.id, data['extdata']);
                         return false;
                     }
                 }
                 //更新权限
                 if (info.permission != data['permission']) {
                     if (!this.modifyPermission(info.id, data['permission'])) {
-                        console.error("modifyPermission faild!", info.id, data['permission']);
+                        logger.error("modifyPermission faild!", info.id, data['permission']);
                         return false;
                     }
                 }
                 //修改类型
                 if (info.type != data['type']) {
                     if (!this.modifyType(info.id, data['type'])) {
-                        console.error("modifyType faild!", info.id, data['type']);
+                        logger.error("modifyType faild!", info.id, data['type']);
                         return false;
                     }
                 }
@@ -135,11 +136,11 @@ var KeyWordStore = /** @class */ (function () {
                 var stmt = this.db.prepare('INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
                 VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)');
                 var info_1 = stmt.run(data);
-                //console.log(info);
+                //logger.debug(info);
                 return info_1.changes == 1;
             }
             catch (error) {
-                console.log("insert faild", error);
+                logger.debug("insert faild", error);
                 return false;
             }
         };
@@ -153,49 +154,49 @@ var KeyWordStore = /** @class */ (function () {
         this.modifyNamespace = function (id, namespace) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET namespace=? WHERE id=?');
             var info = stmt.run(namespace, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改文件id
         this.modifyFileId = function (id, file_id) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET file_id=? WHERE id=?');
             var info = stmt.run(file_id, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改扩展数据
         this.modifyExdata = function (id, extdata) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE id=?');
             var info = stmt.run(extdata, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //通过名称修改扩展数据
         this.modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?');
             var info = stmt.run(extdata, namespace, ownname, name, type);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改对外权限
         this.modifyPermission = function (id, permission) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET permission=? WHERE id=?');
             var info = stmt.run(permission, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改类型
         this.modifyType = function (id, type) {
             var stmt = this.db.prepare('UPDATE t_keyword  SET type=? WHERE id=?');
             var info = stmt.run(type, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //删除数据
         this.delete = function (id) {
             var stmt = this.db.prepare('DELETE FROM t_keyword WHERE id=? LIMIT 0,1');
             var info = stmt.run(id);
-            console.log(info);
+            logger.debug(info);
             return info.changes == 1;
         };
         //批量删除数据
@@ -207,24 +208,24 @@ var KeyWordStore = /** @class */ (function () {
             var sqlids = ids.join(',');
             var stmt = this.db.prepare('DELETE FROM t_keyword WHERE id IN (' + sqlids + ')');
             var info = stmt.run();
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //通过文件id删除数据
         this.deleteByFileId = function (file_id) {
             var stmt = this.db.prepare('DELETE FROM t_keyword WHERE file_id=?');
             var info = stmt.run(file_id);
-            console.log(info);
+            logger.debug(info);
             return info.changes == 1;
         };
         //通过文件id获取所有的定义
         this.getAllByFileId = function (file_id) {
             var stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
             var infos = stmt.all(file_id);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined) {
                 //未查询到结果
-                console.error("not find result. namespace:", namespace);
+                logger.error("not find result. namespace:", namespace);
                 return [];
             }
             return infos;
@@ -233,10 +234,10 @@ var KeyWordStore = /** @class */ (function () {
         this.findByNamespace = function (namespace) {
             var stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
             var infos = stmt.all(namespace);
-            console.log(infos);
+            logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                console.error("not find result. namespace:", namespace);
+                logger.error("not find result. namespace:", namespace);
                 return [];
             }
             return infos;
@@ -271,13 +272,13 @@ var KeyWordStore = /** @class */ (function () {
                         AND namelength < ' + maxlength + ' \
                         AND permission IN (' + sqlpermission + ') \
                         AND type IN (' + sqltype + ')';
-            //console.log(sql);
+            //logger.debug(sql);
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", keyword, namepsaces);
+                //logger.error("not find result. namespace:", keyword, namepsaces);
                 return [];
             }
             return infos;
@@ -321,23 +322,23 @@ var KeyWordStore = /** @class */ (function () {
                                     )\
                                 ) ORDER BY namelength ASC,type ASC LIMIT 0,20';
                 sql = sql.replace(/[\t\s]{1,100}/g, " ");
-                //console.log(sql);
+                //logger.debug(sql);
                 var begintime = new Date().getTime();
                 var stmt = this.db.prepare(sql);
                 var infos = stmt.all();
                 var endtime = new Date().getTime();
                 if (endtime - begintime > 2000) {
-                    console.log(sql);
+                    logger.debug(sql);
                 }
                 if (!infos || infos == undefined || infos.length == 0) {
                     //未查询到结果
-                    //console.error("not find result. namespace:", keyword, namepsaces);
+                    //logger.error("not find result. namespace:", keyword, namepsaces);
                     return [];
                 }
                 return infos;
             }
             catch (error) {
-                console.error("time out!", error);
+                logger.error("time out!", error);
                 return [];
             }
         };
@@ -355,10 +356,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -391,14 +392,14 @@ var KeyWordStore = /** @class */ (function () {
                         AND permission IN (' + sqlpermission + ') \
                         AND type IN (' + sqltype + ') \
                         LIMIT 0,10';
-            //console.log(sql);
+            //logger.debug(sql);
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", keyword, namepsaces);
+                //logger.error("not find result. namespace:", keyword, namepsaces);
                 return [];
             }
             return infos;
@@ -430,14 +431,14 @@ var KeyWordStore = /** @class */ (function () {
                         AND permission IN (' + sqlpermission + ') \
                         AND type IN (' + sqltype + ') \
                         LIMIT 0,10';
-            //console.log(sql);
+            //logger.debug(sql);
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", keyword, namepsaces);
+                //logger.error("not find result. namespace:", keyword, namepsaces);
                 return [];
             }
             return infos;
@@ -458,10 +459,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all(ownname, namespace);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -478,10 +479,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -497,10 +498,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -522,10 +523,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all(ownname, namespace);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -542,10 +543,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -563,10 +564,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -581,10 +582,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all(name);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -606,10 +607,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all(ownname, namespace, name);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return [];
             }
             return infos;
@@ -625,10 +626,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all(ownname, namespace, name, type);
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return false;
             }
             return infos[0];
@@ -645,10 +646,10 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = this.db.prepare(sql);
             var infos = stmt.all();
-            //console.log(infos);
+            //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. namespace:", ownname, namespace, name);
+                //logger.error("not find result. namespace:", ownname, namespace, name);
                 return false;
             }
             return infos;
@@ -692,7 +693,7 @@ var FileIndexStore = /** @class */ (function () {
                 return this;
             }
             this.dbname = dbname;
-            var options = { verbose: console.log, fileMustExist: false };
+            var options = { verbose: logger.debug, fileMustExist: false };
             if (showsql == 0) {
                 options = {};
             }
@@ -715,7 +716,7 @@ var FileIndexStore = /** @class */ (function () {
                 //完成
                 showprogress(0, 0);
             }).catch(function (err) {
-                console.log('backup failed:', err);
+                logger.debug('backup failed:', err);
             });
         };
         this.closeconnect = function () {
@@ -735,7 +736,7 @@ var FileIndexStore = /** @class */ (function () {
         this.initKeyWordFileIndex = function () {
             var row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_fileindex');
             if (row.total == 0) {
-                console.error("not find t_fileindex, create table now");
+                logger.error("not find t_fileindex, create table now");
                 //创建表/索引
                 //filename为文件名称
                 //filepath为文件相对路径全名，包括目录
@@ -769,7 +770,7 @@ var FileIndexStore = /** @class */ (function () {
                     BEGIN \
                         DELETE FROM t_keyword WHERE file_id=old.id; \
                     END;').run();
-                console.log("create trigger. on delete");
+                logger.debug("create trigger. on delete");
             }
             this.db.pragma('cache_size = 50000'); //50000*1.5k
             return;
@@ -783,7 +784,7 @@ var FileIndexStore = /** @class */ (function () {
             if (data['filepath'] === undefined || data['filename'] === undefined
                 || data['md5'] === undefined || data['type'] === undefined
                 || data['extdata'] === undefined || data['updatetime'] === undefined) {
-                //console.error("input data error!", data);
+                //logger.error("input data error!", data);
                 return false;
             }
             if (os.platform() == "win32"
@@ -799,11 +800,11 @@ var FileIndexStore = /** @class */ (function () {
                     VALUES \
                 (@filepath, @filename, @md5, @updatetime, @type, @systeminclude, 1, @extdata)');
                 var info = stmt.run(data);
-                //console.log(info);
+                //logger.debug(info);
                 return info.changes == 1;
             }
             catch (error) {
-                console.log("insert faild", error);
+                logger.debug("insert faild", error);
                 return false;
             }
         };
@@ -812,11 +813,11 @@ var FileIndexStore = /** @class */ (function () {
             try {
                 var stmt = this.db.prepare('DELETE FROM t_fileindex WHERE id=?');
                 var info = stmt.run(id);
-                console.log(info);
+                logger.debug(info);
                 return info.changes == 1;
             }
             catch (error) {
-                console.log("delete faild", error);
+                logger.debug("delete faild", error);
                 return false;
             }
         };
@@ -826,7 +827,7 @@ var FileIndexStore = /** @class */ (function () {
             if (data['id'] === undefined
                 || data['md5'] === undefined || data['updatetime'] === undefined
                 || data['extdata'] === undefined) {
-                //console.error("input data error!", data);
+                //logger.error("input data error!", data);
                 return false;
             }
             //获取时间戳
@@ -840,11 +841,11 @@ var FileIndexStore = /** @class */ (function () {
                 extdata=@extdata \
             WHERE id=@id');
                 var info = stmt.run(data);
-                //console.log(info);
+                //logger.debug(info);
                 return info.changes == 1;
             }
             catch (error) {
-                console.log("update faild", error);
+                logger.debug("update faild", error);
                 return false;
             }
         };
@@ -853,7 +854,7 @@ var FileIndexStore = /** @class */ (function () {
             var stmt = this.db.prepare('UPDATE t_fileindex  SET md5=?,updatetime=? WHERE id=?');
             //let time = (new Date()).getTime();
             var info = stmt.run(md5, time, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改父目录文件id
@@ -861,34 +862,34 @@ var FileIndexStore = /** @class */ (function () {
             //获取数据
             var fileinfo = this.getFileById(id);
             if (!fileinfo || fileinfo === undefined) {
-                console.error("not find file id", id);
+                logger.error("not find file id", id);
                 return false;
             }
             var filepath = fileinfo.filepath.replace(fileinfo.filename, filename);
             var stmt = this.db.prepare('UPDATE t_fileindex  SET filename=?,filepath=? WHERE id=?');
             var info = stmt.run(filename, filepath, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //修改扩展数据
         this.modifyExtdata = function (id, extdata) {
             var stmt = this.db.prepare('UPDATE t_fileindex  SET extdata=? WHERE id=?');
             var info = stmt.run(extdata, id);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //删除数据
         this.delete = function (id) {
             var stmt = this.db.prepare('DELETE FROM t_fileindex WHERE id=?');
             var info = stmt.run(id);
-            console.log(info);
+            logger.debug(info);
             return info.changes == 1;
         };
         //删除数据
         this.deleteByFilename = function (filename) {
             var stmt = this.db.prepare('DELETE FROM t_fileindex WHERE filename=?');
             var info = stmt.run(filename);
-            //console.log(info);
+            //logger.debug(info);
             return info.changes == 1;
         };
         //通过文件名称获取文件信息
@@ -898,7 +899,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. filename:", filename);
+                //logger.error("not find result. filename:", filename);
                 return [];
             }
             //规范化路径
@@ -939,7 +940,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(begin, end);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. filepath:", filepath);
+                //logger.error("not find result. filepath:", filepath);
                 return false;
             }
             //规范化路径
@@ -961,7 +962,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                //console.error("not find result. filepath:", filepath);
+                //logger.error("not find result. filepath:", filepath);
                 return false;
             }
             //规范化路径
@@ -980,7 +981,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                console.error("not find result. ids:", ids);
+                logger.error("not find result. ids:", ids);
                 return [];
             }
             //规范化路径
@@ -1002,7 +1003,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                console.error("not find result. id:", id);
+                logger.error("not find result. id:", id);
                 return false;
             }
             //规范化路径
@@ -1020,7 +1021,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                console.error("get all data faild!");
+                logger.error("get all data faild!");
                 return [];
             }
             //规范化路径
@@ -1042,7 +1043,7 @@ var FileIndexStore = /** @class */ (function () {
             //console.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
-                console.error("get all data faild!");
+                logger.error("get all data faild!");
                 return 0;
             }
             //返回总行书
@@ -1176,7 +1177,7 @@ var Store = /** @class */ (function () {
             //合并文件名称
             for (var i = 0; i < infos.length; i++) {
                 if (!filemap[infos[i].file_id]) {
-                    console.error("fileid error!", infos[i]);
+                    logger.error("fileid error!", infos[i]);
                     infos[i]['filepath'] = "";
                     continue;
                 }
