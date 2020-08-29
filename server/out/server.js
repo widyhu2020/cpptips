@@ -4,6 +4,7 @@ const vscode_languageserver_1 = require("vscode-languageserver");
 const path = require('path');
 const codeAnalyse_1 = require("../../libs/codeAnalyse");
 const fs = require("fs");
+const os = require("os");
 const timers_1 = require("timers");
 const files_1 = require("vscode-languageserver/lib/files");
 let basepath = "/";
@@ -15,12 +16,23 @@ let extpath = "";
 let rebuildTimeout = null;
 let diagnostic = {};
 const log4js_1 = require("log4js");
+function getLoggerPath() {
+    let logpath = "/tmp/cpptips.server.log";
+    if (os.platform() == "win32") {
+        //windows
+        if (!fs.existsSync("c:\\cpplog")) {
+            fs.mkdirSync("c:\\cpplog");
+        }
+        logpath = "c:\\cpplog\\cpptips.server.log";
+    }
+    return logpath;
+}
 log4js_1.configure({
     appenders: {
         cpptips: {
             type: "dateFile",
             keepFileExt: true,
-            filename: "/tmp/cpptips.server.log",
+            filename: getLoggerPath(),
             daysToKeep: 3,
             pattern: '.yyyy-MM-dd'
         }
@@ -164,12 +176,12 @@ function reloadIncludeFileCallBack(msg, showprocess, total, nowIndex, extdata) {
         showErrorMessage("文件索引加载失败！");
     }
     if (msg == "stop_load_index") {
-        showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请选择创建索引的范围，也可以在右侧资源管理器中，选择目录右键“去可视化配置索引”打开配置界面！");
+        showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请在右侧资源管理器中，选择目录右键“加入索引范围”指定需要计算的目录！");
         //显示可视化配置
         sendMsgToVscode('open_index_config', []);
     }
     if (msg == "show_file_more") {
-        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“去可视化配置索引”打开配置界面！");
+        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
     sendMsgToVscode("close_show_process", data);
     //重新加载文件

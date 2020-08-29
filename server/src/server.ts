@@ -43,6 +43,7 @@ const path = require('path');
 
 import { CodeAnalyse, NodeItem, ShowItem, CaConfig, PointInfo} from '../../libs/codeAnalyse';
 import * as fs from 'fs';
+import * as os from 'os';
 import { URL, pathToFileURL } from 'url';
 import { clearTimeout } from 'timers';
 import { uriToFilePath } from 'vscode-languageserver/lib/files';
@@ -58,12 +59,25 @@ let diagnostic:{[key:string]: Diagnostic[]} = {};
 import { configure, getLogger } from "log4js";
 import { isArray, forEach } from 'lodash';
 import { info } from 'console';
+
+function getLoggerPath(){
+    let logpath = "/tmp/cpptips.server.log";
+    if(os.platform() == "win32"){
+        //windows
+        if(!fs.existsSync("c:\\cpplog")) {
+            fs.mkdirSync("c:\\cpplog");
+        }
+        logpath = "c:\\cpplog\\cpptips.server.log";
+    }
+    return logpath;
+}
+
 configure({
     appenders: { 
         cpptips: { 
             type: "dateFile",
             keepFileExt: true,
-            filename: "/tmp/cpptips.server.log", 
+            filename: getLoggerPath(), 
             daysToKeep: 3, 
             pattern: '.yyyy-MM-dd'
         }

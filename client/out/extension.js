@@ -5,19 +5,32 @@
  * ------------------------------------------------------------------------------------------ */
 Object.defineProperty(exports, "__esModule", { value: true });
 const path = require("path");
+const fs = require("fs");
 const vscode_1 = require("vscode");
 const vscode_languageclient_1 = require("vscode-languageclient");
 const IndexConfig_1 = require("./IndexConfig");
 const menuProcess_1 = require("./menuProcess");
 const notifyProcess_1 = require("./notifyProcess");
 let client;
+const os = require("os");
 const log4js_1 = require("log4js");
+function getLoggerPath() {
+    let logpath = "/tmp/cpptips.server.log";
+    if (os.platform() == "win32") {
+        //windows
+        if (!fs.existsSync("c:\\cpplog")) {
+            fs.mkdirSync("c:\\cpplog");
+        }
+        logpath = "c:\\cpplog\\cpptips.server.log";
+    }
+    return logpath;
+}
 log4js_1.configure({
     appenders: {
         cpptips: {
             type: "dateFile",
             keepFileExt: true,
-            filename: "/tmp/cpptips.client.log",
+            filename: getLoggerPath(),
             daysToKeep: 3,
             pattern: '.yyyy-MM-dd'
         }

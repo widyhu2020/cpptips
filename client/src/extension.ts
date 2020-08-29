@@ -18,16 +18,27 @@ import { showIndexConfig, checkNeedShowDefault} from './IndexConfig';
 import { menuProcess } from './menuProcess';
 import { notifyProcess, initStatusBar } from './notifyProcess';
 let client: LanguageClient;
-
+import * as os from 'os';
 import { configure, getLogger } from "log4js";
 import { reflushErrorMsg } from './buildProcess';
 import { time } from 'console';
+function getLoggerPath(){
+    let logpath = "/tmp/cpptips.server.log";
+    if(os.platform() == "win32"){
+        //windows
+        if(!fs.existsSync("c:\\cpplog")) {
+            fs.mkdirSync("c:\\cpplog");
+        }
+        logpath = "c:\\cpplog\\cpptips.server.log";
+    }
+    return logpath;
+}
 configure({
     appenders: { 
         cpptips: { 
             type: "dateFile",
             keepFileExt: true,
-            filename: "/tmp/cpptips.client.log", 
+            filename: getLoggerPath(), 
             daysToKeep: 3, 
             pattern: '.yyyy-MM-dd'
         } 
