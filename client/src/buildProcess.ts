@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup, QuickPickItem, ProcessExecution, TaskEndEvent} from 'vscode';
+import { workspace, ExtensionContext, window, StatusBarItem, StatusBarAlignment, ThemeColor, TextEdit, commands, ViewColumn, Position, Range, MessageOptions, TextDocumentShowOptions, TextDocument, Uri, scm, Terminal, ShellExecution, Task, TaskDefinition, tasks, Disposable, TaskGroup, QuickPickItem, ProcessExecution, TaskEndEvent, ConfigurationTarget} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -36,8 +36,14 @@ function runBuild(path:string, command:string){
 		task: taskName
 	};
 
+	let runCommand = `cd ${path} && ${command}`;
+	if(command.indexOf("${path}") >= 0){
+		let absPath = path.replace(projectPath, "");
+		command = command.replace("${path}", absPath);
+		runCommand = command;
+	}
 	let source = "build";
-	let execution = new ShellExecution(`cd ${path} && ${command}`, null);
+	let execution = new ShellExecution(runCommand, null);
 	let task = new Task(kind, taskName, source);
 	task.group = TaskGroup.Build;
 	task.execution = execution;
@@ -372,13 +378,17 @@ export function GetBuildCmd(context: ExtensionContext, isCommd = true) {
 							runBuild(buildpath, cmd);
 							return;
 						}
+						let config = workspace.getConfiguration();
+						let defaultValue = config.get("cpptips.buildParams", "");
 						window.showInputBox({
+								value : defaultValue,
 								password:false,
 								ignoreFocusOut:true,
 								placeHolder:'../../ ../comm/',
 								prompt:'输入你需要额外指定的路径，指定多个路径时使用空格分隔！',
 							}).then(function(inputMsg){
-								if(!inputMsg) { return; }
+								if(!inputMsg) { return; } 
+								config.update("cpptips.buildParams", inputMsg, ConfigurationTarget.Workspace);
 								cmd = msg.detail + " " + inputMsg;
 								logger.debug("cmd:" + cmd + " ;buildpath:" + buildpath);
 								runBuild(buildpath, cmd);

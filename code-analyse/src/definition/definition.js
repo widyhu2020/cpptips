@@ -115,9 +115,9 @@ class Definition extends Completion{
 
         let match = -1;
         let findIncludeFile = "";
-        console.time("getFileByFileName");
+        logger.debug("getFileByFileName");
         let fileList = fdb.getFileByFileName(fileName);
-        console.timeEnd("getFileByFileName");
+        logger.debug("getFileByFileName");
         //logger.debug(fileList);
         for(let i = 0; i < fileList.length; i++) {
             let filePath = fileList[i];

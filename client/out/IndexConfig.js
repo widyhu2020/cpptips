@@ -8,6 +8,7 @@ const logger = log4js_1.getLogger("cpptips");
 var cookite = "";
 let projectPath = vscode_1.workspace.rootPath;
 let setPath = projectPath + "/.vscode/settings.json";
+let dbpath = projectPath + "/.vscode/db/cpptips.db";
 /**
  * 获取某个扩展文件相对于webview需要的一种特殊路径格式
  * 形如：vscode-resource:/Users/toonces/projects/vscode-cat-coding/media/cat.gif
@@ -212,7 +213,8 @@ exports.showIndexConfig = showIndexConfig;
 ;
 //判定是否需要强制提示配置
 function checkNeedShowDefault() {
-    if (!fs.existsSync(setPath)) {
+    if (!fs.existsSync(setPath)
+        || !fs.existsSync(dbpath)) {
         return true;
     }
     return false;

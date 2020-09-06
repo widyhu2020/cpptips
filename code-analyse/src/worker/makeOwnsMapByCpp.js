@@ -129,9 +129,9 @@ class MakeOwnsMapByCpp {
         let pos = cppfilename.lastIndexOf("/");
         let filename = cppfilename.substr(pos + 1);
         let updatetime = Math.floor(fstat.mtimeMs / 1000);
-        console.time("getFileByFilePath");
+        logger.debug("getFileByFilePath");
         let fileinfo = FileIndexStore.getInstace().getFileByFilePath(cppfilename);
-        console.timeEnd("getFileByFilePath");
+        logger.debug("getFileByFilePath");
         if(fileinfo == false) {
             let data = {
                 filename: filename,
@@ -148,15 +148,15 @@ class MakeOwnsMapByCpp {
 
         //执行分析
         let analyse = new Analyse.Analyse(filecontext, cppfilename);
-        console.time("Analyse");
+        logger.debug("Analyse");
         analyse.doAnalyse();
-        console.timeEnd("Analyse");
-        console.time("getResult");
+        logger.debug("Analyse");
+        logger.debug("getResult");
         let sourceTree = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace());
-        console.timeEnd("getResult");
-        console.time("getDocumentStruct");
+        logger.debug("getResult");
+        logger.debug("getDocumentStruct");
         this.showTree = analyse.getDocumentStruct();
-        console.timeEnd("getDocumentStruct");
+        logger.debug("getDocumentStruct");
 
         let includefile = sourceTree.__file_inlcude;
         let namespaces = sourceTree.__file_usingnamespace;
@@ -248,19 +248,19 @@ if (cluster.isMaster) {
             //子线程
             logger.debug(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
-            console.time("makeSearchTreeByCpp");
+            logger.debug("makeSearchTreeByCpp");
             let maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
             maker.makeSearchTreeByCpp(parasms.cppfilename);
-            console.timeEnd("makeSearchTreeByCpp");
+            logger.debug("makeSearchTreeByCpp");
 
             //释放链接
             maker.disconstructor();
 
             //向主线线程发送数据
             let result = maker.getData();
-            console.time("postMessage");
+            logger.debug("postMessage");
             process.send(result);
-            console.timeEnd("postMessage");
+            logger.debug("postMessage");
         } catch(err){
             logger.debug(err);
             process.kill(process.pid);

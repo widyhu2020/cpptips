@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.2.8",
+	"version": "0.3.0",
 	"repository": {
 		"url": "https://github.com/widyhu2020/cpptips"
 	},
@@ -64,14 +64,15 @@
 						"^bin$",
 						"^\\.svn$",
 						"^\\.git$",
-						"^\\.vscode$"
+						"^\\.vscode$",
+						"^build64_fastbuild$"
 					],
 					"description": "需要忽略的文件的名称或者正则表达式，该规则叠加在最后，符合该规则的文件或者文件夹都将不加载"
 				},
 				"cpptips.updateCheckIntervalTime": {
 					"type": "integer",
 					"maximum": 2147483647,
-					"default": 600000,
+					"default": 600000000,
 					"description": "配置更新检查的间隔时间"
 				},
 				"cpptips.defaultbuildscript": {
@@ -84,6 +85,11 @@
 					"type": "string",
 					"default": "http://9.134.38.144:8888",
 					"description": "配置更新检查时拉取的文件url地址"
+				},
+				"cpptips.buildParams": {
+					"type": "string",
+					"default": "",
+					"description": "编译输入的额外参数，输入一次后面用于默认显示"
 				}
 			}
 		},

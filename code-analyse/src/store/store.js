@@ -21,7 +21,7 @@ class KeyWordStore {
     };
 
     constructor() {
-        console.info("KeyWordStore in constructor");
+        logger.info("KeyWordStore in constructor");
         this.dbname = "";
         this.db = null;
     };
@@ -32,7 +32,7 @@ class KeyWordStore {
             return this;
         }
         this.dbname = dbname;
-        let options = { verbose: logger.debug, fileMustExist: false };
+        let options = { verbose: console.debug, fileMustExist: false };
         if (showsql == 0) {
             options = {};
         }
@@ -40,7 +40,7 @@ class KeyWordStore {
             //内存db
             options.memory = true;
         }
-        console.info("databasepath:", this.dbname);
+        logger.info("databasepath:", this.dbname);
         this.db = new Database(this.dbname, options);
         this.initKeyWordTable();
         return this;
@@ -81,6 +81,8 @@ class KeyWordStore {
             const createu_i_index_file_id = this.db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
             const createu_i_index_type = this.db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
             const createu_i_namelength = this.db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
+            this.db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
+            
 
             //https://www.sqlite.org/pragma.html
             //启动wal模式
@@ -748,7 +750,7 @@ class FileIndexStore {
     };
 
     constructor() {
-        console.info("FileIndexStore in constructor");
+        logger.info("FileIndexStore in constructor");
         this.dbname = '';
         this.db = null;
         this.system_include = 0;
@@ -760,7 +762,7 @@ class FileIndexStore {
             return this;
         }
         this.dbname = dbname;
-        let options = { verbose: logger.debug, fileMustExist: false };
+        let options = { verbose: console.debug, fileMustExist: false };
         if (showsql == 0) { 
             options = {};
         }
@@ -771,6 +773,34 @@ class FileIndexStore {
         this.db = new Database(this.dbname, options);
         this.initKeyWordFileIndex();
         return this;
+    };
+
+    //从备份表复制数据过来
+    backup_live = function(systemdbfile, dbname) {
+        try{
+            let dbtmp = new Database(dbname, {});
+            dbtmp.prepare(`Attach DATABASE "${systemdbfile}" as Tmp`).run();
+            dbtmp.prepare("REPLACE INTO \
+                t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM Tmp.t_keyword").run();
+            dbtmp.prepare("REPLACE INTO \
+                t_fileindex(\
+                    id,filename,filepath,md5,updatetime,type,state,systeminclude,extdata \
+                ) \
+                SELECT \
+                    id,filename,filepath,md5,updatetime,type,state,systeminclude,extdata \
+                FROM Tmp.t_fileindex").run();
+            dbtmp.prepare('DETACH DATABASE "Tmp"').run();
+            dbtmp.close();
+        } catch(error){
+            console.error("import system index faild.", error);
+            logger.error("import system index faild.", error);
+        }
+        //this.closeconnect();
     };
 
     //备份到指定库中，这里用于从存储的db上加载数据写入db中
@@ -825,7 +855,8 @@ class FileIndexStore {
             const createu_i_filename = this.db.prepare('CREATE INDEX i_filename ON t_fileindex(filename)').run();
             const createu_u_i_filepath = this.db.prepare('CREATE UNIQUE INDEX u_i_filepath ON t_fileindex(filepath)').run();
             const createu_u_i_type_state = this.db.prepare('CREATE INDEX u_i_type_state ON t_fileindex(type, state)').run();
-            //console.info(createtable, createu_i_filename, createu_u_i_filepath);
+            //logger.info(createtable, createu_i_filename, createu_u_i_filepath);
+            this.db.prepare("UPDATE sqlite_sequence SET seq = 50000 WHERE name='t_fileindex'").run();
 
             //https://www.sqlite.org/pragma.html
             //this.db.pragma('encoding = UTF-8');
@@ -977,7 +1008,7 @@ class FileIndexStore {
     getFileByFileName = function (filename) {
         const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, systeminclude, extdata FROM t_fileindex WHERE filename=?');
         const infos = stmt.all(filename);
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             //logger.error("not find result. filename:", filename);
@@ -1021,8 +1052,8 @@ class FileIndexStore {
                     AND systeminclude=0 \
                     LIMIT ' + begin + "," + end);
         const infos = stmt.all();
-        //console.info(infos);
-        //console.info(begin, end);
+        //logger.info(infos);
+        //logger.info(begin, end);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             //logger.error("not find result. filepath:", filepath);
@@ -1047,7 +1078,7 @@ class FileIndexStore {
     getFileByFilePath = function (filepath) {
         const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE filepath=?');
         const infos = stmt.all(filepath);
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             //logger.error("not find result. filepath:", filepath);
@@ -1068,7 +1099,7 @@ class FileIndexStore {
         let sqlids = ids.join(',');
         const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE id in (' + sqlids + ')');
         const infos = stmt.all();
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             logger.error("not find result. ids:", ids);
@@ -1092,7 +1123,7 @@ class FileIndexStore {
     getFileById = function(id) {
         const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE id=?');
         const infos = stmt.all(id);
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             logger.error("not find result. id:", id);
@@ -1112,7 +1143,7 @@ class FileIndexStore {
     getAllFileInfo = function() {
         const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex');
         const infos = stmt.all();
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             logger.error("get all data faild!");
@@ -1134,9 +1165,9 @@ class FileIndexStore {
 
     //统计表的行数(为了性能)
     checkHasRowData = function() {
-        const stmt = this.db.prepare('SELECT id as total FROM t_fileindex LIMIT 0,10');
+        const stmt = this.db.prepare('SELECT count(id) as total FROM t_fileindex LIMIT 0,10');
         const infos = stmt.all();
-        //console.info(infos);
+        //logger.info(infos);
         if (!infos || infos == undefined || infos.length == 0) {
             //未查询到结果
             logger.error("get all data faild!");
@@ -1144,7 +1175,35 @@ class FileIndexStore {
         }
 
         //返回总行书
-        return infos.length;
+        return infos[0]['total'];
+    };
+
+    //获取是否包含系统头文件
+    //返回：1: 不包含或者不全系统头文件；2:包含了系统头文件；3:未包含系统头文件，且无法导入
+    checkHasSystemIndex = function(){
+        let setKeyWord = ["map", "vector", "string", "set"];
+        let sqlKeyWord = setKeyWord.join("','");
+        const stmt = this.db.prepare('SELECT DISTINCT filename FROM t_fileindex where filename IN (\'' + sqlKeyWord + '\') and systeminclude=1');
+        const infos = stmt.all();
+        if (!infos 
+            || infos == undefined 
+            || infos.length != setKeyWord.length) {
+            //未查询到结果
+            const stmtmin = this.db.prepare('SELECT min(id) as min FROM t_fileindex where systeminclude!=1');
+            const min = stmtmin.all();
+            if(!min 
+                || min == undefined 
+                || min[0]['min'] > 3545) {
+                //可以重新导入
+                return 1;
+            }
+            //不能重新导入，重新导入会覆盖用户代码产生的索引
+            console.error("get all data faild!");
+            return 3;
+        }
+
+        //系统索引都已经包括了，无需导入
+        return 2;
     };
 };
 

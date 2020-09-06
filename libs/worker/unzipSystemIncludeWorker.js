@@ -20,12 +20,25 @@ var UnzipSystemIncludeWorker = /** @class */ (function () {
                 var filedb_1 = new FileIndexStore();
                 filedb_1.connect(dbpath, 0);
                 var totalRow = filedb_1.checkHasRowData();
-                filedb_1.close();
-                logger.info("file index toatl row:", totalRow);
+                console.info("file index toatl row:", totalRow);
                 if (totalRow >= 1) {
                     //已经存在文件，不进行分析
+                    var ret = filedb_1.checkHasSystemIndex();
+                    if (ret == 1) {
+                        //之前系统索引导入失败，这了重新导入
+                        filedb_1.backup_live(systemdbfile, dbpath);
+                        callback("success");
+                        filedb_1.closeconnect();
+                        return;
+                    }
+                    if (ret == 3) {
+                        callback("can_not_import");
+                        filedb_1.closeconnect();
+                        return;
+                    }
                     logger.info("无需初始化系统db文件");
                     callback("success");
+                    filedb_1.closeconnect();
                     return;
                 }
             }
@@ -35,6 +48,7 @@ var UnzipSystemIncludeWorker = /** @class */ (function () {
             filedb.backup(dbpath, function (t, r) {
                 if (t <= 0) {
                     callback("success");
+                    filedb.closeconnect();
                     return;
                 }
                 logger.debug("progress: " + ((t - r) / t * 100).toFixed(1) + "%");
@@ -91,6 +105,11 @@ else if (cluster.isWorker) {
         var unzipWorker = new UnzipSystemIncludeWorker();
         //解压db文件回调函数
         function unzipSystemDB_process_over(message) {
+            if (message == "can_not_import") {
+                var sendmessage_1 = { "function": "can_not_import" };
+                process.send(sendmessage_1);
+                return;
+            }
             var sendmessage = { "function": "over" };
             process.send(sendmessage);
         }

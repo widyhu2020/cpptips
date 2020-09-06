@@ -10,6 +10,7 @@ var cookite = "";
 let projectPath = workspace.rootPath;
 
 let setPath = projectPath + "/.vscode/settings.json";
+let dbpath = projectPath + "/.vscode/db/cpptips.db"
 
 /**
  * 获取某个扩展文件相对于webview需要的一种特殊路径格式
@@ -223,7 +224,8 @@ export function showIndexConfig(context: ExtensionContext, client:LanguageClient
 
 //判定是否需要强制提示配置
 export function checkNeedShowDefault(){
-	if(!fs.existsSync(setPath)){
+	if(!fs.existsSync(setPath)
+		|| !fs.existsSync(dbpath)){
 		return true;
 	}
 	return false;

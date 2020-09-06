@@ -78,7 +78,7 @@ function activate(context) {
         }
     };
     // Create the language client and start the client.
-    client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions, true);
+    client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions, false);
     let bascpath = vscode_1.workspace.rootPath;
     client.onReady().then(() => {
         if (IndexConfig_1.checkNeedShowDefault()) {

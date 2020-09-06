@@ -105,9 +105,9 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             var pos = cppfilename.lastIndexOf("/");
             var filename = cppfilename.substr(pos + 1);
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
-            console.time("getFileByFilePath");
+            logger.debug("getFileByFilePath");
             var fileinfo = FileIndexStore.getInstace().getFileByFilePath(cppfilename);
-            console.timeEnd("getFileByFilePath");
+            logger.debug("getFileByFilePath");
             if (fileinfo == false) {
                 var data = {
                     filename: filename,
@@ -124,15 +124,15 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             }
             //执行分析
             var analyse = new Analyse.Analyse(filecontext, cppfilename);
-            console.time("Analyse");
+            logger.debug("Analyse");
             analyse.doAnalyse();
-            console.timeEnd("Analyse");
-            console.time("getResult");
+            logger.debug("Analyse");
+            logger.debug("getResult");
             var sourceTree = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace());
-            console.timeEnd("getResult");
-            console.time("getDocumentStruct");
+            logger.debug("getResult");
+            logger.debug("getDocumentStruct");
             this.showTree = analyse.getDocumentStruct();
-            console.timeEnd("getDocumentStruct");
+            logger.debug("getDocumentStruct");
             var includefile = sourceTree.__file_inlcude;
             var namespaces = sourceTree.__file_usingnamespace;
             var queue = new Queue();
@@ -227,17 +227,17 @@ else if (cluster.isWorker) {
             //子线程
             logger.debug(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
-            console.time("makeSearchTreeByCpp");
+            logger.debug("makeSearchTreeByCpp");
             var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
             maker.makeSearchTreeByCpp(parasms.cppfilename);
-            console.timeEnd("makeSearchTreeByCpp");
+            logger.debug("makeSearchTreeByCpp");
             //释放链接
             maker.disconstructor();
             //向主线线程发送数据
             var result = maker.getData();
-            console.time("postMessage");
+            logger.debug("postMessage");
             process.send(result);
-            console.timeEnd("postMessage");
+            logger.debug("postMessage");
         }
         catch (err) {
             logger.debug(err);

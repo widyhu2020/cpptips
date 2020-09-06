@@ -119,9 +119,9 @@ var Definition = /** @class */ (function (_super) {
             var fdb = FileIndexStore.getInstace();
             var match = -1;
             var findIncludeFile = "";
-            console.time("getFileByFileName");
+            logger.debug("getFileByFileName");
             var fileList = fdb.getFileByFileName(fileName);
-            console.timeEnd("getFileByFileName");
+            logger.debug("getFileByFileName");
             //logger.debug(fileList);
             for (var i = 0; i < fileList.length; i++) {
                 var filePath = fileList[i];

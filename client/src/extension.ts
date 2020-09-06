@@ -98,7 +98,7 @@ export function activate(context: ExtensionContext) {
         'Cpptips Language Server',
         serverOptions,
         clientOptions,
-        true
+        false
     );
 
     let bascpath = workspace.rootPath;

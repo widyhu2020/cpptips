@@ -19,7 +19,7 @@ var KeyWordStore = /** @class */ (function () {
                 return this;
             }
             this.dbname = dbname;
-            var options = { verbose: logger.debug, fileMustExist: false };
+            var options = { verbose: console.debug, fileMustExist: false };
             if (showsql == 0) {
                 options = {};
             }
@@ -27,7 +27,7 @@ var KeyWordStore = /** @class */ (function () {
                 //内存db
                 options.memory = true;
             }
-            console.info("databasepath:", this.dbname);
+            logger.info("databasepath:", this.dbname);
             this.db = new Database(this.dbname, options);
             this.initKeyWordTable();
             return this;
@@ -64,6 +64,7 @@ var KeyWordStore = /** @class */ (function () {
                 var createu_i_index_file_id = this.db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
                 var createu_i_index_type = this.db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
                 var createu_i_namelength = this.db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
+                this.db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
                 //https://www.sqlite.org/pragma.html
                 //启动wal模式
                 //this.db.pragma('encoding = UTF-8');
@@ -654,7 +655,7 @@ var KeyWordStore = /** @class */ (function () {
             }
             return infos;
         };
-        console.info("KeyWordStore in constructor");
+        logger.info("KeyWordStore in constructor");
         this.dbname = "";
         this.db = null;
     }
@@ -693,7 +694,7 @@ var FileIndexStore = /** @class */ (function () {
                 return this;
             }
             this.dbname = dbname;
-            var options = { verbose: logger.debug, fileMustExist: false };
+            var options = { verbose: console.debug, fileMustExist: false };
             if (showsql == 0) {
                 options = {};
             }
@@ -704,6 +705,34 @@ var FileIndexStore = /** @class */ (function () {
             this.db = new Database(this.dbname, options);
             this.initKeyWordFileIndex();
             return this;
+        };
+        //从备份表复制数据过来
+        this.backup_live = function (systemdbfile, dbname) {
+            try {
+                var dbtmp = new Database(dbname, {});
+                dbtmp.prepare("Attach DATABASE \"" + systemdbfile + "\" as Tmp").run();
+                dbtmp.prepare("REPLACE INTO \
+                t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM Tmp.t_keyword").run();
+                dbtmp.prepare("REPLACE INTO \
+                t_fileindex(\
+                    id,filename,filepath,md5,updatetime,type,state,systeminclude,extdata \
+                ) \
+                SELECT \
+                    id,filename,filepath,md5,updatetime,type,state,systeminclude,extdata \
+                FROM Tmp.t_fileindex").run();
+                dbtmp.prepare('DETACH DATABASE "Tmp"').run();
+                dbtmp.close();
+            }
+            catch (error) {
+                console.error("import system index faild.", error);
+                logger.error("import system index faild.", error);
+            }
+            //this.closeconnect();
         };
         //备份到指定库中，这里用于从存储的db上加载数据写入db中
         this.backup = function (dbname, showprogress) {
@@ -754,7 +783,8 @@ var FileIndexStore = /** @class */ (function () {
                 var createu_i_filename = this.db.prepare('CREATE INDEX i_filename ON t_fileindex(filename)').run();
                 var createu_u_i_filepath = this.db.prepare('CREATE UNIQUE INDEX u_i_filepath ON t_fileindex(filepath)').run();
                 var createu_u_i_type_state = this.db.prepare('CREATE INDEX u_i_type_state ON t_fileindex(type, state)').run();
-                //console.info(createtable, createu_i_filename, createu_u_i_filepath);
+                //logger.info(createtable, createu_i_filename, createu_u_i_filepath);
+                this.db.prepare("UPDATE sqlite_sequence SET seq = 50000 WHERE name='t_fileindex'").run();
                 //https://www.sqlite.org/pragma.html
                 //this.db.pragma('encoding = UTF-8');
                 this.db.pragma('journal_mode = WAL');
@@ -896,7 +926,7 @@ var FileIndexStore = /** @class */ (function () {
         this.getFileByFileName = function (filename) {
             var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, systeminclude, extdata FROM t_fileindex WHERE filename=?');
             var infos = stmt.all(filename);
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 //logger.error("not find result. filename:", filename);
@@ -936,8 +966,8 @@ var FileIndexStore = /** @class */ (function () {
                     AND systeminclude=0 \
                     LIMIT ' + begin + "," + end);
             var infos = stmt.all();
-            //console.info(infos);
-            //console.info(begin, end);
+            //logger.info(infos);
+            //logger.info(begin, end);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 //logger.error("not find result. filepath:", filepath);
@@ -959,7 +989,7 @@ var FileIndexStore = /** @class */ (function () {
         this.getFileByFilePath = function (filepath) {
             var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE filepath=?');
             var infos = stmt.all(filepath);
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 //logger.error("not find result. filepath:", filepath);
@@ -978,7 +1008,7 @@ var FileIndexStore = /** @class */ (function () {
             var sqlids = ids.join(',');
             var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE id in (' + sqlids + ')');
             var infos = stmt.all();
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 logger.error("not find result. ids:", ids);
@@ -1000,7 +1030,7 @@ var FileIndexStore = /** @class */ (function () {
         this.getFileById = function (id) {
             var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex WHERE id=?');
             var infos = stmt.all(id);
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 logger.error("not find result. id:", id);
@@ -1018,7 +1048,7 @@ var FileIndexStore = /** @class */ (function () {
         this.getAllFileInfo = function () {
             var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex');
             var infos = stmt.all();
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 logger.error("get all data faild!");
@@ -1038,18 +1068,44 @@ var FileIndexStore = /** @class */ (function () {
         };
         //统计表的行数(为了性能)
         this.checkHasRowData = function () {
-            var stmt = this.db.prepare('SELECT id as total FROM t_fileindex LIMIT 0,10');
+            var stmt = this.db.prepare('SELECT count(id) as total FROM t_fileindex LIMIT 0,10');
             var infos = stmt.all();
-            //console.info(infos);
+            //logger.info(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 logger.error("get all data faild!");
                 return 0;
             }
             //返回总行书
-            return infos.length;
+            return infos[0]['total'];
         };
-        console.info("FileIndexStore in constructor");
+        //获取是否包含系统头文件
+        //返回：1: 不包含或者不全系统头文件；2:包含了系统头文件；3:未包含系统头文件，且无法导入
+        this.checkHasSystemIndex = function () {
+            var setKeyWord = ["map", "vector", "string", "set"];
+            var sqlKeyWord = setKeyWord.join("','");
+            var stmt = this.db.prepare('SELECT DISTINCT filename FROM t_fileindex where filename IN (\'' + sqlKeyWord + '\') and systeminclude=1');
+            var infos = stmt.all();
+            if (!infos
+                || infos == undefined
+                || infos.length != setKeyWord.length) {
+                //未查询到结果
+                var stmtmin = this.db.prepare('SELECT min(id) as min FROM t_fileindex where systeminclude!=1');
+                var min = stmtmin.all();
+                if (!min
+                    || min == undefined
+                    || min[0]['min'] > 3545) {
+                    //可以重新导入
+                    return 1;
+                }
+                //不能重新导入，重新导入会覆盖用户代码产生的索引
+                console.error("get all data faild!");
+                return 3;
+            }
+            //系统索引都已经包括了，无需导入
+            return 2;
+        };
+        logger.info("FileIndexStore in constructor");
         this.dbname = '';
         this.db = null;
         this.system_include = 0;

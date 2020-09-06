@@ -24,12 +24,26 @@ class UnzipSystemIncludeWorker {
             let filedb = new FileIndexStore();
             filedb.connect(dbpath, 0);
             let totalRow = filedb.checkHasRowData();
-            filedb.close();
-            logger.info("file index toatl row:", totalRow);
+            console.info("file index toatl row:", totalRow);
             if (totalRow >= 1) {
                 //已经存在文件，不进行分析
+                let ret = filedb.checkHasSystemIndex();
+                if(ret == 1){
+                    //之前系统索引导入失败，这了重新导入
+                    filedb.backup_live(systemdbfile, dbpath);
+                    callback("success");
+                    filedb.closeconnect();
+                    return;
+                }
+                if(ret == 3){
+                    callback("can_not_import");
+                    filedb.closeconnect();
+                    return;
+                }
+                
                 logger.info("无需初始化系统db文件");
                 callback("success");
+                filedb.closeconnect();
                 return;
             }
         }
@@ -40,6 +54,7 @@ class UnzipSystemIncludeWorker {
         filedb.backup(dbpath, (t, r) => {
             if(t <=0) {
                 callback("success");
+                filedb.closeconnect();
                 return;
             }
             logger.debug(`progress: ${((t - r) / t * 100).toFixed(1)}%`);
@@ -100,6 +115,11 @@ if (cluster.isMaster) {
 
         //解压db文件回调函数
         function unzipSystemDB_process_over(message) {
+            if(message == "can_not_import"){
+                let sendmessage = { "function": "can_not_import" };
+                process.send(sendmessage);
+                return;
+            }
             let sendmessage = { "function": "over" };
             process.send(sendmessage);
         }

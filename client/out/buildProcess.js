@@ -14,8 +14,14 @@ function runBuild(path, command) {
         type: 'build',
         task: taskName
     };
+    let runCommand = `cd ${path} && ${command}`;
+    if (command.indexOf("${path}") >= 0) {
+        let absPath = path.replace(projectPath, "");
+        command = command.replace("${path}", absPath);
+        runCommand = command;
+    }
     let source = "build";
-    let execution = new vscode_1.ShellExecution(`cd ${path} && ${command}`, null);
+    let execution = new vscode_1.ShellExecution(runCommand, null);
     let task = new vscode_1.Task(kind, taskName, source);
     task.group = vscode_1.TaskGroup.Build;
     task.execution = execution;
@@ -336,7 +342,10 @@ function GetBuildCmd(context, isCommd = true) {
                             runBuild(buildpath, cmd);
                             return;
                         }
+                        let config = vscode_1.workspace.getConfiguration();
+                        let defaultValue = config.get("cpptips.buildParams", "");
                         vscode_1.window.showInputBox({
+                            value: defaultValue,
                             password: false,
                             ignoreFocusOut: true,
                             placeHolder: '../../ ../comm/',
@@ -345,6 +354,7 @@ function GetBuildCmd(context, isCommd = true) {
                             if (!inputMsg) {
                                 return;
                             }
+                            config.update("cpptips.buildParams", inputMsg, vscode_1.ConfigurationTarget.Workspace);
                             cmd = msg.detail + " " + inputMsg;
                             logger.debug("cmd:" + cmd + " ;buildpath:" + buildpath);
                             runBuild(buildpath, cmd);

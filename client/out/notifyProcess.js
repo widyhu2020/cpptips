@@ -137,6 +137,10 @@ function notifyProcess(context, client) {
             diagnosic.set(sourceUri, _diagnosic);
         }
     });
+    client.onNotification("reloadWindow", (message) => {
+        //重启vscode
+        vscode_1.commands.executeCommand("workbench.action.reloadWindow");
+    });
 }
 exports.notifyProcess = notifyProcess;
 //# sourceMappingURL=notifyProcess.js.map

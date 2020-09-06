@@ -175,6 +175,9 @@ function reloadIncludeFileCallBack(msg, showprocess, total, nowIndex, extdata) {
     if (msg == "error") {
         showErrorMessage("文件索引加载失败！");
     }
+    if (msg == "can_not_import") {
+        showErrorMessage("系统检测到你工程未导入系统索引，系统库函数可能无法提示，因系统索引与你工程目录索引冲突，无法自动重新导入，需要删除工程目录下.vscode/db目录，重建索引来解决", ["知道了"]);
+    }
     if (msg == "stop_load_index") {
         showErrorMessage("你工程目录文件超过200000个，系统终止索引计算，请在右侧资源管理器中，选择目录右键“加入索引范围”指定需要计算的目录！");
         //显示可视化配置

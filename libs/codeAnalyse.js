@@ -563,6 +563,13 @@ var CodeAnalyse = /** @class */ (function () {
                     callback("success");
                     return;
                 }
+                if (data.function == "can_not_import") {
+                    //任务完成关闭子进程
+                    worker.kill();
+                    // that.loadindex = false;
+                    callback("can_not_import");
+                    return;
+                }
             });
             worker.on('exit', function (code, signal) {
                 //恢复正常功能
@@ -2092,7 +2099,10 @@ var CodeAnalyse = /** @class */ (function () {
                     return;
                 }
                 var that_1 = this;
-                function initSystemIncludeOver() {
+                function initSystemIncludeOver(msg) {
+                    if (msg == "can_not_import") {
+                        callback("can_not_import", 0, 0, 0);
+                    }
                     //加载工程头文件
                     logger.info("begin _reloadAllIncludeFile!");
                     //初始化db

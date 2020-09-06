@@ -164,4 +164,9 @@ export function notifyProcess(context:ExtensionContext, client: LanguageClient) 
             diagnosic.set(sourceUri, _diagnosic);
         }
     });
+
+    client.onNotification("reloadWindow", (message:Array<string>)=>{
+        //重启vscode
+        commands.executeCommand("workbench.action.reloadWindow");
+    });
 }
