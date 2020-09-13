@@ -38,7 +38,7 @@ function reflushErrorMsg(errorMsg) {
         task: taskName
     };
     let source = "reflush_build";
-    let execution = new vscode_1.ProcessExecution(`sleep 1 && echo "${errorMsg}"`, null);
+    let execution = new vscode_1.ShellExecution(`echo "${errorMsg}"`, null);
     let task = new vscode_1.Task(kind, taskName, source);
     task.group = vscode_1.TaskGroup.Build;
     task.execution = execution;

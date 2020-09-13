@@ -20,7 +20,7 @@ function initStatusBar() {
 exports.initStatusBar = initStatusBar;
 function notifyProcess(context, client) {
     //初始化diagnosic
-    let diagnosic = vscode_1.languages.createDiagnosticCollection("cpp");
+    let diagnosic = vscode_1.languages.createDiagnosticCollection("cpp1");
     client.onNotification("show_include_process", (data) => {
         myStatusBarItem.show();
         myStatusBarItem.color = showColor;
@@ -141,6 +141,7 @@ function notifyProcess(context, client) {
         //重启vscode
         vscode_1.commands.executeCommand("workbench.action.reloadWindow");
     });
+    return diagnosic;
 }
 exports.notifyProcess = notifyProcess;
 //# sourceMappingURL=notifyProcess.js.map

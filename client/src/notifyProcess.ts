@@ -32,7 +32,7 @@ export function initStatusBar(){
 
 export function notifyProcess(context:ExtensionContext, client: LanguageClient) {
     //初始化diagnosic
-    let diagnosic:DiagnosticCollection = languages.createDiagnosticCollection("cpp");
+    let diagnosic:DiagnosticCollection = languages.createDiagnosticCollection("cpp1");
 
     client.onNotification("show_include_process", (data: Array<number>) => {
         myStatusBarItem.show();
@@ -169,4 +169,6 @@ export function notifyProcess(context:ExtensionContext, client: LanguageClient) 
         //重启vscode
         commands.executeCommand("workbench.action.reloadWindow");
     });
+
+    return diagnosic;
 }

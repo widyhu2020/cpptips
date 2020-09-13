@@ -51,7 +51,7 @@ function runBuild(path:string, command:string){
 		"$cpp_gcc",
 		"$cpp_build"
 	];
-	
+
 	tasks.executeTask(task);
 	
 }
@@ -64,7 +64,7 @@ export function reflushErrorMsg(errorMsg:string){
 	};
 	
 	let source = "reflush_build";
-	let execution = new ProcessExecution(`sleep 1 && echo "${errorMsg}"`, null);
+	let execution = new ShellExecution(`echo "${errorMsg}"`, null);
 	let task = new Task(kind, taskName, source);
 	task.group = TaskGroup.Build;
 	task.execution = execution;

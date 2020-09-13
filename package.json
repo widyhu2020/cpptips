@@ -231,11 +231,17 @@
 					"command": "cpp.buildconfig",
 					"alt": "cpp.buildconfig",
 					"group": "z_commands@1"
+				},
+				{
+					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"command": "cpp.showWebConfig",
+					"alt": "cpp.showWebConfig",
+					"group": "z_commands@2"
 				}
 			],
 			"explorer/context": [
 				{
-					"when": "isMac",
+					"when": "true",
 					"command": "cpp.copyfilename",
 					"alt": "cpp.copyfilename",
 					"group": "6_copypath"

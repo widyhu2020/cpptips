@@ -38,6 +38,7 @@ import {
     MessageActionItem,
     WillSaveTextDocumentParams,
     TextDocumentContentChangeEvent,
+    DiagnosticSeverity,
 } from 'vscode-languageserver';
 const path = require('path');
 
@@ -59,6 +60,7 @@ let diagnostic:{[key:string]: Diagnostic[]} = {};
 import { configure, getLogger } from "log4js";
 import { isArray, forEach } from 'lodash';
 import { info } from 'console';
+import { ENGINE_METHOD_PKEY_ASN1_METHS } from 'constants';
 
 function getLoggerPath(){
     let logpath = "/tmp/cpptips.server.log";
@@ -261,7 +263,7 @@ function reloadIncludeFileCallBack(
         sendMsgToVscode('open_index_config', []);
     }
     if(msg == "show_file_more") {
-        showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
+        //showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
     
     sendMsgToVscode("close_show_process", data);
@@ -528,7 +530,6 @@ connection.onNotification("showDiagnostic", (infos:any) => {
 
 connection.onNotification("diagnosticInfo", (infos:any)=>{
     logger.debug("onNotification", infos);
-    
     //先清空
     diagnostic = {};
 
@@ -539,22 +540,54 @@ connection.onNotification("diagnosticInfo", (infos:any)=>{
         let arrayDiagnostics = [];
         for(let i = 0; i < infos[key].length; i++){
             let obj = infos[key][i];
+            
             let start = obj['range'][0];
             let end = obj['range'][1];
             if(start === undefined || end === undefined){
-                console.log("onNotification", infos);
+                logger.log("onNotification", infos);
                 continue;
             }
+
+            let message = obj['message'] + "-by cpptips";
+            if(obj['message'].indexOf("-by cpptips") >= 0){
+                message = obj['message'];
+            }
+            let severity = obj['severity'];
             let _range = Range.create(start, end);
-            let _diagnostics = Diagnostic.create(_range, obj['message'], obj['severity'], undefined, undefined, undefined);
-            _diagnostics.code = undefined;
-            _diagnostics.relatedInformation = undefined;
-            _diagnostics.source = undefined;
+            let _diagnostics = Diagnostic.create(_range, message, severity, undefined, undefined, undefined);
+            _diagnostics.code = obj['code'];
+            _diagnostics.relatedInformation = obj['relatedInformation'];
+            _diagnostics.source = obj['source'];
             arrayDiagnostics.push(_diagnostics);
         }
+
+        let _path = getLocalPath(key, basepath);
         diagnostic[key] = arrayDiagnostics;
+        sendMsgToVscode("reflushError", [key, JSON.stringify(diagnostic[key])]);
     }
 });
+
+function getLocalPath(filepath:string, rootpath:string){
+    if(fs.existsSync(filepath)) {
+        return filepath;
+    }
+
+    let paths = [];
+    if(filepath.indexOf("/")) {
+        paths = filepath.split("/");
+    } else {
+        paths = filepath.split(path.sep);
+    }
+
+    for(let i = 0; i < paths.length; i++){
+        let _paths = paths.slice(i);
+        let _filepath = rootpath + _paths.join("/");
+        if(fs.existsSync(filepath)) {
+            return _filepath;
+        }
+    }
+    return filepath;
+}
 
 connection.onInitialize((params: InitializeParams) => {
     //logger.debug(JSON.stringify(process));
@@ -1327,10 +1360,9 @@ function updateDiagnostic(uri:string, change:TextDocumentContentChangeEvent, con
                 logger.debug("after", _diagnostic.range.end);
             }
         }
-        
+
         diagnostic[_path] = newdiagnostic;
     }
-    
 }
 
 //编辑文件触发，增量触发
@@ -1744,8 +1776,7 @@ connection.onHover((params: TextDocumentPositionParams): Hover | undefined => {
             contents: precode
         };
         return data;
-    }
-);
+});
 
 // Listen on the connection 
 connection.listen();

@@ -23,13 +23,13 @@ import { configure, getLogger } from "log4js";
 import { reflushErrorMsg } from './buildProcess';
 import { time } from 'console';
 function getLoggerPath(){
-    let logpath = "/tmp/cpptips.server.log";
+    let logpath = "/tmp/cpptips.client.log";
     if(os.platform() == "win32"){
         //windows
         if(!fs.existsSync("c:\\cpplog")) {
             fs.mkdirSync("c:\\cpplog");
         }
-        logpath = "c:\\cpplog\\cpptips.server.log";
+        logpath = "c:\\cpplog\\cpptips.client.log";
     }
     return logpath;
 }
@@ -48,7 +48,7 @@ configure({
     }
 });
 const logger = getLogger("cpptips");
-logger.level = "all";
+logger.level = "debug";
 
 export function activate(context: ExtensionContext) {
     // The server is implemented in node
@@ -110,24 +110,32 @@ export function activate(context: ExtensionContext) {
         }
 
         //注册回调事件
-        notifyProcess(context, client);
+        let diagnosic:DiagnosticCollection = notifyProcess(context, client);
 
         //右键菜单处理
         menuProcess(context, client);
 
+        let diagnostic = {};
         tasks.onDidEndTask((listener:TaskEndEvent)=>{
             if(listener.execution.task.source == "build"){
                 setTimeout(() => {
                     let _diagnostic = languages.getDiagnostics();
                     logger.debug(_diagnostic);
-                    let diagnostic = {};
                     for(let i = 0; i < _diagnostic.length; i++){
                         let _path = _diagnostic[i][0];
                         diagnostic[_path.path] = _diagnostic[i][1];
                     }
+                    logger.debug(diagnostic);
+                    reflushErrorMsg("编译完成，你可以关闭该终端");
+                }, 500); 
+            }
+
+            if(listener.execution.task.source == "reflush_build"){
+                setTimeout(() => {
                     client.sendNotification("diagnosticInfo", diagnostic);
                     logger.debug(diagnostic);
-                }, 3000); 
+                    diagnostic = {};
+                }, 500); 
             }
         });
     });
@@ -136,8 +144,6 @@ export function activate(context: ExtensionContext) {
     initStatusBar();
     context.subscriptions.push(client.start());
 }
-
-
 
 export function deactivate(): Thenable<void> | undefined {
     if (!client) {

@@ -76,8 +76,9 @@ function showIndexConfig(context, client) {
         getDirNames(global, message) {
             let basePath = projectPath + "/" + message.path;
             let config = this.getConfig();
-            let dirname = this.getTreeNode(basePath, config, 0);
-            invokeCallback(global.panel, message, dirname);
+            let linkconfig = this.getLinkDir();
+            let dirname = this.getTreeNode(basePath, config, linkconfig, 0);
+            invokeCallback(global.panel, message, dirname['list']);
         },
         ignoreFileAndDir(global, message) {
             let configuration = vscode_1.workspace.getConfiguration();
@@ -121,10 +122,23 @@ function showIndexConfig(context, client) {
             logger.debug("needLoadDir:", needLoadDir);
             return needLoadDir;
         },
+        getLinkDir() {
+            //cpptips.needLoadLinkDir
+            let configuration = vscode_1.workspace.getConfiguration();
+            let needLoadDir = configuration['cpptips']['needLoadLinkDir'];
+            logger.debug("needLoadLinkDir:", needLoadDir);
+            return needLoadDir;
+        },
         saveConfig(needLoadDir) {
             vscode_1.workspace.getConfiguration().update('cpptips.needLoadDir', needLoadDir, vscode_1.ConfigurationTarget.Workspace);
         },
         checkIsInConfig(config, dirname) {
+            //console.log(config);
+            if (config.length <= 0) {
+                //如果没有配置，则默认全部配置
+                //让用户作减法
+                return true;
+            }
             for (let i = 0; i < config.length; i++) {
                 if (config[i] == dirname) {
                     return true;
@@ -132,20 +146,52 @@ function showIndexConfig(context, client) {
             }
             return false;
         },
-        getTreeNode(basePath, config, depth = 0) {
-            if (depth > 2) {
-                return [];
+        getTreeNode(basePath, config, linkconfig, depth = 0) {
+            if (depth > 64) {
+                return { 'total': 0, 'list': [] };
             }
             let dirf = fs.readdirSync(basePath, { 'encoding': 'utf8', 'withFileTypes': true });
             // 这个data数组中装的是当前文件夹下所有的文件名(包括文件夹)
             var that = this;
             let dirname = [];
-            logger.debug(dirf);
+            //logger.debug(dirf);
+            let child_count = 0;
             dirf.forEach(function (el, _index) {
+                if (el.isFile && /(\.cpp$)|(\.h$)|(\.hpp$)|(\.proto$)/.test(el.name)) {
+                    //文件才累加
+                    child_count++;
+                }
                 let fullpath = basePath + path.sep + el.name;
-                if (/[.]{1,1}.*/.test(el.name) || !el.isDirectory()) {
+                if (/[.]{1,1}.*/.test(el.name)
+                    || el.isFile()
+                    || el.isSocket()
+                    || el.isFIFO()
+                    || el.isCharacterDevice()
+                    || el.isBlockDevice()) {
                     //只取目录
                     return;
+                }
+                if (el.isSymbolicLink()) {
+                    logger.debug("isSymbolicLink:", fullpath);
+                    let statinfo = null;
+                    try {
+                        statinfo = fs.statSync(fullpath);
+                    }
+                    catch (error) {
+                        logger.debug("catch(error):", fullpath);
+                        return;
+                    }
+                    if (statinfo && !statinfo.isDirectory()) {
+                        logger.debug("isDirectory:", fullpath);
+                        return;
+                    }
+                    let _relativePath = fullpath.replace(projectPath + "/", "") + "/";
+                    if (linkconfig.length <= 0
+                        || !that.checkIsInConfig(linkconfig, _relativePath)) {
+                        //没有配置的连接
+                        logger.debug("checkIsInConfig", _relativePath);
+                        return;
+                    }
                 }
                 let check = false;
                 let relativePath = fullpath.replace(projectPath + "/", "") + "/";
@@ -154,14 +200,21 @@ function showIndexConfig(context, client) {
                 }
                 let node = {
                     'text': el.name,
+                    'data': "",
                     'state': { "opened": false, "checked": check },
                     'children': []
                 };
-                // logger.debug("xxxx", node);
-                node['children'] = that.getTreeNode(fullpath, config, depth + 1);
-                dirname.push(node);
+                let _data = that.getTreeNode(fullpath, config, linkconfig, depth + 1);
+                child_count += _data['total'];
+                if (depth < 3) {
+                    //只展示3层目录
+                    node['children'] = _data['list'];
+                    node['data'] = _data['total'].toString();
+                    dirname.push(node);
+                }
             });
-            return dirname;
+            return { 'total': child_count, 'list': dirname };
+            ;
         },
         showTipMessage(message, titles = ["我知道了"], callback = null) {
             //发送弹窗

@@ -14,14 +14,15 @@ const notifyProcess_1 = require("./notifyProcess");
 let client;
 const os = require("os");
 const log4js_1 = require("log4js");
+const buildProcess_1 = require("./buildProcess");
 function getLoggerPath() {
-    let logpath = "/tmp/cpptips.server.log";
+    let logpath = "/tmp/cpptips.client.log";
     if (os.platform() == "win32") {
         //windows
         if (!fs.existsSync("c:\\cpplog")) {
             fs.mkdirSync("c:\\cpplog");
         }
-        logpath = "c:\\cpplog\\cpptips.server.log";
+        logpath = "c:\\cpplog\\cpptips.client.log";
     }
     return logpath;
 }
@@ -40,7 +41,7 @@ log4js_1.configure({
     }
 });
 const logger = log4js_1.getLogger("cpptips");
-logger.level = "all";
+logger.level = "debug";
 function activate(context) {
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
@@ -86,22 +87,29 @@ function activate(context) {
             IndexConfig_1.showIndexConfig(context, client);
         }
         //注册回调事件
-        notifyProcess_1.notifyProcess(context, client);
+        let diagnosic = notifyProcess_1.notifyProcess(context, client);
         //右键菜单处理
         menuProcess_1.menuProcess(context, client);
+        let diagnostic = {};
         vscode_1.tasks.onDidEndTask((listener) => {
             if (listener.execution.task.source == "build") {
                 setTimeout(() => {
                     let _diagnostic = vscode_1.languages.getDiagnostics();
                     logger.debug(_diagnostic);
-                    let diagnostic = {};
                     for (let i = 0; i < _diagnostic.length; i++) {
                         let _path = _diagnostic[i][0];
                         diagnostic[_path.path] = _diagnostic[i][1];
                     }
+                    logger.debug(diagnostic);
+                    buildProcess_1.reflushErrorMsg("编译完成，你可以关闭该终端");
+                }, 500);
+            }
+            if (listener.execution.task.source == "reflush_build") {
+                setTimeout(() => {
                     client.sendNotification("diagnosticInfo", diagnostic);
                     logger.debug(diagnostic);
-                }, 3000);
+                    diagnostic = {};
+                }, 500);
             }
         });
     });
