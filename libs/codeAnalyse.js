@@ -916,6 +916,7 @@ var CodeAnalyse = /** @class */ (function () {
                     //未找到直接跳过
                     continue;
                 }
+                var _sourceline = lines[i];
                 var sourctline = line;
                 var pretype = line.substring(0, pos);
                 var _pretype = pretype;
@@ -963,7 +964,7 @@ var CodeAnalyse = /** @class */ (function () {
                     if (pretype.indexOf("::") == 0) {
                         pretype = pretype.substring(2);
                     }
-                    return { t: pretype, l: sourctline, p: ispoint };
+                    return { t: pretype, l: sourctline, ol: _sourceline, p: ispoint };
                 }
                 var result = this._getCharCountInStr(pretype, 0, new Set(['<', '>', ':']));
                 if (pretype != "return"
@@ -978,11 +979,14 @@ var CodeAnalyse = /** @class */ (function () {
                         || (pretype.indexOf("<") != -1 && pretype[pretype.length - 1] == ">")) {
                         //定义不能有其他字符
                         pretype = pretype.replace(/[\s]{0,4}[<>]{1,1}[\s]{0,4}/g, function (kw) { return kw.trim(); });
-                        return { t: pretype, l: sourctline, p: ispoint };
+                        return { t: pretype, l: sourctline, ol: _sourceline, p: ispoint };
                     }
                 }
             }
-            return { t: "", l: "", p: 0, pos: -1 };
+            if (valname == "this") {
+                return { t: "this", l: "", ol: "", p: 0, pos: -1 };
+            }
+            return { t: "", l: "", ol: "", p: 0, pos: -1 };
         };
         this._getFileNamespace = function (lines) {
             var data = [];
@@ -1076,7 +1080,7 @@ var CodeAnalyse = /** @class */ (function () {
             // { t: "", l: "" }
             //获取当前操作的wonname中
             var _ownname = this._getPosOwner(data);
-            var _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+            var _valetype = { t: _ownname, l: "p", ol: 'p', p: lastline, pos: -1 };
             if (name.n != "this") {
                 //非this指针，需要找出变量定义的类型
                 _valetype = this._getValDefineOwn(lines, name.n);
@@ -1204,7 +1208,7 @@ var CodeAnalyse = /** @class */ (function () {
                 var name_4 = names.pop();
                 //获取当前操作的wonname中
                 var _ownname = this._getPosOwner(data);
-                var _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+                var _valetype = { t: _ownname, l: "p", ol: 'p', p: lastline, pos: -1 };
                 if (name_4.n != "this") {
                     //非this指针，需要找出变量定义的类型
                     _valetype = this._getValDefineOwn(lines, name_4.n);
@@ -1265,6 +1269,15 @@ var CodeAnalyse = /** @class */ (function () {
                 var _nameInfo = DefineMap.getInstace().getRealName(classname);
                 namespace = _nameInfo.namespace;
                 classname = _nameInfo.name;
+                if (namespace == "") {
+                    //如果没有名空间，则获取全名重新解释
+                    var _classname = cp.getClassFullName(classname, usingnamespace);
+                    if (classname != _classname) {
+                        _nameInfo = DefineMap.getInstace().getRealName(_classname);
+                        namespace = _nameInfo.namespace;
+                        classname = _nameInfo.name;
+                    }
+                }
                 var inherit = cp.getInheritOfClass(classname, namespace, usingnamespace);
                 queue = queue.concat(inherit);
                 var _showitem = cp.getByOwnerNameInNamespace(classname, namespace, ownname);
@@ -1365,6 +1378,9 @@ var CodeAnalyse = /** @class */ (function () {
             }
             if (pos == -1) {
                 pos = line.indexOf("&" + valname, 0);
+            }
+            if (pos == -1) {
+                pos = line.indexOf("\t" + valname, 0);
             }
             return pos;
         };
@@ -1568,12 +1584,11 @@ var CodeAnalyse = /** @class */ (function () {
             }
             if (valetype != "" && names.length == 0) {
                 //可能是本文档定义
-                // if(!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
-                //     && /\.h$/g.test(filepath)) {
                 //同文件跳转
                 var result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
-                return result;
-                // }
+                if (result) {
+                    return result;
+                }
                 //可能是函数定义，需要清空类型从全局或者owner找
                 valetype = "";
             }
@@ -1591,7 +1606,7 @@ var CodeAnalyse = /** @class */ (function () {
         };
         //同文档查找定义
         this._findDefineInDocument = function (_valetype, filecontext, lengthmeta, valetype, filepath, name) {
-            var sourceline = _valetype.l;
+            var sourceline = _valetype.ol;
             var beginlines = this._findLineNumWithCode(filecontext, lengthmeta, sourceline);
             var begincols = sourceline.indexOf(valetype);
             var endlines = beginlines;
@@ -1614,7 +1629,34 @@ var CodeAnalyse = /** @class */ (function () {
         //归属定义定位
         this._findAllNameInGlobal = function (names, name, ownname, usingnamespace) {
             var df = new Definition(this.basedir, this.extPath);
-            var owns = [ownname, ''];
+            var owns = [''];
+            var runcout = 5;
+            var _getinherit = [ownname];
+            while (true) {
+                var _tmpClass = _getinherit.pop();
+                if (!_tmpClass || runcout-- < 0) {
+                    break;
+                }
+                if (_tmpClass == "") {
+                    continue;
+                }
+                //获取真姓名
+                var _result = DefineMap.getInstace().getRealName(_tmpClass);
+                if (_result.namespace == "") {
+                    _tmpClass = df.getClassFullName(_result.name, usingnamespace);
+                    _result = DefineMap.getInstace().getRealName(_tmpClass);
+                }
+                if (_result && _result.namespace.length >= 0) {
+                    //获取密命名空间和类名称
+                    usingnamespace.push(_result.namespace);
+                    _tmpClass = _result.name;
+                    owns.push(_tmpClass);
+                }
+                var inheritClass = df.getInheritOfClassByNamspaces(_tmpClass, usingnamespace);
+                for (var i = 0; i < inheritClass.length; i++) {
+                    _getinherit.push(inheritClass[i]);
+                }
+            }
             var result = df.getDefineInWitchClass(owns, name, usingnamespace);
             if (!result) {
                 //全局和本类都为找到定义
@@ -1624,13 +1666,31 @@ var CodeAnalyse = /** @class */ (function () {
                     //去掉own查找也失败
                     return false;
                 }
+                var hasResult = false;
+                var info_1 = null;
                 for (var i = 0; i < result.length; i++) {
-                    var info_1 = result[i];
+                    info_1 = result[i];
                     if (info_1.type == TypeEnum.ENUMITEM) {
                         //枚举值跳转
-                        var filepath = df.getFileInfo(info_1.file_id);
-                        return df.readFileFindDefine(filepath, info_1.ownname, info_1.name, info_1.type);
+                        var filepath_1 = df.getFileInfo(info_1.file_id);
+                        return df.readFileFindDefine(filepath_1, info_1.ownname, info_1.name, info_1.type);
                     }
+                    hasResult = true;
+                }
+                if (hasResult
+                    && (info_1.type == TypeEnum.CALSS
+                        || info_1.type == TypeEnum.STRUCT
+                        || info_1.type == TypeEnum.ENUM
+                        || info_1.type == TypeEnum.TYPEDEF
+                        || info_1.type == TypeEnum.DEFINE
+                        || (info_1.type == TypeEnum.FUNCTION && names.length == 0)
+                        || (info_1.type == TypeEnum.VARIABLE && names.length == 0))) {
+                    //变量定义
+                    //没有归属查找
+                    var file_id = df.getRealFileId(info_1);
+                    var sourcefilepath = df.getFileInfo(file_id);
+                    var filepath = df.getFileInfo(info_1.file_id);
+                    return df.readFileFindDefine(filepath, info_1.ownname, info_1.name, info_1.type, sourcefilepath);
                 }
                 return false;
             }
@@ -1644,15 +1704,15 @@ var CodeAnalyse = /** @class */ (function () {
                 || (info.type == TypeEnum.VARIABLE && names.length == 0)) {
                 //变量定义
                 //没有归属查找
-                var file_id = df.getRealFileId(info);
-                var sourcefilepath = df.getFileInfo(file_id);
-                var filepath = df.getFileInfo(info.file_id);
-                return df.readFileFindDefine(filepath, info.ownname, info.name, info.type, sourcefilepath);
+                var file_id_1 = df.getRealFileId(info);
+                var sourcefilepath_1 = df.getFileInfo(file_id_1);
+                var filepath_2 = df.getFileInfo(info.file_id);
+                return df.readFileFindDefine(filepath_2, info.ownname, info.name, info.type, sourcefilepath_1);
             }
             if (info.type == TypeEnum.ENUMITEM) {
                 //枚举值跳转
-                var filepath = df.getFileInfo(info.file_id);
-                return df.readFileFindDefine(filepath, info.ownname, info.name, info.type);
+                var filepath_3 = df.getFileInfo(info.file_id);
+                return df.readFileFindDefine(filepath_3, info.ownname, info.name, info.type);
             }
             //变量多级跳转
             var typename = info.name;
@@ -1879,33 +1939,51 @@ var CodeAnalyse = /** @class */ (function () {
             return result;
         };
         this._findLineNumWithCode = function (filecontext, lengthmeta, linecode) {
-            var ilength = linecode.length;
-            var lnum = 0;
-            var pos = 0;
-            var maxRun = 0;
-            while (true && maxRun < 500) {
-                maxRun++;
-                var _pos = filecontext.indexOf("\n", pos);
-                if (_pos == -1) {
-                    //未找到
-                    pos = _pos + 1;
-                    return -1;
+            for (var i = 0; i < lengthmeta.length; i++) {
+                var linedata = filecontext.substring(lengthmeta[i].b, lengthmeta[i].e);
+                var _pos = linedata.lastIndexOf(linecode);
+                if (_pos != -1) {
+                    //找到了
+                    var beginPos = lengthmeta[i].b + _pos + linecode.length;
+                    var _code = filecontext.substring(0, beginPos);
+                    var _countnum = this._getCharCountInStr(_code, 0, new Set(['\n']));
+                    return _countnum['\n'];
                 }
-                if (_pos - pos == ilength) {
-                    //判断起点是否在作用域范围
-                    for (var i = 0; i < lengthmeta.length; i++) {
-                        if (_pos >= lengthmeta[i].b && _pos <= lengthmeta[i].e) {
-                            //在作用域范围
-                            var _line = filecontext.substring(pos, _pos);
-                            if (_line == linecode) {
-                                return lnum;
-                            }
-                        }
-                    }
-                }
-                pos = _pos + 1;
-                lnum++;
             }
+            return 0;
+            // let ilength = linecode.length;
+            // let lnum = 0;
+            // let pos = filecontext.length - 1;
+            // let maxRun = 0;
+            // while (true && maxRun < 50000) {
+            //     maxRun++;
+            //     let _pos = filecontext.lastIndexOf("\n", pos);
+            //     if(_pos == -1) {
+            //         //未找到
+            //         pos = _pos - 1;
+            //         return -1;
+            //     }
+            //     let line = filecontext.substring(_pos, pos);
+            //     if(line.trim().indexOf("//") == 0){
+            //         pos = _pos - 1;
+            //         lnum++;
+            //         continue;
+            //     }
+            //     if (pos - _pos >= ilength && pos - _pos <= ilength + 8) {
+            //         //判断起点是否在作用域范围
+            //         for (let i = 0; i < lengthmeta.length; i++) {
+            //             if (_pos >= lengthmeta[i].b && pos <= lengthmeta[i].e) {
+            //                 //在作用域范围
+            //                 let _line = filecontext.substring(_pos + 1, pos + 1);
+            //                 if (_line.trim() == linecode.trim()) {
+            //                     return lnum;
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     pos = _pos - 1;
+            //     lnum++;
+            // }
         };
         //标准化文件路径
         this._filePathFormat = function (filepath) {
@@ -2165,6 +2243,7 @@ var CodeAnalyse = /** @class */ (function () {
                 return this._getDefinePoint(filepath, filecontext, linelast, owns);
             }
             catch (error) {
+                console.log("call getDefinePoint faild!", error);
                 logger.debug("call getDefinePoint faild!", error);
                 return false;
             }

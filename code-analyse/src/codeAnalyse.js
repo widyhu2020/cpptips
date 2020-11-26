@@ -1027,6 +1027,7 @@ class CodeAnalyse {
                 continue;
             }
             
+            let _sourceline = lines[i];
             let sourctline = line;
             let pretype = line.substring(0, pos);
             let _pretype = pretype;
@@ -1078,7 +1079,7 @@ class CodeAnalyse {
                 if(pretype.indexOf("::") == 0) {
                     pretype = pretype.substring(2);
                 }
-                return { t: pretype, l: sourctline, p: ispoint };
+                return { t: pretype, l: sourctline, ol:_sourceline, p: ispoint };
             }
             
             let result = this._getCharCountInStr(pretype, 0, new Set(['<', '>', ':']));
@@ -1094,11 +1095,14 @@ class CodeAnalyse {
                     || (pretype.indexOf("<") != -1 && pretype[pretype.length - 1] == ">")) {
                     //定义不能有其他字符
                     pretype = pretype.replace(/[\s]{0,4}[<>]{1,1}[\s]{0,4}/g, (kw)=>{ return kw.trim(); });
-                    return { t: pretype, l: sourctline, p: ispoint };
+                    return { t: pretype, l: sourctline, ol:_sourceline, p: ispoint };
                 }
             }
         }
-        return { t: "", l: "", p: 0, pos: -1};
+        if(valname == "this") {
+            return { t: "this", l: "", ol:"", p: 0, pos: -1};
+        }
+        return { t: "", l: "", ol:"", p: 0, pos: -1};
     };
 
     _getFileNamespace = function (lines) {
@@ -1203,7 +1207,7 @@ class CodeAnalyse {
         // { t: "", l: "" }
         //获取当前操作的wonname中
         let _ownname = this._getPosOwner(data);
-        let _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+        let _valetype = { t: _ownname, l: "p", ol:'p', p: lastline, pos: -1 };
         if (name.n != "this") {
             //非this指针，需要找出变量定义的类型
             _valetype = this._getValDefineOwn(lines, name.n);
@@ -1340,7 +1344,7 @@ class CodeAnalyse {
             let name = names.pop();
             //获取当前操作的wonname中
             let _ownname = this._getPosOwner(data);
-            let _valetype = { t: _ownname, l: "p", p: lastline, pos: -1 };
+            let _valetype = { t: _ownname, l: "p", ol:'p', p: lastline, pos: -1 };
             if (name.n != "this") {
                 //非this指针，需要找出变量定义的类型
                 _valetype = this._getValDefineOwn(lines, name.n);
@@ -1407,10 +1411,19 @@ class CodeAnalyse {
             let _nameInfo = DefineMap.getInstace().getRealName(classname);
             namespace = _nameInfo.namespace;
             classname = _nameInfo.name;
+            if(namespace == "") {
+                //如果没有名空间，则获取全名重新解释
+                let _classname = cp.getClassFullName(classname, usingnamespace);
+                if(classname != _classname){
+                    _nameInfo = DefineMap.getInstace().getRealName(_classname);
+                    namespace = _nameInfo.namespace;
+                    classname = _nameInfo.name;
+                } 
+            }
 
             let inherit = cp.getInheritOfClass(classname, namespace, usingnamespace);
             queue = queue.concat(inherit);
-
+            
             let _showitem = cp.getByOwnerNameInNamespace(classname, namespace, ownname);
             showitem = showitem.concat(_showitem);
             deeppath++;
@@ -1523,6 +1536,9 @@ class CodeAnalyse {
         }
         if (pos == -1) {
             pos = line.indexOf("&" + valname, 0);
+        }
+        if (pos == -1) {
+            pos = line.indexOf("\t" + valname, 0);
         }
         return pos;
     }
@@ -1762,12 +1778,11 @@ class CodeAnalyse {
         
         if (valetype != "" && names.length == 0) {
             //可能是本文档定义
-            // if(!(/^[0-9a-z_]{0,56}[\s\t]{0,4}\(/ig.test(linelast))
-            //     && /\.h$/g.test(filepath)) {
-                //同文件跳转
-                let result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
+            //同文件跳转
+            let result = this._findDefineInDocument(_valetype, filecontext, lengthmeta, valetype, filepath, name);
+            if(result) {
                 return result;
-            // }
+            }
             //可能是函数定义，需要清空类型从全局或者owner找
             valetype = "";
         }
@@ -1788,7 +1803,7 @@ class CodeAnalyse {
 
     //同文档查找定义
     _findDefineInDocument = function(_valetype, filecontext, lengthmeta, valetype, filepath, name) {
-        let sourceline = _valetype.l;
+        let sourceline = _valetype.ol;
         let beginlines = this._findLineNumWithCode(filecontext, lengthmeta, sourceline);
         let begincols = sourceline.indexOf(valetype);
         let endlines = beginlines;
@@ -1812,7 +1827,38 @@ class CodeAnalyse {
     //归属定义定位
     _findAllNameInGlobal = function (names, name, ownname, usingnamespace) {
         let df = new Definition(this.basedir, this.extPath);
-        let owns = [ownname, ''];
+        let owns = [''];
+
+        let runcout = 5;
+        let _getinherit = [ownname];
+        while(true) {
+            let _tmpClass = _getinherit.pop();
+            if(!_tmpClass || runcout-- < 0){
+                break;
+            }
+            if(_tmpClass == "") {
+                continue;
+            }
+
+            //获取真姓名
+            let _result = DefineMap.getInstace().getRealName(_tmpClass);
+            if(_result.namespace == ""){
+                _tmpClass = df.getClassFullName(_result.name, usingnamespace);
+                _result = DefineMap.getInstace().getRealName(_tmpClass);
+            }
+            if(_result && _result.namespace.length >= 0) {
+                //获取密命名空间和类名称
+                usingnamespace.push(_result.namespace);
+                _tmpClass = _result.name;
+                owns.push(_tmpClass);
+            }
+
+            let inheritClass = df.getInheritOfClassByNamspaces(_tmpClass, usingnamespace)
+            for(let i = 0; i < inheritClass.length; i++){
+                _getinherit.push(inheritClass[i]);
+            }
+        }
+        
         let result = df.getDefineInWitchClass(owns, name, usingnamespace);
         if (!result) {
             //全局和本类都为找到定义
@@ -1822,13 +1868,31 @@ class CodeAnalyse {
                 //去掉own查找也失败
                 return false;
             }
+            let hasResult = false;
+            let info = null;
             for (let i = 0; i < result.length; i++) {
-                let info = result[i];
+                info = result[i];
                 if(info.type == TypeEnum.ENUMITEM) {
                     //枚举值跳转
                     let filepath = df.getFileInfo(info.file_id);
                     return df.readFileFindDefine(filepath, info.ownname, info.name, info.type);
                 }
+                hasResult = true;
+            }
+            if (hasResult 
+                && (info.type == TypeEnum.CALSS
+                    || info.type == TypeEnum.STRUCT
+                    || info.type == TypeEnum.ENUM
+                    || info.type == TypeEnum.TYPEDEF
+                    || info.type == TypeEnum.DEFINE
+                    || (info.type == TypeEnum.FUNCTION && names.length == 0)
+                    || (info.type == TypeEnum.VARIABLE && names.length == 0))) {
+                //变量定义
+                //没有归属查找
+                var file_id = df.getRealFileId(info);
+                var sourcefilepath = df.getFileInfo(file_id);
+                var filepath = df.getFileInfo(info.file_id);
+                return df.readFileFindDefine(filepath, info.ownname, info.name, info.type, sourcefilepath);
             }
             return false;
         }
@@ -2097,34 +2161,54 @@ class CodeAnalyse {
     };
 
     _findLineNumWithCode = function (filecontext, lengthmeta, linecode) {
-        let ilength = linecode.length;
-        let lnum = 0;
-        let pos = 0;
-        let maxRun = 0;
-        while (true && maxRun < 500) {
-            maxRun++;
-            let _pos = filecontext.indexOf("\n", pos);
 
-            if(_pos == -1) {
-                //未找到
-                pos = _pos + 1;
-                return -1;
+        for(let i = 0; i < lengthmeta.length; i++){
+            let linedata = filecontext.substring(lengthmeta[i].b, lengthmeta[i].e);
+            let _pos = linedata.lastIndexOf(linecode);
+            if(_pos != -1){
+                //找到了
+                let beginPos = lengthmeta[i].b + _pos + linecode.length;
+                let _code = filecontext.substring(0, beginPos);
+                let _countnum = this._getCharCountInStr(_code, 0, new Set(['\n']));
+                return _countnum['\n'];
             }
-            if (_pos - pos == ilength) {
-                //判断起点是否在作用域范围
-                for (let i = 0; i < lengthmeta.length; i++) {
-                    if (_pos >= lengthmeta[i].b && _pos <= lengthmeta[i].e) {
-                        //在作用域范围
-                        let _line = filecontext.substring(pos, _pos);
-                        if (_line == linecode) {
-                            return lnum;
-                        }
-                    }
-                }
-            }
-            pos = _pos + 1;
-            lnum++;
         }
+        return 0;
+        
+        // let ilength = linecode.length;
+        // let lnum = 0;
+        // let pos = filecontext.length - 1;
+        // let maxRun = 0;
+        // while (true && maxRun < 50000) {
+        //     maxRun++;
+        //     let _pos = filecontext.lastIndexOf("\n", pos);
+
+        //     if(_pos == -1) {
+        //         //未找到
+        //         pos = _pos - 1;
+        //         return -1;
+        //     }
+        //     let line = filecontext.substring(_pos, pos);
+        //     if(line.trim().indexOf("//") == 0){
+        //         pos = _pos - 1;
+        //         lnum++;
+        //         continue;
+        //     }
+        //     if (pos - _pos >= ilength && pos - _pos <= ilength + 8) {
+        //         //判断起点是否在作用域范围
+        //         for (let i = 0; i < lengthmeta.length; i++) {
+        //             if (_pos >= lengthmeta[i].b && pos <= lengthmeta[i].e) {
+        //                 //在作用域范围
+        //                 let _line = filecontext.substring(_pos + 1, pos + 1);
+        //                 if (_line.trim() == linecode.trim()) {
+        //                     return lnum;
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     pos = _pos - 1;
+        //     lnum++;
+        // }
     };
 
     //标准化文件路径
@@ -2383,6 +2467,7 @@ class CodeAnalyse {
             }
             return this._getDefinePoint(filepath, filecontext, linelast, owns);
         } catch (error) {
+            console.log("call getDefinePoint faild!", error);
             logger.debug("call getDefinePoint faild!", error);
             return false;
         }

@@ -195,6 +195,18 @@ class Completion {
         return inherit;
     };
 
+    //获取继承父
+    getInheritOfClassByNamspaces = function(name, namespaces) {
+        let fullname = this.getClassFullName(name, namespaces);
+        let _lpos = fullname.lastIndexOf("::");
+        if(_lpos >= 0) {
+            let namespace = fullname.substring(0, _lpos);
+            return this.getInheritOfClassSample(name,namespace);
+        }
+        
+        return [];
+    }
+
     //输入前缀和命名空间，获取智能提示列表
     querByPreKwInNamepsace = function (preKw, namespaces, ownname, defineval, gettype = []) {
 

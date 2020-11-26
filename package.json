@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.3.0",
+	"version": "0.3.2",
 	"repository": {
 		"url": "https://github.com/widyhu2020/cpptips"
 	},
@@ -120,7 +120,7 @@
 			},
 			{
 				"command": "cpp.showWebConfig",
-				"title": "去可视化配置索引"
+				"title": "【配置】去可视化配置索引"
 			},
 			{
 				"command": "cpp.reflushOneIdex",
@@ -136,7 +136,7 @@
 			},
 			{
 				"command": "cpp.buildconfig",
-				"title": "配置编译过程"
+				"title": "【配置】配置编译过程"
 			}
 		],
 		"languages": [
@@ -230,7 +230,7 @@
 					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
 					"command": "cpp.buildconfig",
 					"alt": "cpp.buildconfig",
-					"group": "z_commands@1"
+					"group": "z_commands@2"
 				},
 				{
 					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
@@ -356,6 +356,7 @@
 		"electron-rebuild": "^1.10.0",
 		"events": "^3.1.0",
 		"log4js": "^6.3.0",
+		"node-abi": "^2.19.1",
 		"node-gyp": "^6.1.0",
 		"open": "^7.1.0",
 		"unzipper": "^0.10.10"

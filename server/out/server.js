@@ -432,6 +432,7 @@ connection.onNotification("diagnosticInfo", (infos) => {
     let keys = Object.keys(infos);
     for (let j = 0; j < keys.length; j++) {
         let key = keys[j];
+        let pathinfo = path.parse(key);
         let arrayDiagnostics = [];
         for (let i = 0; i < infos[key].length; i++) {
             let obj = infos[key][i];
@@ -445,17 +446,29 @@ connection.onNotification("diagnosticInfo", (infos) => {
             if (obj['message'].indexOf("-by cpptips") >= 0) {
                 message = obj['message'];
             }
+            let code = obj['code'];
+            //severity: 'Error'
             let severity = obj['severity'];
+            if (severity == "Error" || severity == 1) {
+                // severity = DiagnosticSeverity.Error;
+                //这是一个坑，client和server枚举不一致，client是从0开始的
+                severity = 0;
+            }
+            else if (severity == "Warning" || severity == 2) {
+                // severity = DiagnosticSeverity.Warning;
+                //这是一个坑，client和server枚举不一致，client是从0开始的
+                severity = 1;
+            }
             let _range = vscode_languageserver_1.Range.create(start, end);
             let _diagnostics = vscode_languageserver_1.Diagnostic.create(_range, message, severity, undefined, undefined, undefined);
             _diagnostics.code = obj['code'];
             _diagnostics.relatedInformation = obj['relatedInformation'];
-            _diagnostics.source = obj['source'];
+            _diagnostics.source = obj['source'].replace(pathinfo.dir, "");
             arrayDiagnostics.push(_diagnostics);
         }
         let _path = getLocalPath(key, basepath);
-        diagnostic[key] = arrayDiagnostics;
-        sendMsgToVscode("reflushError", [key, JSON.stringify(diagnostic[key])]);
+        diagnostic[_path] = arrayDiagnostics;
+        sendMsgToVscode("reflushError", [_path, JSON.stringify(diagnostic[_path])]);
     }
 });
 function getLocalPath(filepath, rootpath) {
@@ -479,7 +492,10 @@ function getLocalPath(filepath, rootpath) {
     return filepath;
 }
 connection.onInitialize((params) => {
-    //logger.debug(JSON.stringify(process));
+    console.debug(process.versions);
+    console.debug(process.arch);
+    console.debug(process.platform);
+    console.debug(process.execPath);
     logger.debug("root path", params.rootPath);
     if (params.rootPath != null) {
         basepath = params.rootPath;
@@ -545,10 +561,10 @@ connection.onInitialized(() => {
         codeAnalyse_1.CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
         logger.mark("reloadAllIncludeFile");
         //更新检查
-        logger.debug("begin updateCheck");
-        logger.mark("updateCheck");
-        codeAnalyse_1.CodeAnalyse.getInstace().updateCheck(updateTips);
-        logger.mark("updateCheck");
+        // logger.debug("begin updateCheck");
+        // logger.mark("updateCheck");
+        // CodeAnalyse.getInstace().updateCheck(updateTips);
+        // logger.mark("updateCheck");
     }, (err) => { logger.debug(err); });
 });
 //配置调整
@@ -1423,7 +1439,7 @@ connection.onDefinition((params) => {
     let filename = getFilePath(params.textDocument.uri);
     if (filename == false) {
         logger.debug("onDefinition", params.textDocument.uri);
-        return;
+        return undefined;
     }
     let line = params.position.line;
     let cpos = params.position.character;

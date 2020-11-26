@@ -7,6 +7,7 @@ const KeyWordStore = require('./src/store/store').KeyWordStore;
 const Store = require('./src/store/store').Store;
 const Traverse = require('./src/traversedir/traverse').Traverse;
 const Completion = require('./src/completion/completion').Completion;
+//mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/logic_db/Merchant.cpp
 let basedir = "/Users/widyhu/widyhu/cpp_project/";
 const path = require('path');
 
@@ -21,9 +22,9 @@ filename = "xxxxx.proto";
 
 //测试归属找提示
 // 301 30
-let line = 301;
-let cpos = 30;
-filename = "src/syncmchinfo.cpp";
+let line = 118;
+let cpos = 15;
+filename = "mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantdaosvr/logic_db/Merchant.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);
@@ -130,5 +131,5 @@ CodeAnalyse.getInstace().init({
 });
 
 CodeAnalyse.getInstace().getDependentByCpp(filename, succcallbackloadcpp);
-//CodeAnalyse.getInstace().reloadAllIncludeFile(succcallbackloadindex);
+// CodeAnalyse.getInstace().reloadAllIncludeFile(succcallbackloadindex);
 

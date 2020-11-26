@@ -29,6 +29,7 @@ var AnalyseDomain = /** @class */ (function () {
             var findfunctiondefine = false;
             for (var i = 0; i < data.length; i++) {
                 var blcok = data[i];
+                var _block = blcok;
                 blcok = blcok.trim();
                 //if(/namespace/g.test(blcok)) logger.debug(blcok);
                 if (blcok[blcok.length - 1] == '{') {
@@ -46,7 +47,7 @@ var AnalyseDomain = /** @class */ (function () {
                             || _retType == "do"
                             || _retType == "while"
                             || functiondef[functiondef.length - 1] == ";") {
-                            tmpdata.push(blcok);
+                            tmpdata.push(_block);
                             continue;
                         }
                         var params = matchData[4].replace(/[()*&\n]{1,1}|const/g, "");
@@ -62,7 +63,7 @@ var AnalyseDomain = /** @class */ (function () {
                         }
                         if (params != "" && !isParamsDefine) {
                             //不是函数定义
-                            tmpdata.push(blcok);
+                            tmpdata.push(_block);
                             continue;
                         }
                         if (findfunctiondefine) {
@@ -71,7 +72,7 @@ var AnalyseDomain = /** @class */ (function () {
                         }
                         //函数定义
                         findfunctiondefine = true;
-                        tmpdata.push(blcok);
+                        tmpdata.push(_block);
                         continue;
                     }
                 }
@@ -114,7 +115,7 @@ var AnalyseDomain = /** @class */ (function () {
             var data = [];
             var lastpos = this.context.length - 1;
             var maxRun = 0;
-            while (true && maxRun < 500) {
+            while (true && maxRun < 50000) {
                 maxRun++;
                 var result = this._doAnalyse(lastpos);
                 data.push(result.text);
@@ -163,19 +164,19 @@ var AnalyseDomain = /** @class */ (function () {
             return ret;
         };
         this.context = context;
-        this.context = this.context.replace(/\/\/[^\n]*\n/g, "\n");
+        //this.context = this.context.replace(/\/\/[^\n]*\n/g, "\n");
         // this.context = this.context.replace(/\/\*.+?(\*\/){1,1}/mg, "");
-        while (true) {
-            var bpos = this.context.indexOf("/*", 0);
-            var epos = this.context.indexOf("*/", bpos);
-            if (bpos == -1 || epos == -1) {
-                //查找完毕
-                break;
-            }
-            var firstContext = this.context.substring(0, bpos);
-            var lastContext = this.context.substring(epos + 2);
-            this.context = firstContext + lastContext;
-        }
+        // while(true) {
+        //     let bpos = this.context.indexOf("/*", 0);
+        //     let epos = this.context.indexOf("*/", bpos);
+        //     if(bpos == -1 || epos == -1) {
+        //         //查找完毕
+        //         break;
+        //     }
+        //     let firstContext = this.context.substring(0, bpos);
+        //     let lastContext = this.context.substring(epos + 2);
+        //     this.context = firstContext + lastContext;
+        // }  
     }
     ;
     return AnalyseDomain;

@@ -173,6 +173,16 @@ var Completion = /** @class */ (function () {
             }
             return inherit;
         };
+        //获取继承父
+        this.getInheritOfClassByNamspaces = function (name, namespaces) {
+            var fullname = this.getClassFullName(name, namespaces);
+            var _lpos = fullname.lastIndexOf("::");
+            if (_lpos >= 0) {
+                var namespace = fullname.substring(0, _lpos);
+                return this.getInheritOfClassSample(name, namespace);
+            }
+            return [];
+        };
         //输入前缀和命名空间，获取智能提示列表
         this.querByPreKwInNamepsace = function (preKw, namespaces, ownname, defineval, gettype) {
             if (gettype === void 0) { gettype = []; }

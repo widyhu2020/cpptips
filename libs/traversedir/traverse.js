@@ -525,7 +525,7 @@ var Traverse = /** @class */ (function () {
             }
         }
         //链接全部加入索引计算范围
-        for (var i = 0; i < this.userConfig.needLoadLinkDir.length; i++) {
+        for (var i = 0; this.userConfig.needLoadLinkDir && i < this.userConfig.needLoadLinkDir.length; i++) {
             var path_2 = this.userConfig.needLoadLinkDir[i];
             this.needLoadDir.push(path_2);
         }

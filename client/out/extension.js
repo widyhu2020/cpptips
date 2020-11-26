@@ -45,8 +45,6 @@ logger.level = "debug";
 function activate(context) {
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
-    // languages.getDiagnostics();
-    // languages.onDidChangeDiagnostics()
     let extensionPath = context.extensionPath;
     let storagePath = context.storagePath;
     let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
@@ -80,7 +78,7 @@ function activate(context) {
     };
     // Create the language client and start the client.
     client = new vscode_languageclient_1.LanguageClient('CpptipslanguageServer', 'Cpptips Language Server', serverOptions, clientOptions, false);
-    let bascpath = vscode_1.workspace.rootPath;
+    let bascpath = vscode_1.workspace.workspaceFolders;
     client.onReady().then(() => {
         if (IndexConfig_1.checkNeedShowDefault()) {
             //需要强制提醒

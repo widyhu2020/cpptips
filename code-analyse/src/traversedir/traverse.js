@@ -80,7 +80,7 @@ class Traverse {
         }
 
         //链接全部加入索引计算范围
-        for(let i = 0; i < this.userConfig.needLoadLinkDir.length; i++) {
+        for(let i = 0; this.userConfig.needLoadLinkDir && i < this.userConfig.needLoadLinkDir.length; i++) {
             let path = this.userConfig.needLoadLinkDir[i];
             this.needLoadDir.push(path);
         }

@@ -79,6 +79,7 @@ class AnalyseBase {
             let _nameMap = this._saveAreaOwn(current, fileid);
             nameMap = Object.assign(nameMap, _nameMap);
         });
+        
         //去掉无用的定义
         this._removeNoUserFunction();
         return nameMap;

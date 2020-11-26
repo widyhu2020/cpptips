@@ -56,9 +56,6 @@ export function activate(context: ExtensionContext) {
         path.join('server', 'out', 'server.js')
     );
 
-    // languages.getDiagnostics();
-    // languages.onDidChangeDiagnostics()
-
     let extensionPath = context.extensionPath;
     let storagePath = context.storagePath;
     let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
@@ -101,7 +98,7 @@ export function activate(context: ExtensionContext) {
         false
     );
 
-    let bascpath = workspace.rootPath;
+    let bascpath = workspace.workspaceFolders;
     client.onReady().then(()=>{
        
         if(checkNeedShowDefault()){

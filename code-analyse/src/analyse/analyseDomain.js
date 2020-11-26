@@ -10,20 +10,20 @@ class AnalyseDomain {
     //分析domain
     constructor(context) {
         this.context = context;
-        this.context = this.context.replace(/\/\/[^\n]*\n/g, "\n");
+        //this.context = this.context.replace(/\/\/[^\n]*\n/g, "\n");
         // this.context = this.context.replace(/\/\*.+?(\*\/){1,1}/mg, "");
 
-        while(true) {
-            let bpos = this.context.indexOf("/*", 0);
-            let epos = this.context.indexOf("*/", bpos);
-            if(bpos == -1 || epos == -1) {
-                //查找完毕
-                break;
-            }
-            let firstContext = this.context.substring(0, bpos);
-            let lastContext = this.context.substring(epos + 2);
-            this.context = firstContext + lastContext;
-        }  
+        // while(true) {
+        //     let bpos = this.context.indexOf("/*", 0);
+        //     let epos = this.context.indexOf("*/", bpos);
+        //     if(bpos == -1 || epos == -1) {
+        //         //查找完毕
+        //         break;
+        //     }
+        //     let firstContext = this.context.substring(0, bpos);
+        //     let lastContext = this.context.substring(epos + 2);
+        //     this.context = firstContext + lastContext;
+        // }  
     };
 
     getCharNumInStr = function(str, bpos, epos, ichar) {
@@ -49,6 +49,7 @@ class AnalyseDomain {
         let findfunctiondefine = false;
         for(let i = 0; i < data.length; i++) {
             let blcok = data[i];
+            let _block = blcok;
             blcok = blcok.trim();
             //if(/namespace/g.test(blcok)) logger.debug(blcok);
             if(blcok[blcok.length - 1] == '{') {
@@ -66,7 +67,7 @@ class AnalyseDomain {
                         || _retType == "do"
                         || _retType == "while"
                         || functiondef[functiondef.length - 1] == ";") {
-                        tmpdata.push(blcok);
+                        tmpdata.push(_block);
                         continue;
                     }
                     let params = matchData[4].replace(/[()*&\n]{1,1}|const/g, "");
@@ -82,7 +83,7 @@ class AnalyseDomain {
                     }
                     if(params != "" && !isParamsDefine) {
                         //不是函数定义
-                        tmpdata.push(blcok);
+                        tmpdata.push(_block);
                         continue;
                     }
                     
@@ -92,7 +93,7 @@ class AnalyseDomain {
                     }
                     //函数定义
                     findfunctiondefine = true;
-                    tmpdata.push(blcok);
+                    tmpdata.push(_block);
                     continue;
                 }
             }
@@ -140,7 +141,7 @@ class AnalyseDomain {
         let data = [];
         let lastpos = this.context.length - 1;
         let maxRun = 0;
-        while (true && maxRun < 500) {
+        while (true && maxRun < 50000) {
             maxRun++;
             let result = this._doAnalyse(lastpos);
             data.push(result.text);

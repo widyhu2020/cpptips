@@ -74,7 +74,7 @@ _rebuildNatveModelMaxOs = function(){
    let scriptpath = __dirname;
    scriptpath = path.resolve(scriptpath, '../..');
    let electronVersion = process.versions.electron;
-   if(!fs.existsSync(scriptpath + "/node_modules/.bin")) {
+   if(!fs.existsSync(scriptpath + "/nodemodules/.bin")) {
 	   //创建目录
 	   fs.mkdirSync(scriptpath + "/node_modules/.bin");
    }
@@ -97,6 +97,8 @@ _rebuildNatveModelMaxOs = function(){
 	   '--module-dir',
 	   modelepath
    ];
+   console.log("没有找到可用的版本，正在尝试编译该版本。");
+   console.log(buildcli + " " + params.join(" "));
    //./node_modules/.bin/electron-rebuild -f -w better-sqlite3 -v 7.1.11
    let result = childprocess.spawnSync(buildcli, params, {encoding: "utf8"});
    console.log(result);
@@ -114,6 +116,9 @@ _rebuildNatveModelLinux = function() {
    scriptpath = path.resolve(scriptpath, '../../node_modules/better-sqlite3');
 
    let cmd = `cd ${scriptpath} && ${execPath} ../node-gyp/bin/node-gyp.js configure && ${execPath} ../node-gyp/bin/node-gyp.js rebuild`;
+   
+   console.log("没有找到可用的版本，正在尝试编译该版本。");
+   console.log(cmd);
 
    scriptpath = path.resolve(scriptpath, '../integer');
    let cmd2 = `&& cd ${scriptpath} && ${execPath} ../node-gyp/bin/node-gyp.js configure && ${execPath} ../node-gyp/bin/node-gyp.js rebuild`;

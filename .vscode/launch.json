@@ -5,7 +5,8 @@
 		{
 			"type": "extensionHost",
 			"request": "launch",
-			"name": "client",
+			"name": "客户端",
+			"sourceMaps": true,
 			"runtimeExecutable": "${execPath}",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceRoot}"
@@ -31,8 +32,11 @@
 		{
 			"type": "node",
 			"request": "attach",
-			"name": "service",
+			"name": "服务器",
+			"address": "localhost",
+			"protocol": "inspector",
 			"port": 6009,
+			"sourceMaps": true,
 			"restart": true,
 			"outFiles": [
 				"${workspaceRoot}/server/out/**/*.js"
@@ -43,8 +47,8 @@
 		{
 			"name": "客户端 + 服务器调试",
 			"configurations": [
-				"client",
-				"service"
+				"客户端",
+				"服务器"
 			]
 		}
 	]
