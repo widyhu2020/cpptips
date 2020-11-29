@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.build = exports.GetBuildCmd = exports.reflushErrorMsg = void 0;
 const path = require("path");
 const fs = require("fs");
 const vscode_1 = require("vscode");

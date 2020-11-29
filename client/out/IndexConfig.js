@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkNeedShowDefault = exports.showIndexConfig = void 0;
 const vscode_1 = require("vscode");
 const path = require("path");
 const fs = require("fs");

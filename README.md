@@ -247,3 +247,8 @@ v0.3.2
 - 解决定位不到的调整报语法错误的问题
 - 解决同文件跳转不准确或者不跳转的问题
 - 解决基类为模版类的情况下，无法跟踪基类的成员函数和成员变量的问题
+
+v0.4.0
+- lsp架构中，server改自带的node版本，以解决vscode升级导致node和版本不一致electron导致插件无法运行的问题，新版本将sqlite不再依赖electron的版本
+- 增加自动编译能力，系统内置macos、linux（x64）、windows（x86）、windows（x64）四个操作系统和cpu的node（12.16.1），内置的原生sqlite如果不能使用，系统会自动启用编译，自动编译这一功能依赖操作系统中是需要安装python，如果编译失败，可以先安装python，使用打印出来的指令手工编译，或者安装python重新启动vscode，这一改动将使安装包比原来更大
+- 支持protobuf自动建BaseClient，方便接口调用提示（svrkit专用）

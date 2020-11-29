@@ -30,9 +30,11 @@ class AnalyseProtobuf extends AnalyseBase{
         //logger.mark("splitContext")
         let lines = this._splitContextProto();
         //logger.mark("splitContext");
-        //logger.debug(lines);
 
+        //与分析proto
+        //logger.mark("_preProcessProto")
         this._preProcessProto(lines);
+        //logger.mark("_preProcessProto")
 
         //分析作用域
         //logger.mark("analyseDomain")
@@ -45,23 +47,31 @@ class AnalyseProtobuf extends AnalyseBase{
         //logger.mark("makeNamespace");
 
         //遍历树其他代码快分析函数
-        //logger.mark("analyseCodeBlock")
+        //logger.mark("_analyseCodeBlockProtoFunction")
         this.tree.traverseBF((current) => {
             for (let i = 0; i < current.data.length; i++) {
                 this._analyseCodeBlockProtoFunction(current, lines, current.data[i]);
             }
         });
-        //logger.mark("analyseCodeBlock");
-
+        //logger.mark("_analyseCodeBlockProtoFunction");
 
         //遍历树其他代码快分析枚举
-        //logger.mark("analyseCodeBlock")
+        //logger.mark("_analyseCodeBlockProtoEnum")
         this.tree.traverseBF((current) => {
             for (let i = 0; i < current.data.length; i++) {
                 this._analyseCodeBlockProtoEnum(current, lines, current.data[i]);
             }
         });
-        //logger.mark("analyseCodeBlock");
+        //logger.mark("_analyseCodeBlockProtoEnum");
+
+        //分析接口定义
+        //logger.mark("_analyseCodeBlockProtoInterface")
+        this.tree.traverseBF((current) => {
+            for (let i = 0; i < current.data.length; i++) {
+                this._analyseCodeBlockProtoInterface(current, lines, current.data[i]);
+            }
+        });
+        //logger.mark("_analyseCodeBlockProtoInterface");
     };
 
     //预处理-分析作用域
@@ -81,15 +91,12 @@ class AnalyseProtobuf extends AnalyseBase{
             }
 
             //将数据挂载到当前作用域下
-            //logger.debug(i);
             this.tree.addDataToNode(this.point_domain, i);
-            //this.block.push(this.context[i]);
         }
     };
 
     //文档拆分-protobuf
     _splitContextProto = function () {
-
         let filecontext = this.context.replace(
             /([,.;(){}=<>*&-]{1,1})/g, function (kw) {
                 //关键符号用空格隔开
@@ -113,9 +120,7 @@ class AnalyseProtobuf extends AnalyseBase{
         //格式化空格，多个全部转化为1个
         filecontext = filecontext.replace(/([\s\n\t\r]+)/g, function (kw) {
             let datalenth = kw.trim();
-            //logger.debug("|"+kw+"|");
             if (datalenth.length > 0) {
-                //logger.debug("|" + kw + "|");
                 return datalenth;
             }
             return " ";
@@ -148,7 +153,6 @@ class AnalyseProtobuf extends AnalyseBase{
             let find_context = "";
             if (current.domain_level > 0) {
                 find_context = lines[current.domain_level - 1];
-                //logger.debug("find context:" + find_context);
             }
 
             let domain_name = find_context;
@@ -193,7 +197,6 @@ class AnalyseProtobuf extends AnalyseBase{
                 let inherits = [{ 'p': 0, 'n': "google::protobuf::Message" }];
                 let realLine = "class " + items[i + 1] + " : public google::protobuf::Message";
                 let data = new MateData.BaseData(items[i + 1], TypeEnum.CALSS, realLine, inherits);
-                //logger.debug(data);
                 Tree.setType(treeNode, data);
                 return;
             }
@@ -202,7 +205,16 @@ class AnalyseProtobuf extends AnalyseBase{
                 //枚举定义
                 let realLine = "enum " + items[i + 1];
                 let data = new MateData.BaseData(items[i + 1], TypeEnum.ENUM, realLine);
-                //logger.debug(data);
+                Tree.setType(treeNode, data);
+                return;
+            }
+
+            if(items[i] == "service") {
+                //接口定义
+                //\s在这表示的是空白符，空格，\w是字母数字=下划线，在这里表示的是字母
+                let _name = items[i + 1].replace(/(?:^|\s)\w/g,function(c){return c.toUpperCase()});
+                let realLine = "class " + _name + "BaseClient";
+                let data = new MateData.BaseData(_name + "BaseClient", TypeEnum.CALSS, realLine);
                 Tree.setType(treeNode, data);
                 return;
             }
@@ -224,22 +236,19 @@ class AnalyseProtobuf extends AnalyseBase{
             if (current.ownname == null) {
                 //子没有产生命名空间，则为父亲的命名空间
                 current.namespace = parentnamespace;
-                //logger.debug(current.namespace);
                 return;
             }
             if (parentnamespace != "") {
                 if (current.parent.ownname
                     && current.parent.ownname.type == TypeEnum.CALSS) {
-                    current.namespace = parentnamespace;// + "_" + current.ownname.name;
+                    current.namespace = parentnamespace;
                     current.ownname.name = current.parent.ownname.name + "_" + current.ownname.name;
                     this.innerNameMap[current.ownname.name] = current.parent.ownname.name + "@" + current.ownname.name;
                 } else { 
-                    current.namespace = parentnamespace;// + "::" + current.ownname.name;
+                    current.namespace = parentnamespace;
                 }
-                //logger.debug(current.namespace);
             } else {
                 current.namespace = current.ownname.name
-                //logger.debug(current.namespace);
             }
         });
     };
@@ -247,12 +256,13 @@ class AnalyseProtobuf extends AnalyseBase{
     //分析所有的函数
     _analyseCodeBlockProtoFunction = function (node, lines, index) {
         if (!node.ownname
+            || node.ownname.rawline.indexOf(" google::protobuf::Message") < 0
             || (node.ownname
             && node.ownname.type != TypeEnum.CALSS)) {
             //只需要处理class类型
             return;
         }
-
+        
         let items = lines[index].split(' ');
         //去掉空格
         items = items.filter((e,i,arr) => { return e!=''; });
@@ -288,7 +298,6 @@ class AnalyseProtobuf extends AnalyseBase{
                 for(; k < items.length; k++) {
                     if (prekeywords.has(items[k])) {
                         //可能没有注释，结束
-                        //logger.debug("ddd", items[k], items, k);
                         break;
                     }
                     if (items[k] == ';') {
@@ -333,7 +342,7 @@ class AnalyseProtobuf extends AnalyseBase{
         }
 
         //枚举检查函数
-        if(node.parent != null && node.ownname.type == TypeEnum.NAMESPACE) {
+        if(node.parent != null && node.parent.ownname.type == TypeEnum.NAMESPACE) {
             let funcname = node.ownname.name + "_IsValid";
             let addVerRet = new MateData.VariableMet();
             addVerRet.type = "bool";
@@ -396,19 +405,86 @@ class AnalyseProtobuf extends AnalyseBase{
         }
     };
 
+    //分析所有的接口定义
+    _analyseCodeBlockProtoInterface = function (node, lines, index) {
+        if (!node.ownname
+            || node.ownname.rawline.indexOf("google::protobuf::Message") >= 0
+            || (node.ownname
+                && node.ownname.type != TypeEnum.CALSS)) {
+            //只需要处理enum类型
+            return;
+        }
+        // console.log(node.ownname);
+        let item = lines[index];
+        item = item.replace(/\s[.]{1,1}\s/g, ".");
+        item = item.replace("\n", " ");
+        let rex = /rpc[\s]{1,10}([\w]{3,128})[\s]{0,10}\([\s]{0,10}([\w.]{3,128})[\s]{0,10}\)[\s]{1,10}returns[\s]{0,10}\([\s]{0,10}([\w.]{3,128})[\s]{0,10}\)/;
+        let result = rex.exec(item);
+        if(!result) {
+            //未匹配接口规则，直接跳过
+            // console.log(item);
+            return;
+        }
+
+        let functionname = result[1];
+        let input = result[2].replace(/[.]{1,1}/g, "::");
+        let output = result[3].replace(/[.]{1,1}/g, "::");
+        if(input.indexOf("::") < 0) {
+            input = this.basenamespace + "::" + input;
+        }
+        if(output.indexOf("::") < 0) {
+            output = this.basenamespace + "::" + output;
+        }
+
+        let retObj = new MateData.VariableMet();
+        retObj.type = "int";
+        retObj.name = "";
+
+        let variable = [];
+        let headObj = new MateData.VariableMet();
+        headObj.type = "unsigned int";
+        headObj.name = "iUin";
+        headObj.isconst = 0;
+        headObj.ispoint = 0;
+        headObj.isuseadder = 0;
+        variable.push(headObj);
+
+        let inputObj = new MateData.VariableMet();
+        inputObj.type = input;
+        inputObj.name = "objReq";
+        inputObj.isconst = 1;
+        inputObj.ispoint = 0;
+        inputObj.isuseadder = 1;
+        variable.push(inputObj);
+
+        let outputObj = new MateData.VariableMet();
+        outputObj.type = input;
+        outputObj.name = "objResp";
+        outputObj.isconst = 0;
+        outputObj.ispoint = 0;
+        outputObj.isuseadder = 1;
+        variable.push(outputObj);
+
+        let addMethod = new MateData.MethodMet();
+        addMethod.name = functionname;
+        addMethod.returndata = retObj;
+        addMethod.params = variable;
+        addMethod.rawline = "int " + functionname + "(unsigned int iUin, const " + input + " & objReq, " + output + " & objResp)";
+        addMethod.isinline = 0;
+        addMethod.isconst = 0;
+        node.addMethod(addMethod);
+    };
+
     //单个字段分析
     _analyseFildProto = function (node, prename, type, name, annotate) {
-        //logger.debug(prename, type, name, annotate);
         //protobuf生产的方法，会将大些转成小写
         //获取父区域的名称
         if(node.parent
             && node.parent.ownname ) {
             let _name = node.parent.ownname.name;
             let _key = node.ownname.name + "_" + type;
-            //logger.debug("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
             if(this.innerNameMap[_key]) {
                 type = _key;
-                //logger.debug("ddddddddd",type);
             }
         }
 
@@ -786,7 +862,7 @@ class AnalyseProtobuf extends AnalyseBase{
 
     //分析非数组
     _analyseFildNormal = function (node, type, name, annotate) {
-        let useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t"]);
+        let useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t", "bool"]);
         //类型转换
         type = this._transferTypeToCpp(node, type);
         //添加设置方法
@@ -813,7 +889,7 @@ class AnalyseProtobuf extends AnalyseBase{
     _analyseFildArray = function (node, type, name, annotate) {
         //类型转换
         type = this._transferTypeToCpp(node, type, annotate);
-        let useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t"]);
+        let useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t", "bool"]);
         //添加设置方法
         if (useNumberTypes.has(type)) {
             this._makenNumberArrayAddAnalyseFiled(node, name, type, annotate);

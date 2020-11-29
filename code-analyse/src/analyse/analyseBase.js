@@ -6,6 +6,7 @@
  * 
  * ------------------------------------------------------------------------------------------ */
 
+const { exit } = require('process');
 const Tree = require('./tree');
 const logger = require('log4js').getLogger("cpptips");
 
@@ -61,7 +62,7 @@ class AnalyseBase {
         this.filedb = filedb;
         this.keyworddb = keyworddb;
         this.savepublic = savepublic;
-        
+
         let fileinfo = filedb.getFileByFilePath(this.filename);
         if (!fileinfo || fileinfo === undefined) {
             logger.debug("not find file index!", this.filename);
@@ -71,7 +72,6 @@ class AnalyseBase {
 
         //清空该文件所有的扩展数据,防止出现不修改名称的问题
         //keyworddb.cleanExtData(fileid);
-        
         //变量所有区域
         let nameMap = {};
         this.tree.traverseBF((current) => {
@@ -309,7 +309,6 @@ class AnalyseBase {
         return retResult;
    }
 
-    //
     _getAreaNamespace = function(current) {
         if (current.ownname
             &&current.ownname.type
@@ -379,9 +378,9 @@ class AnalyseBase {
             "i": input,
             "c": e.isconst,
             "s": e.isstatic,
-            "m": (e.templatefunctiondef ? e.templatefunctiondef: "")                    //模版定义
+            "m": (e.templatefunctiondef ? e.templatefunctiondef: "") //模版定义
         };
-
+       
         let saveData = {
             ownname: samplename,
             name: e.name,
@@ -391,7 +390,7 @@ class AnalyseBase {
             file_id: fileid,
             extdata: JSON.stringify([sigleFun])
         };
-
+ 
         let function_id = namespace + "|" + samplename + "|" + e.name;
         //找到的定义
         if(!this.newDefine[function_id]) {
@@ -738,13 +737,19 @@ class AnalyseBase {
         let gtype = ownname == null ? '0' : ownname.type;
         let ownsvaename = ownname == null ? '' : ownname.name;
 
+        if(this.isprotobuf
+            && ownname
+            && ownname.rawline.indexOf("google::protobuf::Message") < 0) {
+            //从probuf解释出来的类，不用命名空间
+            namespace = "";
+        }
+
         //归属保存
         let gname = this._saveOwnInfo(ownsvaename, inherits, template, namespace, gtype, fileid);
         mergedName = Object.assign(mergedName, gname);
 
         //方法
         metchod.forEach(e => {
-            //logger.debug(e.name);
             if(e.name.indexOf("::") == -1) {
                 let methedName = this._saveMethod(e, samplename, namespace, fileid);
                 mergedName = Object.assign(mergedName, methedName);

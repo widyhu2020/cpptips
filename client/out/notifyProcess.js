@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.notifyProcess = exports.initStatusBar = void 0;
 const vscode_1 = require("vscode");
 const IndexConfig_1 = require("./IndexConfig");
 const log4js_1 = require("log4js");

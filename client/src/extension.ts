@@ -21,7 +21,8 @@ let client: LanguageClient;
 import * as os from 'os';
 import { configure, getLogger } from "log4js";
 import { reflushErrorMsg } from './buildProcess';
-import { time } from 'console';
+const unzipper = require("unzipper");
+
 function getLoggerPath(){
     let logpath = "/tmp/cpptips.client.log";
     if(os.platform() == "win32"){
@@ -50,11 +51,94 @@ configure({
 const logger = getLogger("cpptips");
 logger.level = "debug";
 
+function initBetterSqlite3(context: ExtensionContext) {
+    let systemname = process.platform;
+    let user_better_sqlite3 = "";
+    let user_integer = "";
+    if(systemname == "linux") {
+        user_better_sqlite3 = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-linux-x64', 'better_sqlite3.node'));
+        user_integer = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-linux-x64', 'integer.node'));
+    } else if(systemname == "darwin") {
+        user_better_sqlite3 = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-darwin-x64', 'better_sqlite3.node'));
+        user_integer = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-darwin-x64', 'integer.node'));
+    } else if(systemname == "win32"){
+        if(process.arch == "ia32" || process.arch == "x86"){
+            user_better_sqlite3 = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x86', 'better_sqlite3.node'));
+            user_integer = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x86', 'integer.node')); 
+        } else {
+            user_better_sqlite3 = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x64', 'better_sqlite3.node'));
+            user_integer = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x64', 'integer.node'));
+        }
+    }
+
+    let better_sqlite3 = context.asAbsolutePath(path.join('node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'));
+    let integer =  context.asAbsolutePath(path.join('node_modules', 'integer', 'build', 'Release', 'integer.node'));
+ 
+    if(fs.existsSync(user_better_sqlite3)){
+        fs.copyFileSync(user_better_sqlite3, better_sqlite3);
+    }
+    if(fs.existsSync(user_integer)){
+        fs.copyFileSync(user_integer, integer);
+    }
+}
+
+async function initNodeBinary(context: ExtensionContext, callback) {
+    let systemname = process.platform;
+    let binPath = "";
+    if(systemname == "linux") {
+        binPath = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-linux-x64', 'node'));
+    } else if(systemname == "darwin") {
+        binPath = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-darwin-x64', 'node'));
+    } else if(systemname == "win32"){
+        console.log(process.arch);
+        if(process.arch == "ia32" || process.arch == "x86"){
+            binPath = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x86', 'node.exe')); 
+        } else {
+            binPath = context.asAbsolutePath(path.join('bin', 'node-v12.16.1-win-x64', 'node.exe'));
+        }
+    } else{
+        console.error("该平台目前可能不兼容！");
+        return "node";
+    }
+
+    console.log(binPath);
+    if(!fs.existsSync(binPath)){
+        //解压文件
+        let zipfile = context.asAbsolutePath(path.join('bin', 'node-v12.16.1.zip'));
+        
+        let zip = fs.createReadStream(zipfile).pipe(unzipper.Parse({forceStream: true}));
+        console.log(zip);
+        for await (const entry of zip) {
+            console.log(entry);
+            let fileName = entry.path;
+            let type = entry.type;// 'Directory' or 'File'
+            let unzipPath = context.asAbsolutePath(path.join('bin', fileName));
+            if(type == 'Directory'){
+                if(!fs.existsSync(unzipPath)){
+                    fs.mkdirSync(unzipPath);
+                }
+            } else {
+                entry.pipe(fs.createWriteStream(unzipPath));
+            }
+        }
+        //调整目录权限
+        fs.chmodSync(binPath, fs.constants.S_IRWXU | fs.constants.S_IRWXG | fs.constants.S_IROTH | fs.constants.S_IWOTH);
+    } 
+
+    //初始化原生库
+    initBetterSqlite3(context);
+    return binPath;
+}
+
 export function activate(context: ExtensionContext) {
+    initNodeBinary(context, bizActivate).then((_binPath)=>{
+        bizActivate(context, _binPath);
+    });
+}
+
+function bizActivate(context: ExtensionContext, binPath:string) {
     // The server is implemented in node
-    let serverModule = context.asAbsolutePath(
-        path.join('server', 'out', 'server.js')
-    );
+    let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
 
     let extensionPath = context.extensionPath;
     let storagePath = context.storagePath;
@@ -62,14 +146,15 @@ export function activate(context: ExtensionContext) {
     let serverOptions: ServerOptions = {
         run: { 
             module: serverModule, 
-            transport: TransportKind.ipc,
-            args: ["--extpath=" + extensionPath, "--storepath=" + storagePath]
+            transport: TransportKind.pipe,
+            args: ["--extpath=" + extensionPath, "--storepath=" + storagePath],
+            runtime: binPath
         },
         debug: {
             module: serverModule,
-            transport: TransportKind.ipc,
+            transport: TransportKind.pipe,
             options: debugOptions,
-            args: ["--extpath=" + extensionPath, "--storepath=" + storagePath]
+            args: ["--extpath=" + extensionPath, "--storepath=" + storagePath],
         }
     };
 

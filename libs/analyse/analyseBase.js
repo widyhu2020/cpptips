@@ -5,6 +5,7 @@
  *      Author: widyhu
  *
  * ------------------------------------------------------------------------------------------ */
+var exit = require('process').exit;
 var Tree = require('./tree');
 var logger = require('log4js').getLogger("cpptips");
 //分析所需要的关键字,不是c++全部关键字
@@ -272,7 +273,6 @@ var AnalyseBase = /** @class */ (function () {
             //logger.debug(retResult);
             return retResult;
         };
-        //
         this._getAreaNamespace = function (current) {
             if (current.ownname
                 && current.ownname.type
@@ -663,12 +663,17 @@ var AnalyseBase = /** @class */ (function () {
             var mergedName = this._saveIncludeAndUsingnamespace(current, fileid);
             var gtype = ownname == null ? '0' : ownname.type;
             var ownsvaename = ownname == null ? '' : ownname.name;
+            if (this.isprotobuf
+                && ownname
+                && ownname.rawline.indexOf("google::protobuf::Message") < 0) {
+                //从probuf解释出来的类，不用命名空间
+                namespace = "";
+            }
             //归属保存
             var gname = this._saveOwnInfo(ownsvaename, inherits, template, namespace, gtype, fileid);
             mergedName = Object.assign(mergedName, gname);
             //方法
             metchod.forEach(function (e) {
-                //logger.debug(e.name);
                 if (e.name.indexOf("::") == -1) {
                     var methedName = _this._saveMethod(e, samplename, namespace, fileid);
                     mergedName = Object.assign(mergedName, methedName);

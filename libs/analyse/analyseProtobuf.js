@@ -35,8 +35,10 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             //logger.mark("splitContext")
             var lines = this._splitContextProto();
             //logger.mark("splitContext");
-            //logger.debug(lines);
+            //与分析proto
+            //logger.mark("_preProcessProto")
             this._preProcessProto(lines);
+            //logger.mark("_preProcessProto")
             //分析作用域
             //logger.mark("analyseDomain")
             this._analyseDomainProto(lines);
@@ -46,21 +48,29 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             this._makeNamespaceProto();
             //logger.mark("makeNamespace");
             //遍历树其他代码快分析函数
-            //logger.mark("analyseCodeBlock")
+            //logger.mark("_analyseCodeBlockProtoFunction")
             this.tree.traverseBF(function (current) {
                 for (var i = 0; i < current.data.length; i++) {
                     _this._analyseCodeBlockProtoFunction(current, lines, current.data[i]);
                 }
             });
-            //logger.mark("analyseCodeBlock");
+            //logger.mark("_analyseCodeBlockProtoFunction");
             //遍历树其他代码快分析枚举
-            //logger.mark("analyseCodeBlock")
+            //logger.mark("_analyseCodeBlockProtoEnum")
             this.tree.traverseBF(function (current) {
                 for (var i = 0; i < current.data.length; i++) {
                     _this._analyseCodeBlockProtoEnum(current, lines, current.data[i]);
                 }
             });
-            //logger.mark("analyseCodeBlock");
+            //logger.mark("_analyseCodeBlockProtoEnum");
+            //分析接口定义
+            //logger.mark("_analyseCodeBlockProtoInterface")
+            this.tree.traverseBF(function (current) {
+                for (var i = 0; i < current.data.length; i++) {
+                    _this._analyseCodeBlockProtoInterface(current, lines, current.data[i]);
+                }
+            });
+            //logger.mark("_analyseCodeBlockProtoInterface");
         };
         //预处理-分析作用域
         _this._preProcessProto = function (lines) {
@@ -77,9 +87,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     continue;
                 }
                 //将数据挂载到当前作用域下
-                //logger.debug(i);
                 this.tree.addDataToNode(this.point_domain, i);
-                //this.block.push(this.context[i]);
             }
         };
         //文档拆分-protobuf
@@ -105,9 +113,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             //格式化空格，多个全部转化为1个
             filecontext = filecontext.replace(/([\s\n\t\r]+)/g, function (kw) {
                 var datalenth = kw.trim();
-                //logger.debug("|"+kw+"|");
                 if (datalenth.length > 0) {
-                    //logger.debug("|" + kw + "|");
                     return datalenth;
                 }
                 return " ";
@@ -138,7 +144,6 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 var find_context = "";
                 if (current.domain_level > 0) {
                     find_context = lines[current.domain_level - 1];
-                    //logger.debug("find context:" + find_context);
                 }
                 var domain_name = find_context;
                 var pos = find_context.lastIndexOf(';');
@@ -179,7 +184,6 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     var inherits = [{ 'p': 0, 'n': "google::protobuf::Message" }];
                     var realLine = "class " + items[i + 1] + " : public google::protobuf::Message";
                     var data = new MateData.BaseData(items[i + 1], TypeEnum.CALSS, realLine, inherits);
-                    //logger.debug(data);
                     Tree.setType(treeNode, data);
                     return;
                 }
@@ -187,7 +191,15 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     //枚举定义
                     var realLine = "enum " + items[i + 1];
                     var data = new MateData.BaseData(items[i + 1], TypeEnum.ENUM, realLine);
-                    //logger.debug(data);
+                    Tree.setType(treeNode, data);
+                    return;
+                }
+                if (items[i] == "service") {
+                    //接口定义
+                    //\s在这表示的是空白符，空格，\w是字母数字=下划线，在这里表示的是字母
+                    var _name = items[i + 1].replace(/(?:^|\s)\w/g, function (c) { return c.toUpperCase(); });
+                    var realLine = "class " + _name + "BaseClient";
+                    var data = new MateData.BaseData(_name + "BaseClient", TypeEnum.CALSS, realLine);
                     Tree.setType(treeNode, data);
                     return;
                 }
@@ -209,30 +221,28 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 if (current.ownname == null) {
                     //子没有产生命名空间，则为父亲的命名空间
                     current.namespace = parentnamespace;
-                    //logger.debug(current.namespace);
                     return;
                 }
                 if (parentnamespace != "") {
                     if (current.parent.ownname
                         && current.parent.ownname.type == TypeEnum.CALSS) {
-                        current.namespace = parentnamespace; // + "_" + current.ownname.name;
+                        current.namespace = parentnamespace;
                         current.ownname.name = current.parent.ownname.name + "_" + current.ownname.name;
                         _this.innerNameMap[current.ownname.name] = current.parent.ownname.name + "@" + current.ownname.name;
                     }
                     else {
-                        current.namespace = parentnamespace; // + "::" + current.ownname.name;
+                        current.namespace = parentnamespace;
                     }
-                    //logger.debug(current.namespace);
                 }
                 else {
                     current.namespace = current.ownname.name;
-                    //logger.debug(current.namespace);
                 }
             });
         };
         //分析所有的函数
         _this._analyseCodeBlockProtoFunction = function (node, lines, index) {
             if (!node.ownname
+                || node.ownname.rawline.indexOf(" google::protobuf::Message") < 0
                 || (node.ownname
                     && node.ownname.type != TypeEnum.CALSS)) {
                 //只需要处理class类型
@@ -269,7 +279,6 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                     for (; k < items.length; k++) {
                         if (prekeywords.has(items[k])) {
                             //可能没有注释，结束
-                            //logger.debug("ddd", items[k], items, k);
                             break;
                         }
                         if (items[k] == ';') {
@@ -310,7 +319,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 return;
             }
             //枚举检查函数
-            if (node.parent != null && node.ownname.type == TypeEnum.NAMESPACE) {
+            if (node.parent != null && node.parent.ownname.type == TypeEnum.NAMESPACE) {
                 var funcname = node.ownname.name + "_IsValid";
                 var addVerRet = new MateData.VariableMet();
                 addVerRet.type = "bool";
@@ -368,19 +377,79 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
                 }
             }
         };
+        //分析所有的接口定义
+        _this._analyseCodeBlockProtoInterface = function (node, lines, index) {
+            if (!node.ownname
+                || node.ownname.rawline.indexOf("google::protobuf::Message") >= 0
+                || (node.ownname
+                    && node.ownname.type != TypeEnum.CALSS)) {
+                //只需要处理enum类型
+                return;
+            }
+            // console.log(node.ownname);
+            var item = lines[index];
+            item = item.replace(/\s[.]{1,1}\s/g, ".");
+            item = item.replace("\n", " ");
+            var rex = /rpc[\s]{1,10}([\w]{3,128})[\s]{0,10}\([\s]{0,10}([\w.]{3,128})[\s]{0,10}\)[\s]{1,10}returns[\s]{0,10}\([\s]{0,10}([\w.]{3,128})[\s]{0,10}\)/;
+            var result = rex.exec(item);
+            if (!result) {
+                //未匹配接口规则，直接跳过
+                // console.log(item);
+                return;
+            }
+            var functionname = result[1];
+            var input = result[2].replace(/[.]{1,1}/g, "::");
+            var output = result[3].replace(/[.]{1,1}/g, "::");
+            if (input.indexOf("::") < 0) {
+                input = this.basenamespace + "::" + input;
+            }
+            if (output.indexOf("::") < 0) {
+                output = this.basenamespace + "::" + output;
+            }
+            var retObj = new MateData.VariableMet();
+            retObj.type = "int";
+            retObj.name = "";
+            var variable = [];
+            var headObj = new MateData.VariableMet();
+            headObj.type = "unsigned int";
+            headObj.name = "iUin";
+            headObj.isconst = 0;
+            headObj.ispoint = 0;
+            headObj.isuseadder = 0;
+            variable.push(headObj);
+            var inputObj = new MateData.VariableMet();
+            inputObj.type = input;
+            inputObj.name = "objReq";
+            inputObj.isconst = 1;
+            inputObj.ispoint = 0;
+            inputObj.isuseadder = 1;
+            variable.push(inputObj);
+            var outputObj = new MateData.VariableMet();
+            outputObj.type = input;
+            outputObj.name = "objResp";
+            outputObj.isconst = 0;
+            outputObj.ispoint = 0;
+            outputObj.isuseadder = 1;
+            variable.push(outputObj);
+            var addMethod = new MateData.MethodMet();
+            addMethod.name = functionname;
+            addMethod.returndata = retObj;
+            addMethod.params = variable;
+            addMethod.rawline = "int " + functionname + "(unsigned int iUin, const " + input + " & objReq, " + output + " & objResp)";
+            addMethod.isinline = 0;
+            addMethod.isconst = 0;
+            node.addMethod(addMethod);
+        };
         //单个字段分析
         _this._analyseFildProto = function (node, prename, type, name, annotate) {
-            //logger.debug(prename, type, name, annotate);
             //protobuf生产的方法，会将大些转成小写
             //获取父区域的名称
             if (node.parent
                 && node.parent.ownname) {
                 var _name = node.parent.ownname.name;
                 var _key = node.ownname.name + "_" + type;
-                //logger.debug("xxxxxx",_name, node.ownname.name, type, _key, this.innerNameMap);
                 if (this.innerNameMap[_key]) {
                     type = _key;
-                    //logger.debug("ddddddddd",type);
                 }
             }
             name = name.toLowerCase();
@@ -708,7 +777,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         };
         //分析非数组
         _this._analyseFildNormal = function (node, type, name, annotate) {
-            var useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t"]);
+            var useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t", "bool"]);
             //类型转换
             type = this._transferTypeToCpp(node, type);
             //添加设置方法
@@ -732,7 +801,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
         _this._analyseFildArray = function (node, type, name, annotate) {
             //类型转换
             type = this._transferTypeToCpp(node, type, annotate);
-            var useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t"]);
+            var useNumberTypes = new Set(["uint64_t", "int64_t", "uint32_t", "int32_t", "uint16_t", "int16_t", "bool"]);
             //添加设置方法
             if (useNumberTypes.has(type)) {
                 this._makenNumberArrayAddAnalyseFiled(node, name, type, annotate);

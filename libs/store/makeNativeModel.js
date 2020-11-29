@@ -1,118 +1,71 @@
 /* --------------------------------------------------------------------------------------------
- * store.js
+ * makeNativeModel.js
  *
  *  Created on: 2020年4月18日
  *      Author: widyhu
  *
  * ------------------------------------------------------------------------------------------ */
+var path = require('path');
 var os = require('os');
+//获取操作系统和cpu类型
+function getSystemAndCpu() {
+    var binPath = "";
+    var systemname = process.platform;
+    if (systemname == "linux") {
+        binPath = "../../bin/node-v12.16.1-linux-x64/node";
+    }
+    else if (systemname == "darwin") {
+        binPath = "../../bin/node-v12.16.1-darwin-x64/node";
+    }
+    else if (systemname == "win32") {
+        console.log(process.arch);
+        if (process.arch == "ia32" || process.arch == "x86") {
+            binPath = path.join("..", '..', 'bin', 'node-v12.16.1-win-x86', 'node.exe');
+        }
+        else {
+            binPath = path.join('..', '..', 'bin', 'node-v12.16.1-win-x64', 'node.exe');
+        }
+    }
+    else {
+        binPath = "node";
+    }
+    return binPath;
+}
 //重新编译原生模块
-_rebuildNatveModel = function () {
+function _rebuildNatveModel() {
     try {
         var Database = require('better-sqlite3');
     }
     catch (error) {
-        //先看看包是否包含，如果包含则自动加载
-        var autoRet = _rebuildNatveModelAuto();
-        if (autoRet) {
-            //自动已经选择到了原生二进制
-            return;
+        //better-sqlite3
+        var childprocess = require('child_process');
+        var binPath = getSystemAndCpu();
+        var scriptpath = __dirname;
+        var goPan = "";
+        if (process.platform == "win32") {
+            //windows操作系统
+            var pathinfo = path.parse(scriptpath);
+            goPan = pathinfo.root.replace("\\", "") + "&&";
         }
-        //自动选择失败，在linux和darwin下尝试自己编译二进制
-        //注意：windows因为依赖太多负载，自身编译不叫困难
-        var systemname = process.platform;
-        if (systemname == "linux") {
-            //linux操作系统
-            return _rebuildNatveModelLinux();
-        }
-        if (systemname == "darwin") {
-            //linux操作系统
-            return _rebuildNatveModelMaxOs();
-        }
+        scriptpath = path.resolve(scriptpath, path.join('..', '..', 'node_modules', 'better-sqlite3'));
+        var configure = binPath + " " + path.join('..', 'node-gyp', 'bin', 'node-gyp.js') + ' configure';
+        var build = binPath + " " + path.join('..', 'node-gyp', 'bin', 'node-gyp.js') + ' build';
+        var cmd = goPan + "cd " + scriptpath + "&&" + configure + "&&" + build;
+        console.log(cmd);
+        var result = childprocess.execSync(cmd, { encoding: "utf8" });
+        console.log(result);
+        //编译integer
+        scriptpath = __dirname;
+        scriptpath = path.resolve(scriptpath, path.join('..', '..', 'node_modules', 'integer'));
+        configure = binPath + " " + path.join('..', 'node-gyp', 'bin', 'node-gyp.js') + "  configure";
+        build = binPath + " " + path.join('..', 'node-gyp', 'bin', 'node-gyp.js') + ' build';
+        cmd = goPan + "cd " + scriptpath + "&&" + configure + "&&" + build;
+        console.log(cmd);
+        result = childprocess.execSync(cmd, { encoding: "utf8" });
+        console.log(result);
     }
-};
-_rebuildNatveModelAuto = function () {
-    var path = require('path');
-    var fs = require('fs');
-    var scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../..');
-    var modulesversion = process.versions.modules;
-    var arch = process.arch;
-    var platform = process.platform;
-    var nativedir = platform + "-" + arch;
-    var nativePath = scriptpath + "/data/" + nativedir + "/" + modulesversion;
-    if (!fs.existsSync(nativePath)) {
-        //没有该平台相关的编译文件
-        console.error("not find this platform and arch native!nativedir: ", nativedir);
-        //尝试去后台读取编译生成的文件
-        //呵呵，这里没时间实现，欢迎有心人实现下
-        return false;
-    }
-    //拷贝better_sqlite3.node文件
-    var sourceFile = nativePath + "/better_sqlite3.node";
-    var destFile = scriptpath + "/node_modules/better-sqlite3/build/Release/better_sqlite3.node";
-    console.log("copy lib:", sourceFile, destFile);
-    fs.copyFileSync(sourceFile, destFile);
-    //拷贝integer
-    sourceFile = nativePath + "/integer.node";
-    destFile = scriptpath + "/node_modules/integer/build/Release/integer.node";
-    console.log("copy lib:", sourceFile, destFile);
-    fs.copyFileSync(sourceFile, destFile);
-    return true;
-};
-_rebuildNatveModelMaxOs = function () {
-    var path = require('path');
-    var fs = require('fs');
-    var scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../..');
-    var electronVersion = process.versions.electron;
-    if (!fs.existsSync(scriptpath + "/nodemodules/.bin")) {
-        //创建目录
-        fs.mkdirSync(scriptpath + "/node_modules/.bin");
-    }
-    //将node-gyp拷贝过来
-    if (!fs.existsSync(scriptpath + "/node_modules/.bin/node-gyp")) {
-        //拷贝
-        fs.copyFileSync(scriptpath + "/node_modules/node-gyp/bin/node-gyp.js", scriptpath + "/node_modules/.bin/node-gyp");
-    }
-    var childprocess = require('child_process');
-    var buildcli = scriptpath + '/node_modules/electron-rebuild/lib/src/cli.js';
-    var modelepath = scriptpath + '/node_modules/better-sqlite3';
-    var params = [
-        "-f",
-        "-w",
-        "better-sqlite3",
-        '-v',
-        electronVersion,
-        '--module-dir',
-        modelepath
-    ];
-    console.log("没有找到可用的版本，正在尝试编译该版本。");
-    console.log(buildcli + " " + params.join(" "));
-    //./node_modules/.bin/electron-rebuild -f -w better-sqlite3 -v 7.1.11
-    var result = childprocess.spawnSync(buildcli, params, { encoding: "utf8" });
-    console.log(result);
-    if (result.status == 0) {
-        console.log("rebuild better-sqlite3 success!");
-    }
-};
-_rebuildNatveModelLinux = function () {
-    var path = require('path');
-    var fs = require('fs');
-    var execPath = process.execPath;
-    var scriptpath = __dirname;
-    scriptpath = path.resolve(scriptpath, '../../node_modules/better-sqlite3');
-    var cmd = "cd " + scriptpath + " && " + execPath + " ../node-gyp/bin/node-gyp.js configure && " + execPath + " ../node-gyp/bin/node-gyp.js rebuild";
-    console.log("没有找到可用的版本，正在尝试编译该版本。");
-    console.log(cmd);
-    scriptpath = path.resolve(scriptpath, '../integer');
-    var cmd2 = "&& cd " + scriptpath + " && " + execPath + " ../node-gyp/bin/node-gyp.js configure && " + execPath + " ../node-gyp/bin/node-gyp.js rebuild";
-    cmd = cmd + cmd2;
-    var childprocess = require('child_process');
-    console.log(cmd);
-    var result = childprocess.execSync(cmd, { encoding: "utf8" });
-    console.log(result);
-};
+}
+;
 //尝试加载原生数据库
 _rebuildNatveModel();
 var NativeForTestValid = /** @class */ (function () {
