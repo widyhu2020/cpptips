@@ -127,7 +127,6 @@ var AutoFillParam = /** @class */ (function (_super) {
                 }
                 typeMap = this._getObjectFunction(typeMap, false, name_1, type, namespaces, 0);
             }
-            //logger.debug(JSON.stringify(typeMap));
             return typeMap;
         };
         //获取对象对应的方法
@@ -312,8 +311,10 @@ var AutoFillParam = /** @class */ (function (_super) {
                 var jsonData = JSON.parse(jsonExt);
                 var ownnames = [];
                 ownnames.push(name);
+                //获取继承的父亲
                 for (var i = 0; i < jsonData.i.length; i++) {
-                    ownnames.push(jsonData.i[i].n);
+                    var _tmpName = jsonData.i[i].n.replace(/\<[\w,]{2,256}\>/, "");
+                    ownnames.push(_tmpName);
                 }
                 var infos = KeyWordStore.getInstace().getByOwnNameAndName(ownnames, this.functionName, namespaces);
                 if (infos.length <= 0) {

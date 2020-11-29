@@ -425,7 +425,7 @@ var AnalyseProtobuf = /** @class */ (function (_super) {
             inputObj.isuseadder = 1;
             variable.push(inputObj);
             var outputObj = new MateData.VariableMet();
-            outputObj.type = input;
+            outputObj.type = output;
             outputObj.name = "objResp";
             outputObj.isconst = 0;
             outputObj.ispoint = 0;

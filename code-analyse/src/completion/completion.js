@@ -174,6 +174,7 @@ class Completion {
                     continue;
                 }
                 //没有命名空间的，需要找到全名称
+                classname = classname.replace(/\<[\s\w,]{2,256}\>/, "");
                 usnamespace.push(namespace);
                 let findclass = kws.getByNameAndNamespaces(classname, usnamespace);
                 if (findclass.length <= 0) {

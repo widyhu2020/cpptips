@@ -39,3 +39,5 @@ bin/tmp
 bin/tmp/**
 bin/node-dev
 bin/node-dev/**
+server/src/**
+client/src/**

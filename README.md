@@ -252,3 +252,8 @@ v0.4.0
 - lsp架构中，server改自带的node版本，以解决vscode升级导致node和版本不一致electron导致插件无法运行的问题，新版本将sqlite不再依赖electron的版本
 - 增加自动编译能力，系统内置macos、linux（x64）、windows（x86）、windows（x64）四个操作系统和cpu的node（12.16.1），内置的原生sqlite如果不能使用，系统会自动启用编译，自动编译这一功能依赖操作系统中是需要安装python，如果编译失败，可以先安装python，使用打印出来的指令手工编译，或者安装python重新启动vscode，这一改动将使安装包比原来更大
 - 支持protobuf自动建BaseClient，方便接口调用提示（svrkit专用）
+
+v0.4.1
+- 修复继承的父类定义包含模版参数时，无法提示和跳转
+- 修复proto生产的client类中参数类型使用错误的问题
+- 修复跳转时，如果client文件中找不到方法，则跳转到protobuf的函数定义中

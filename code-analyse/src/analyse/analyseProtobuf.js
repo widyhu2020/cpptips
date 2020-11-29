@@ -458,7 +458,7 @@ class AnalyseProtobuf extends AnalyseBase{
         variable.push(inputObj);
 
         let outputObj = new MateData.VariableMet();
-        outputObj.type = input;
+        outputObj.type = output;
         outputObj.name = "objResp";
         outputObj.isconst = 0;
         outputObj.ispoint = 0;

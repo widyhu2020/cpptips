@@ -1077,7 +1077,6 @@ var CodeAnalyse = /** @class */ (function () {
             var cp = new Completion();
             //弹出最顶的，用来找定义
             var name = names.pop();
-            // { t: "", l: "" }
             //获取当前操作的wonname中
             var _ownname = this._getPosOwner(data);
             var _valetype = { t: _ownname, l: "p", ol: 'p', p: lastline, pos: -1 };
@@ -1165,10 +1164,13 @@ var CodeAnalyse = /** @class */ (function () {
                     break;
                 }
                 var inheritclass = result.inherit;
+                var mergerClassName = [];
                 for (var i = 0; i < inheritclass.length; i++) {
-                    dequeue.push(inheritclass[i]);
+                    var _className = inheritclass[i].replace(/\<[\s\w,]{2,256}\>/, "");
+                    dequeue.push(_className);
+                    mergerClassName.push(_className);
                 }
-                ownnames = ownnames.concat(inheritclass);
+                ownnames = ownnames.concat(mergerClassName);
             }
             ;
             var fileinfo = df.getDefineInWitchClass(ownnames, names, usingnamespace);
@@ -1760,10 +1762,13 @@ var CodeAnalyse = /** @class */ (function () {
                             break;
                         }
                         var inheritclass = result.inherit;
+                        var mergerClassName = [];
                         for (var i_1 = 0; i_1 < inheritclass.length; i_1++) {
-                            dequeue_1.push(inheritclass[i_1]);
+                            var _className = inheritclass[i_1].replace(/\<[\s\w,]{2,256}\>/, "");
+                            dequeue_1.push(_className);
+                            mergerClassName.push(_className);
                         }
-                        ownnames_1 = ownnames_1.concat(inheritclass);
+                        ownnames_1 = ownnames_1.concat(mergerClassName);
                     }
                     ;
                     var fileinfo_1 = df.getDefineInWitchClass(ownnames_1, names[i].n, usingnamespace);
@@ -1803,13 +1808,17 @@ var CodeAnalyse = /** @class */ (function () {
                 }
                 //这里只处理5层继承
                 var inheritclass = result.inherit;
+                var mergerClassName = [];
                 for (var i = 0; i < inheritclass.length; i++) {
                     if (inheritclass[i] == "google::protobuf::Message") {
                         isProbuf = true;
                     }
-                    dequeue.push(inheritclass[i]);
+                    var _className = inheritclass[i];
+                    _className = _className.replace(/\<[\s\w,]{2,256}\>/, "");
+                    dequeue.push(_className);
+                    mergerClassName.push(_className);
                 }
-                ownnames = ownnames.concat(inheritclass);
+                ownnames = ownnames.concat(mergerClassName);
             }
             var name = lastname.n;
             if (isProbuf) {
@@ -2333,9 +2342,9 @@ var CodeAnalyse = /** @class */ (function () {
                     return [];
                 }
                 //test
-                logger.mark("_getAllNameByObj");
+                logger.mark("_autoFillParams");
                 var result = this._autoFillParams(filepath, filecontext, preParams);
-                logger.mark("_getAllNameByObj");
+                logger.mark("_autoFillParams");
                 return result;
             }
             catch (error) {

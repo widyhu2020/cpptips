@@ -1,2 +1,6 @@
 
 client/src/test.js
+.vscode
+bin/node-dev
+bin/node-v**
+data/usr

@@ -126,7 +126,6 @@ class AutoFillParam extends Completion{
 			typeMap = this._getObjectFunction(typeMap, false, name, type, namespaces, 0);
 		}
 
-		//logger.debug(JSON.stringify(typeMap));
 		return typeMap;
 	};
 
@@ -318,8 +317,10 @@ class AutoFillParam extends Completion{
 			let jsonData = JSON.parse(jsonExt);
 			let ownnames = [];
 			ownnames.push(name);
+			//获取继承的父亲
 			for(let i = 0; i < jsonData.i.length; i++) {
-				ownnames.push(jsonData.i[i].n);
+				let _tmpName = jsonData.i[i].n.replace(/\<[\w,]{2,256}\>/, "");
+				ownnames.push(_tmpName);
 			}
 			let infos = KeyWordStore.getInstace().getByOwnNameAndName(ownnames, this.functionName, namespaces);
 			if(infos.length <= 0) {

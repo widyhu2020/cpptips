@@ -1204,7 +1204,6 @@ class CodeAnalyse {
         
         //弹出最顶的，用来找定义
         let name = names.pop();
-        // { t: "", l: "" }
         //获取当前操作的wonname中
         let _ownname = this._getPosOwner(data);
         let _valetype = { t: _ownname, l: "p", ol:'p', p: lastline, pos: -1 };
@@ -1296,10 +1295,13 @@ class CodeAnalyse {
                 break;
             }
             let inheritclass = result.inherit;
+            let mergerClassName = [];
             for(let i = 0; i < inheritclass.length; i++) {
-                dequeue.push(inheritclass[i]);
+                let _className = inheritclass[i].replace(/\<[\s\w,]{2,256}\>/, "");
+                dequeue.push(_className);
+                mergerClassName.push(_className);
             }
-            ownnames = ownnames.concat(inheritclass);
+            ownnames = ownnames.concat(mergerClassName);
         };
         
         let fileinfo = df.getDefineInWitchClass(ownnames, names, usingnamespace);
@@ -1969,10 +1971,13 @@ class CodeAnalyse {
                         break;
                     }
                     let inheritclass = result.inherit;
+                    let mergerClassName = [];
                     for(let i = 0; i < inheritclass.length; i++) {
-                        dequeue.push(inheritclass[i]);
+                        let _className = inheritclass[i].replace(/\<[\s\w,]{2,256}\>/, "");
+                        dequeue.push(_className);
+                        mergerClassName.push(_className);
                     }
-                    ownnames = ownnames.concat(inheritclass);
+                    ownnames = ownnames.concat(mergerClassName);
                 };
                 let fileinfo = df.getDefineInWitchClass(ownnames, names[i].n, usingnamespace);
                 if (fileinfo == false) {
@@ -2013,13 +2018,17 @@ class CodeAnalyse {
 
             //这里只处理5层继承
             let inheritclass = result.inherit;
+            let mergerClassName = [];
             for(let i = 0; i < inheritclass.length; i++) {
                 if(inheritclass[i] == "google::protobuf::Message") {
                     isProbuf = true;
                 }
-                dequeue.push(inheritclass[i]);
+                let _className = inheritclass[i];
+                _className = _className.replace(/\<[\s\w,]{2,256}\>/, "");
+                dequeue.push(_className);
+                mergerClassName.push(_className);
             }
-            ownnames = ownnames.concat(inheritclass);
+            ownnames = ownnames.concat(mergerClassName);
         }
 
         let name = lastname.n;
@@ -2560,9 +2569,9 @@ class CodeAnalyse {
                 return [];
             }
             //test
-            logger.mark("_getAllNameByObj");
+            logger.mark("_autoFillParams");
             let result = this._autoFillParams(filepath, filecontext, preParams);
-            logger.mark("_getAllNameByObj");
+            logger.mark("_autoFillParams");
             return result;
         } catch (error) {
             logger.debug("call getAllNameByObj faild!", error);

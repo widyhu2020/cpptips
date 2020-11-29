@@ -1,9 +1,0 @@
-// Place your settings in this file to overwrite default and user settings.
-{
-    "typescript.tsc.autoDetect": "off",
-    "editor.insertSpaces": false,
-    "tslint.enable": true,
-    "typescript.preferences.quoteStyle": "single",
-    "cpptips.updateCheckIntervalTime": 10000,
-    "cpptips.updateCheckUrl": "http://127.0.0.1:8888"
-}

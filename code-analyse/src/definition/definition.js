@@ -378,11 +378,31 @@ class Definition extends Completion{
                     //这里有优化空间，_后面的不一定将是message的名称，且可能多个message都定义了相同的内部message，导致调整不准确
                     let _pos = ownname.lastIndexOf("_");
                     if(_pos == -1) {
-                        return false;
+                        //可能是需要找client方法
+                        let regstr = "rpc[\\s]{1,10}" + name + "[\\s]{0,10}\\(";
+                        let reg = new RegExp(regstr, "m");
+                        let regResult = reg.exec(filecontext);
+                        if(!regResult){
+                            return false;
+                        }
+                        let allbpos = filecontext.indexOf(regResult[0]) + 4;
+                        let _lineinfo = this._getDefinePost(filecontext, allbpos);
+                        let _bpos = _lineinfo.c.indexOf(name, 0);
+                        let result = {
+                            filename: "file://" + filepath,
+                            bline: _lineinfo.l,
+                            bcols: _bpos,
+                            eline: _lineinfo.l,
+                            ecols: _bpos + name.length,
+                            linecode: _lineinfo.c,
+                            prelinecode: this._getHoverTips(filecontext, ownpos, allbpos, "", name, filepath),
+                            title: name != "" ? name : ownname
+                        };
+                        return result;
                     }
                     ownname = ownname.substring(_pos + 1);
                     ownpos = this._findValInStr(filecontext, ownname, 0);
-                    if(_pos == -1) {
+                    if(ownpos == -1) {
                         return false;
                     }
                 } else {
