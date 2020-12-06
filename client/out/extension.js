@@ -32,7 +32,9 @@ let client;
 const os = require("os");
 const log4js_1 = require("log4js");
 const buildProcess_1 = require("./buildProcess");
+const cpptipsRepository_1 = require("./cpptipsRepository");
 const unzipper = require("unzipper");
+let cpptipsRepostory = null;
 function getLoggerPath() {
     let logpath = "/tmp/cpptips.client.log";
     if (os.platform() == "win32") {
@@ -232,8 +234,13 @@ function bizActivate(context, binPath) {
     //初始化状态呢拦
     notifyProcess_1.initStatusBar();
     context.subscriptions.push(client.start());
+    //变更提醒
+    cpptipsRepostory = new cpptipsRepository_1.CpptipsRepository(context);
 }
 function deactivate() {
+    if (!cpptipsRepostory) {
+        cpptipsRepostory.unconstructor();
+    }
     if (!client) {
         return undefined;
     }

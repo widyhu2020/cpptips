@@ -39,6 +39,8 @@ import {
     WillSaveTextDocumentParams,
     TextDocumentContentChangeEvent,
     DiagnosticSeverity,
+    CodeLens,
+    CodeLensParams,
 } from 'vscode-languageserver';
 const path = require('path');
 

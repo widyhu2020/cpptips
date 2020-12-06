@@ -5,13 +5,12 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace, Location, Range, ExtensionContext, window, languages, TextEditor, DiagnosticCollection, TextDocument, Diagnostic, Position, DiagnosticSeverity, DiagnosticRelatedInformation, DiagnosticChangeEvent, tasks, TaskEndEvent, Uri} from 'vscode';
+import { workspace, ExtensionContext, languages, DiagnosticCollection, tasks, TaskEndEvent} from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
     TransportKind,
-    VersionedTextDocumentIdentifier,
 } from 'vscode-languageclient';
 
 import { showIndexConfig, checkNeedShowDefault} from './IndexConfig';
@@ -21,7 +20,10 @@ let client: LanguageClient;
 import * as os from 'os';
 import { configure, getLogger } from "log4js";
 import { reflushErrorMsg } from './buildProcess';
+import { CpptipsRepository } from './cpptipsRepository';
 const unzipper = require("unzipper");
+
+let cpptipsRepostory : CpptipsRepository = null;
 
 function getLoggerPath(){
     let logpath = "/tmp/cpptips.client.log";
@@ -137,6 +139,7 @@ export function activate(context: ExtensionContext) {
 }
 
 function bizActivate(context: ExtensionContext, binPath:string) {
+    
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
 
@@ -219,15 +222,22 @@ function bizActivate(context: ExtensionContext, binPath:string) {
                     diagnostic = {};
                 }, 500); 
             }
+
         });
     });
-    
+
     //初始化状态呢拦
     initStatusBar();
     context.subscriptions.push(client.start());
+ 
+    //变更提醒
+    cpptipsRepostory = new CpptipsRepository(context);
 }
 
 export function deactivate(): Thenable<void> | undefined {
+    if(!cpptipsRepostory){
+        cpptipsRepostory.unconstructor();
+    }
     if (!client) {
         return undefined;
     }
