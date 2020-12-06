@@ -4,6 +4,7 @@ exports.CpptipsRepository = void 0;
 const vscode_1 = require("vscode");
 const path = require("path");
 const fs = require("fs");
+const crypto = require('crypto');
 class CpptipsRepository {
     constructor(context) {
         this.basePath = "";
@@ -18,7 +19,7 @@ class CpptipsRepository {
             //创建目录
             fs.mkdirSync(this.basePath, { recursive: true });
         }
-        this.deleteTimer = setInterval(this.cleanMasterFile, 120000, this);
+        this.deleteTimer = setInterval(this.cleanMasterFile, 12000, this);
         this.refushTimer = setInterval(this.saveMasterFile, 3000, this);
         this.SourceControl(context);
     }
@@ -37,11 +38,17 @@ class CpptipsRepository {
             //文件大小为0，表示新加的文件
             return null;
         }
-        let relativePath = vscode_1.workspace.asRelativePath(uri.fsPath);
-        let pathinfo = path.parse(relativePath);
-        let filename = pathinfo.base;
+        let pathinfo = path.parse(uri.fsPath);
+        let filename = this.getPathHash(pathinfo.dir) + "_" + pathinfo.base;
         let retUri = vscode_1.Uri.parse(path.resolve(this.basePath, filename));
         return retUri;
+    }
+    ;
+    getPathHash(fileBasePath) {
+        let pathhash = crypto.createHash("md5");
+        pathhash.update(fileBasePath);
+        let md5 = pathhash.digest('hex');
+        return md5;
     }
     ;
     getRunCmd(fileBasePath, fileName, masterFileName) {
@@ -76,7 +83,7 @@ class CpptipsRepository {
             //打开暂存文件直接返回
             return;
         }
-        let filename = pathinfo.base;
+        let filename = pthis.getPathHash(pathinfo.dir) + "_" + pathinfo.base;
         let filepath = path.resolve(pthis.basePath, filename);
         let nowTime = new Date().getTime();
         if (fs.existsSync(filepath)
@@ -85,8 +92,8 @@ class CpptipsRepository {
             //120s内不更新
             return;
         }
-        let cmd = pthis.getRunCmd(pathinfo.dir, filename, filepath);
-        //console.log(cmd);
+        let cmd = pthis.getRunCmd(pathinfo.dir, pathinfo.base, filepath);
+        // console.log(cmd);
         let childprocess = require('child_process');
         childprocess.exec(cmd, { encoding: "utf8" }, function (error, stdout, stderr) {
             if (error
@@ -133,14 +140,15 @@ class CpptipsRepository {
         let paths = fs.readdirSync(pthis.basePath);
         let setFlPath = new Set(arrFlPath);
         paths.forEach(_path => {
+            let _realPath = _path.replace(/^[a-f0-9]{1,32}_/i, "");
+            _realPath = path.resolve(pthis.basePath, _realPath);
             _path = path.resolve(pthis.basePath, _path);
-            if (setFlPath.has(_path)) {
+            if (setFlPath.has(_realPath)) {
                 //当前打开的文件不能不删除
                 return;
             }
             let nowTime = new Date().getTime();
-            console.log(nowTime, fs.statSync(_path).mtime.getTime());
-            if (nowTime - fs.statSync(_path).mtime.getTime() > 86400000) {
+            if (nowTime - fs.statSync(_path).mtime.getTime() > 864) {
                 //只清除大于1天的文件
                 if (/\.vscode/.test(_path)) {
                     //删除文件
