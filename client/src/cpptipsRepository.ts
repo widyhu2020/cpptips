@@ -19,7 +19,7 @@ export class CpptipsRepository implements QuickDiffProvider {
 			fs.mkdirSync(this.basePath, {recursive: true});
 		}
 
-		this.deleteTimer = setInterval(this.cleanMasterFile, 12000, this);
+		this.deleteTimer = setInterval(this.cleanMasterFile, 120000, this);
 		this.refushTimer = setInterval(this.saveMasterFile, 3000, this);
 		this.SourceControl(context);
 	}
@@ -154,7 +154,7 @@ export class CpptipsRepository implements QuickDiffProvider {
 			}
 
 			let nowTime = new Date().getTime();
-			if(nowTime - fs.statSync(_path).mtime.getTime() > 864){
+			if(nowTime - fs.statSync(_path).mtime.getTime() > 86400000){
 				//只清除大于1天的文件
 				if(/\.vscode/.test(_path)){
 					//删除文件
