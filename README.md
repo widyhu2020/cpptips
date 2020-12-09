@@ -263,3 +263,8 @@ v0.4.2
 
 v0.4.4
 - 修复v0.4.2版本中，相同名字的文件，diff错位的问题
+
+v0.4.6
+- 解决上个版本引入的加载对比临时文件的问题，使用过版本的可以使用一下方法清理引入的数据
+sqlit projectpath/.vscode/db/cpptips.db
+>delete from t_fileindex where filepath like "%.vscode%";

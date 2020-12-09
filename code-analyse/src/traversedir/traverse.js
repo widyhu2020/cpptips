@@ -288,7 +288,8 @@ class Traverse {
     _checkIsSystem = function(filepath) {
         // /usr/local/
         // /google/protobuf/
-        if (filepath.indexOf("/usr/local/") != -1 || filepath.indexOf("\\usr\\local\\") != -1
+        if (filepath.indexOf("/.vscode/") != -1 || filepath.indexOf("\\.vscode\\") != -1
+            || filepath.indexOf("/usr/local/") != -1 || filepath.indexOf("\\usr\\local\\") != -1
             || filepath.indexOf("/usr/include/") != -1 || filepath.indexOf("\\usr\\include\\") != -1
             || filepath.indexOf("/google/protobuf/") != -1 || filepath.indexOf("\\google\\protobuf\\") != -1
             || /.*\.tcc$/g.test(filepath)){

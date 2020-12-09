@@ -293,6 +293,15 @@ function getFilePath(uri:string) {
         let filename = uri.slice(pathpos + basepath.length);
         return filename;
     }
+    if(filepath.indexOf('.vscode') >= 0
+        || filepath.replace(/[\\]{1,2}/g, "/").indexOf(basepath) != 0) {
+        //无需处理的文件
+        //1.路径中包含.vscode
+        //2.路径不是基础路径开头的
+        console.log(basepath, filepath);
+        return false;
+    }
+    // console.log(basepath, filepath);
 
     let pathpos: number = filepath.indexOf(basepath);
     if(pathpos != -1) {
@@ -1322,7 +1331,7 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
     openFile[params.textDocument.uri] = params.textDocument.text;
     
     let filepath = getFilePath(params.textDocument.uri);
-    if(filepath == false) {
+    if(filepath == false || filepath.indexOf(".vscode") >= 0) {
         logger.debug("onDidOpenTextDocument", params.textDocument.uri);
         return;
     }

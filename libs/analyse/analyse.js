@@ -36,6 +36,10 @@ var Analyse = /** @class */ (function () {
                 return [];
             }
         };
+        if (filename.indexOf(".vscode") != 0) {
+            //无需处理
+            return;
+        }
         //分析handler
         this.analyseHandler = null;
         //proto文件
