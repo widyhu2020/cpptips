@@ -9,6 +9,7 @@
 const { exit } = require('process');
 const Tree = require('./tree');
 const logger = require('log4js').getLogger("cpptips");
+const fs = require('fs');
 
 //分析所需要的关键字,不是c++全部关键字
 let keywork = new Set([
@@ -661,27 +662,36 @@ class AnalyseBase {
         let mapName = {};
         if (current.include.length > 0
             || current.usingnamespace.length > 0) {
+  
             //首节点
             //包含的头文件
             let include = current.include.length > 0 ? current.include : [];
+        
             //引用的命名空间
             let usingnamespace = current.usingnamespace.length > 0 ? current.usingnamespace : [];
+      
             //保存头文件
             let fileinfo = this.filedb.getFileById(fileid);
             let extData = { i: [], u: [] };
             if (fileinfo.extdata != "") {
                 extData = JSON.parse(fileinfo.extdata);
             }
+            
             let setOfInclude = new Set(extData.i);
+            extData.i = Array.from(setOfInclude);
             for (let i = 0; i < include.length; i++) {
-                if (!setOfInclude.has(include[i])) {
-                    extData.i.push(include[i]);
+
+                let _tmpInclude = include[i].replace(/["'<>]{1,1}/g, "");
+                if (!setOfInclude.has(_tmpInclude)) {
+                    extData.i.push(_tmpInclude);
                 }
             }
             let setOfUsingNamespace = new Set(extData.u);
+            extData.u =  Array.from(setOfUsingNamespace);
             for (let i = 0; i < usingnamespace.length; i++) {
-                if (!setOfUsingNamespace.has(usingnamespace[i])) {
-                    extData.u.push(usingnamespace[i]);
+                let _tmpUsingNamespce = usingnamespace[i].replace(/["'<>]{1,1}/g, "");
+                if (!setOfUsingNamespace.has(_tmpUsingNamespce)) {
+                    extData.u.push(_tmpUsingNamespce);
                 }
             }
 

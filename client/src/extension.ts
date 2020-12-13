@@ -222,7 +222,6 @@ function bizActivate(context: ExtensionContext, binPath:string) {
                     diagnostic = {};
                 }, 500); 
             }
-
         });
     });
 

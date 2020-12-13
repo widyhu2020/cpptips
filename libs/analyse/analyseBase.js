@@ -8,6 +8,7 @@
 var exit = require('process').exit;
 var Tree = require('./tree');
 var logger = require('log4js').getLogger("cpptips");
+var fs = require('fs');
 //分析所需要的关键字,不是c++全部关键字
 var keywork = new Set([
     '#define', 'if', 'for', 'int', 'int32_t', 'int64_t', '#include',
@@ -604,15 +605,19 @@ var AnalyseBase = /** @class */ (function () {
                     extData = JSON.parse(fileinfo.extdata);
                 }
                 var setOfInclude = new Set(extData.i);
+                extData.i = Array.from(setOfInclude);
                 for (var i = 0; i < include.length; i++) {
-                    if (!setOfInclude.has(include[i])) {
-                        extData.i.push(include[i]);
+                    var _tmpInclude = include[i].replace(/["'<>]{1,1}/g, "");
+                    if (!setOfInclude.has(_tmpInclude)) {
+                        extData.i.push(_tmpInclude);
                     }
                 }
                 var setOfUsingNamespace = new Set(extData.u);
+                extData.u = Array.from(setOfUsingNamespace);
                 for (var i = 0; i < usingnamespace.length; i++) {
-                    if (!setOfUsingNamespace.has(usingnamespace[i])) {
-                        extData.u.push(usingnamespace[i]);
+                    var _tmpUsingNamespce = usingnamespace[i].replace(/["'<>]{1,1}/g, "");
+                    if (!setOfUsingNamespace.has(_tmpUsingNamespce)) {
+                        extData.u.push(_tmpUsingNamespce);
                     }
                 }
                 mapName["__file_inlcude"] = extData.i;

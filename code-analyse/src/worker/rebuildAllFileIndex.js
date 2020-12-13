@@ -451,11 +451,11 @@ class RebuildFileIndex {
 
         //如果是md5值不一样，则启动分析合并
         if ((hasInDb && lastMd5 != md5) || forckReolad) {
-            //logger.debug(lastMd5, md5, filepath);
+            logger.debug(lastMd5, md5, filepath);
             //获取文件id
             let fileinfo = FileIndexStore.getInstace().getFileByFilePath(filepath);
             if (!fileinfo) {
-                //logger.debug("not find file!", filepath);
+                logger.debug("not find file!", filepath);
                 return false;
             }
             let file_id = fileinfo.id;
@@ -514,7 +514,7 @@ class RebuildFileIndex {
             let analyse = new Analyse(filecontext, filename);
             analyse.doAnalyse();
             let nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-            //logger.debug(nameMap);
+            // console.log(nameMap);
             return nameMap;
         } catch (error) {
             logger.debug(filename, error);
@@ -599,20 +599,15 @@ if (cluster.isMaster) {
     let parasms = {
             msg_type: 2,//0:表示全量加载；1:表示重新加载指定文件，此时data中需要有filepath；2：强制重新加载文件；3：强制重新加载所有的索引；4:重新加载一批文件
             data: {
-                // basepath: "/Users/widyhu/widyhu/cpptips/data/",
-                // dbpath: "/Users/widyhu/widyhu/cpptips/data/basedb.db",
-                // filepath: '/usr/local/include/google/protobuf/message_lite.h',
-
-                basepath: "/Users/widyhu/widyhu/cpp_project/",
-                dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
-                filepath: 'xxxxxxxx',
-                
-                filepaths: ['xxxxxxxx',
-                            'xxxxxxxx'],
+                basepath: "--",
+                dbpath: "--",
+                filepath: '--',
+                // filepaths: ['xxxxxxxx',
+                //             'xxxxxxxx'],
                 issystem: 0,//工具-系统目录分析
                 userConfig: defaultSettings
             }
-        }
+    }
     worker.send(parasms);
     worker.on('message', (data) => {
         let value = data['process'];
@@ -621,7 +616,7 @@ if (cluster.isMaster) {
             return;
         }
         if(data.function == "scan_ing") {
-            //logger.debug("当前加载目录：", data.extdata);
+            // logger.debug("当前加载目录：", data.extdata);
             return;
         }
 

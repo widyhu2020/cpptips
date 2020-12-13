@@ -29,24 +29,28 @@ var KeyWordStore = /** @class */ (function () {
             }
             logger.info("databasepath:", this.dbname);
             this.db = new Database(this.dbname, options);
-            this.initKeyWordTable();
+            this.initKeyWordTable(this.db);
             return this;
         };
         this.closeconnect = function () {
-            if (this.db == null) {
+            if (this.db) {
                 //之前有过链接
-                return true;
+                this.db.close();
+                this.db = null;
             }
-            this.db.close();
-            this.db = null;
+            if (this.dbMemDb) {
+                //之前有过链接
+                this.dbMemDb.close();
+                this.dbMemDb = null;
+            }
         };
         //创建并初始化关键字索引表
-        this.initKeyWordTable = function () {
-            var row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
+        this.initKeyWordTable = function (db) {
+            var row = db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
             if (row.total == 0) {
                 logger.error("not find t_keyword, create table now");
                 //创建表/索引
-                var createtable = this.db.prepare('CREATE TABLE t_keyword(\
+                var createtable = db.prepare('CREATE TABLE t_keyword(\
                     id INTEGER PRIMARY KEY AUTOINCREMENT,\
                     ownname  TEXT NOT NULL,\
                     name      TEXT NOT NULL,\
@@ -57,22 +61,22 @@ var KeyWordStore = /** @class */ (function () {
                     file_id   INTEGER NOT NULL,\
                     extdata    TEXT DEFAULT \"\"\
                 );').run();
-                var createu_index_fullname = this.db.prepare('CREATE UNIQUE INDEX u_index_fullname ON t_keyword(ownname, namespace, name, type)').run();
-                var createu_i_index_ownname = this.db.prepare('CREATE INDEX i_index_ownname ON t_keyword(ownname)').run();
-                var createu_i_index_name = this.db.prepare('CREATE INDEX i_index_name ON t_keyword(name)').run();
-                var createu_i_index_namespace = this.db.prepare('CREATE INDEX i_index_namespace ON t_keyword(namespace)').run();
-                var createu_i_index_file_id = this.db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
-                var createu_i_index_type = this.db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
-                var createu_i_namelength = this.db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
-                this.db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
+                var createu_index_fullname = db.prepare('CREATE UNIQUE INDEX u_index_fullname ON t_keyword(ownname, namespace, name, type)').run();
+                var createu_i_index_ownname = db.prepare('CREATE INDEX i_index_ownname ON t_keyword(ownname)').run();
+                var createu_i_index_name = db.prepare('CREATE INDEX i_index_name ON t_keyword(name)').run();
+                var createu_i_index_namespace = db.prepare('CREATE INDEX i_index_namespace ON t_keyword(namespace)').run();
+                var createu_i_index_file_id = db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
+                var createu_i_index_type = db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
+                var createu_i_namelength = db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
+                db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
                 //https://www.sqlite.org/pragma.html
                 //启动wal模式
                 //this.db.pragma('encoding = UTF-8');
-                this.db.pragma('journal_mode = WAL');
-                this.db.pragma('auto_vacuum = 1'); //删除数据时整理文件大小
-                this.db.pragma('synchronous = 0'); //不怕丢数据，要快
+                db.pragma('journal_mode = WAL');
+                db.pragma('auto_vacuum = 1'); //删除数据时整理文件大小
+                db.pragma('synchronous = 0'); //不怕丢数据，要快
             }
-            this.db.pragma('cache_size = 100000'); //100000*1.5k
+            db.pragma('cache_size = 100000'); //100000*1.5k
             return;
         };
         this.close = function () {
@@ -134,10 +138,10 @@ var KeyWordStore = /** @class */ (function () {
                 return true;
             }
             try {
-                var stmt = this.db.prepare('INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
-                VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)');
+                var sql = 'INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
+            VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)';
+                var stmt = this.db.prepare(sql);
                 var info_1 = stmt.run(data);
-                //logger.debug(info);
                 return info_1.changes == 1;
             }
             catch (error) {
@@ -145,57 +149,142 @@ var KeyWordStore = /** @class */ (function () {
                 return false;
             }
         };
-        //清楚所有的扩展数据，防止出现函数修改名称不更换问题
+        //使用关联的文件创建查找副本
+        this.setMemDB = function (fileids, userfilepath, currentfileid) {
+            console.log("userfilepath:", userfilepath);
+            this.dependentFileId[userfilepath] = fileids;
+            if (!this.dbMemDb) {
+                this.dbMemDb = new Database(':memory:', {});
+                // this.dbMemDb = new Database(':memory:', {verbose: console.log});
+                // this.dbMemDb = new Database(this.dbname + ".cached", {verbose: console.log});
+                this.initKeyWordTable(this.dbMemDb);
+            }
+            //复制数据到内存db
+            console.time("moveDataToMen");
+            try {
+                var stmt = this.dbMemDb.prepare("SELECT DISTINCT file_id FROM t_keyword");
+                var infos = stmt.all();
+                var inMem_1 = new Set();
+                if (infos) {
+                    infos.forEach(function (info) { inMem_1.add(info.file_id); });
+                }
+                // console.log("befor:", fileids);
+                fileids = fileids.filter(function (value, index, array) { return !inMem_1.has(value); });
+                fileids.push(currentfileid);
+                // console.log("after:", fileids);
+                if (fileids.length <= 0) {
+                    //无需移动数据
+                    console.log("no data need to memdb!");
+                    console.timeEnd("moveDataToMen");
+                    return true;
+                }
+                var strfileids = fileids.join(',');
+                this.dbMemDb.prepare("Attach DATABASE \"" + this.dbname + "\" as Tmp").run();
+                //删除当前文件索引
+                this.dbMemDb.prepare("DELETE FROM t_keyword WHERE file_id IN (" + currentfileid + ")").run();
+                this.dbMemDb.prepare("REPLACE INTO \
+                t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM Tmp.t_keyword WHERE file_id IN (" + strfileids + ")").run();
+                this.dbMemDb.prepare('DETACH DATABASE "Tmp"').run();
+            }
+            catch (err) {
+                console.log(err);
+            }
+            console.timeEnd("moveDataToMen");
+            return true;
+        };
+        //删除不必要的索引
+        this.removeMenDB = function (removeFilePath) {
+            if (!this.dependentFileId[removeFilePath]
+                || !this.dbMemDb) {
+                return;
+            }
+            var removeDependent = this.dependentFileId[removeFilePath];
+            var totalDependent = [];
+            var keys = Object.keys(this.dependentFileId);
+            for (var i = 0; i < keys.length; i++) {
+                if (keys[i] == removeFilePath) {
+                    continue;
+                }
+                totalDependent = totalDependent.concat(this.dependentFileId[keys[i]]);
+            }
+            var setDependent = new Set(totalDependent);
+            var needDelete = removeDependent.filter(function (item, index, array) { return !setDependent.has(item); });
+            if (needDelete.length > 0) {
+                var deletesql = "DELETE FROM t_keyword WHERE file_id IN (" + needDelete.join(',') + ")";
+                logger.log(deletesql);
+                this.dbMemDb.prepare(deletesql).run(); //清除数据
+            }
+            delete this.dependentFileId[removeFilePath];
+            return;
+        };
+        //清除所有的扩展数据，防止出现函数修改名称不更换问题
         this.cleanExtData = function (fileid) {
-            var stmt_update = this.db.prepare('UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)');
+            var sql = 'UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)';
+            var stmt_update = this.db.prepare(sql);
             var info = stmt_update.run(fileid);
+            if (this.dbMemDb) {
+                //更改内存db
+                this.dbMemDb.prepare(sql).run(fileid);
+            }
             return info;
         };
         //修改命名空间
         this.modifyNamespace = function (id, namespace) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET namespace=? WHERE id=?');
+            var sql = 'UPDATE t_keyword  SET namespace=? WHERE id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(namespace, id);
             //logger.debug(info);
             return info.changes == 1;
         };
         //修改文件id
         this.modifyFileId = function (id, file_id) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET file_id=? WHERE id=?');
+            var sql = 'UPDATE t_keyword  SET file_id=? WHERE id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(file_id, id);
             //logger.debug(info);
             return info.changes == 1;
         };
         //修改扩展数据
         this.modifyExdata = function (id, extdata) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE id=?');
+            var sql = 'UPDATE t_keyword  SET extdata=? WHERE id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(extdata, id);
             //logger.debug(info);
             return info.changes == 1;
         };
         //通过名称修改扩展数据
         this.modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?');
+            var sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(extdata, namespace, ownname, name, type);
             //logger.debug(info);
             return info.changes == 1;
         };
         //修改对外权限
         this.modifyPermission = function (id, permission) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET permission=? WHERE id=?');
+            var sql = 'UPDATE t_keyword  SET permission=? WHERE id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(permission, id);
             //logger.debug(info);
             return info.changes == 1;
         };
         //修改类型
         this.modifyType = function (id, type) {
-            var stmt = this.db.prepare('UPDATE t_keyword  SET type=? WHERE id=?');
+            var sql = 'UPDATE t_keyword  SET type=? WHERE id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(type, id);
             //logger.debug(info);
             return info.changes == 1;
         };
         //删除数据
         this.delete = function (id) {
-            var stmt = this.db.prepare('DELETE FROM t_keyword WHERE id=? LIMIT 0,1');
+            var sql = 'DELETE FROM t_keyword WHERE id=? LIMIT 0,1';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(id);
             logger.debug(info);
             return info.changes == 1;
@@ -207,14 +296,16 @@ var KeyWordStore = /** @class */ (function () {
                 return true;
             }
             var sqlids = ids.join(',');
-            var stmt = this.db.prepare('DELETE FROM t_keyword WHERE id IN (' + sqlids + ')');
+            var sql = 'DELETE FROM t_keyword WHERE id IN (' + sqlids + ')';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run();
             //logger.debug(info);
             return info.changes == 1;
         };
         //通过文件id删除数据
         this.deleteByFileId = function (file_id) {
-            var stmt = this.db.prepare('DELETE FROM t_keyword WHERE file_id=?');
+            var sql = 'DELETE FROM t_keyword WHERE file_id=?';
+            var stmt = this.db.prepare(sql);
             var info = stmt.run(file_id);
             logger.debug(info);
             return info.changes == 1;
@@ -233,7 +324,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //指定命名空间下查找
         this.findByNamespace = function (namespace) {
-            var stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
+            var stmt = this._getDbConnect().prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
             var infos = stmt.all(namespace);
             logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -243,10 +334,18 @@ var KeyWordStore = /** @class */ (function () {
             }
             return infos;
         };
+        //获取可用的db链接
+        this._getDbConnect = function () {
+            if (this.dbMemDb) {
+                return this.dbMemDb;
+            }
+            return this.db;
+        };
         //前缀匹配搜索
         this.freezFindByPreKeyword = function (keyword, namepsaces, ownname, maxlength, permission, types) {
             if (permission === void 0) { permission = []; }
             if (types === void 0) { types = []; }
+            var db = this._getDbConnect();
             if (types.length == 0) {
                 types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
             }
@@ -274,7 +373,7 @@ var KeyWordStore = /** @class */ (function () {
                         AND permission IN (' + sqlpermission + ') \
                         AND type IN (' + sqltype + ')';
             //logger.debug(sql);
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -286,6 +385,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //前缀匹配搜索
         this.freezFindAllByPreKeyword = function (keyword, namepsaces, ownname, maxlength) {
+            var db = this._getDbConnect();
             var sqlnamespace = namepsaces.join("','");
             //非函数和变量
             //只查找公共的定向
@@ -325,7 +425,7 @@ var KeyWordStore = /** @class */ (function () {
                 sql = sql.replace(/[\t\s]{1,100}/g, " ");
                 //logger.debug(sql);
                 var begintime = new Date().getTime();
-                var stmt = this.db.prepare(sql);
+                var stmt = db.prepare(sql);
                 var infos = stmt.all();
                 var endtime = new Date().getTime();
                 if (endtime - begintime > 2000) {
@@ -345,6 +445,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //从命名空间中匹配own
         this.freezGetByNameAndNamespaces = function (name, namespaces, maxlength) {
+            var db = this._getDbConnect();
             var sqlnamespace = namespaces.join("','");
             var freezquer = "LIKE \'" + name + '%\' escape \'/\'';
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -355,7 +456,7 @@ var KeyWordStore = /** @class */ (function () {
                                 AND type IN (1,2,3,4,9)\
                                 AND namespace in (\'' + sqlnamespace + '\')';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -369,6 +470,7 @@ var KeyWordStore = /** @class */ (function () {
         this.freezFindByPreKeywordCase = function (keyword, namepsaces, ownname, maxlength, permission, types) {
             if (permission === void 0) { permission = []; }
             if (types === void 0) { types = []; }
+            var db = this._getDbConnect();
             if (types.length == 0) {
                 types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
             }
@@ -395,7 +497,7 @@ var KeyWordStore = /** @class */ (function () {
                         LIMIT 0,10';
             //logger.debug(sql);
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -409,6 +511,7 @@ var KeyWordStore = /** @class */ (function () {
         this.freezFindByPreKeywordnOnOwnCase = function (keyword, namepsaces, maxlength, permission, types) {
             if (permission === void 0) { permission = []; }
             if (types === void 0) { types = []; }
+            var db = this._getDbConnect();
             if (types.length == 0) {
                 types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
             }
@@ -434,7 +537,7 @@ var KeyWordStore = /** @class */ (function () {
                         LIMIT 0,10';
             //logger.debug(sql);
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -447,6 +550,7 @@ var KeyWordStore = /** @class */ (function () {
         //通过全名获取
         this.getByOwnName = function (ownname, namespace, permission) {
             if (permission === void 0) { permission = []; }
+            var db = this._getDbConnect();
             var sqlpermission = "";
             if (permission.length <= 0) {
                 permission = [0, 1, 2];
@@ -458,7 +562,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND namespace=? \
                                     AND permission IN (' + permission + ')';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all(ownname, namespace);
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -470,6 +574,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //指定命名空间和owner已经公开属性查询函数
         this.getByOwnNameAndNs = function (ownname, namespaces) {
+            var db = this._getDbConnect();
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -478,7 +583,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND extdata NOT LIKE \'%"r":{"t":"void",%\'\
                                     AND permission=0 LIMIT 200';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -490,6 +595,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //获取own下的所有指定类型的定义
         this.getAllInOwnNameAndNs = function (ownname, namespaces, type) {
+            var db = this._getDbConnect();
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -497,7 +603,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND namespace in (\'' + sqlnamespace + '\') \
                                     AND type=' + type;
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -510,6 +616,7 @@ var KeyWordStore = /** @class */ (function () {
         //通过全名获取,不能_开头，用于使用在标准头文件中通过_来决定内部方法变量等等
         this.getByOwnNameNotStart_ = function (ownname, namespace, permission) {
             if (permission === void 0) { permission = []; }
+            var db = this._getDbConnect();
             var sqlpermission = "";
             if (permission.length <= 0) {
                 permission = [0, 1, 2];
@@ -522,7 +629,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND name NOT GLOB \'_*\' \
                                     AND permission IN (' + permission + ')';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all(ownname, namespace);
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -534,6 +641,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //通过名称和owner获取
         this.getByOwnNameAndName = function (ownnames, name, namespaces) {
+            var db = this._getDbConnect();
             var owns = ownnames.join('\',\'');
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -542,7 +650,7 @@ var KeyWordStore = /** @class */ (function () {
                                         AND name=\'' + name + '\' \
                                         AND namespace in (\'' + sqlnamespace + '\')';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -554,6 +662,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //通过名称和owner获取
         this.getByOwnNameAndNameType = function (ownnames, name, namespaces, type) {
+            var db = this._getDbConnect();
             var owns = ownnames.join('\',\'');
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -563,7 +672,7 @@ var KeyWordStore = /** @class */ (function () {
                                         AND namespace in (\'' + sqlnamespace + '\') \
                                         AND type=' + type;
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -575,13 +684,14 @@ var KeyWordStore = /** @class */ (function () {
         };
         //从命名空间中查找own
         this.getByNameAndNamespaces = function (name, namespaces) {
+            var db = this._getDbConnect();
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                             FROM t_keyword \
                                 WHERE name=? \
                                 AND namespace in (\'' + sqlnamespace + '\')';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all(name);
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -594,6 +704,7 @@ var KeyWordStore = /** @class */ (function () {
         //通过全名获取(无类型)
         this.getByFullname = function (ownname, namespace, name, types) {
             if (types === void 0) { types = []; }
+            var db = this._getDbConnect();
             if (types.length == 0) {
                 //如果没有填类型，则查找所有类型
                 types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -606,7 +717,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND name=? \
                                     AND type IN (' + strtypes + ') LIMIT 0,100';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all(ownname, namespace, name);
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -618,6 +729,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //通过全名获取
         this.getByFullnameAndType = function (ownname, namespace, name, type) {
+            var db = this._getDbConnect();
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
                                     WHERE ownname=? \
@@ -625,7 +737,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND name=? \
                                     AND type=? LIMIT 0,1';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all(ownname, namespace, name, type);
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -637,6 +749,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //通过全名获取
         this.getByFullnameNssAndType = function (ownname, namespaces, name, type) {
+            var db = this._getDbConnect();
             var sqlnamespace = namespaces.join("','");
             var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -645,7 +758,7 @@ var KeyWordStore = /** @class */ (function () {
                                     AND name= \'' + name + '\' \
                                     AND type= ' + type + ' LIMIT 0,1';
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
-            var stmt = this.db.prepare(sql);
+            var stmt = db.prepare(sql);
             var infos = stmt.all();
             //logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
@@ -658,6 +771,9 @@ var KeyWordStore = /** @class */ (function () {
         logger.info("KeyWordStore in constructor");
         this.dbname = "";
         this.db = null;
+        this.dbMemDb = null;
+        this.userfilepath = "";
+        this.dependentFileId = {};
     }
     //单例方法
     KeyWordStore.getInstace = function () {

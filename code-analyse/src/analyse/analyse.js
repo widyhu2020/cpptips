@@ -14,7 +14,7 @@ const logger = require('log4js').getLogger("cpptips");
 class Analyse {
     constructor(filecontext, filename = '') {
 
-        if(filename.indexOf(".vscode") != 0) {
+        if(filename.indexOf(".vscode") != -1) {
             //无需处理
             return;
         }

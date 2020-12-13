@@ -81,16 +81,16 @@ class AnalyseCpp extends AnalyseBase {
         //logger.mark("_analyseVariable");
 
         //分析枚举
-        //logger.mark("_analyseVariable")
+        //logger.mark("_analyseEnum")
         this.tree.traverseBF((current) => {
             //logger.debug(current.domain_level, current.namespace);
             for (let i = 0; i < current.data.length; i++) {
-                //logger.mark("_analyseVariable:" + i)
+                //logger.mark("_analyseEnum:" + i)
                 this._analyseEnum(current, this.lines, current.data[i], i);
-                //logger.mark("_analyseVariable:" + i);
+                //logger.mark("_analyseEnum:" + i);
             }
         });
-        //logger.mark("_analyseVariable");
+        //logger.mark("_analyseEnum");
     };
 
     //分析枚举
@@ -225,20 +225,21 @@ class AnalyseCpp extends AnalyseBase {
             && node.namespace == node.parent.namespace) {
             //命名空间域父区域命名空间一致，表示该区域代码里面的变量无需关注
             //代码为 if/for/while或者函数引入
-            //logger.debug(node.namespace, " | ", node.parent.namespace);
+            //命名空间不为空
+            // console.debug(node.namespace+ "|"+ node.parent.namespace + "|");
             return;
         } 
 
         let line = lines[index].split(';');
         let permission = node.permission[idataindex];
         line.forEach(item => {
-            if (index == 0 || /(#define .+)|(#include )/ig.test(item)){
+            if (index == 0 || /(#define)|(#include)[\s]{1,10}/ig.test(item)){
                 //宏定义解释
                 this._analyseIncludeAndDefine(node, item);
             }
 
             let valable = this._judgeCodeisVariabledefine(permission, item);
-    
+            
             permission = valable['p'];
             if (valable['v'] != null && valable['v'] != false){
                 valable['v'].forEach(e => {
@@ -574,7 +575,8 @@ class AnalyseCpp extends AnalyseBase {
                 || node.ownname.type == TypeEnum.AIR_IN_FUNCTION))) {
                 //枚举中不会包含函数定义
                 return;
-            }
+        }
+        
         let ownname = "";
         if(node.ownname.type == TypeEnum.CALSS
             || node.ownname.type == TypeEnum.STRUCT) {
@@ -582,13 +584,13 @@ class AnalyseCpp extends AnalyseBase {
             //方便后续识别构造函数
             ownname = node.ownname.name;
         }
-
+        
         let permission = 0;
         if (defaultpermission > 0) {
             //公开属性，默认使用前一个代码块的
             permission = node.permission[defaultpermission - 1];
         }
-
+        
         if(index == 0) {
             //首行处理，首行不在花括号中间
             let item = this._getFirstFunctionName(lines[index]);
@@ -598,16 +600,16 @@ class AnalyseCpp extends AnalyseBase {
                 method.permission = permission;
                 node.addMethod(method);
             }
-            return;
+            // return; //20201212
         }
 
-        if (index < 2) {
-            //无需处理的代码快，可能是第一块，这块出来头文件相关单独处理
-            return;
-        }
+        // if (index < 2) {//20201212
+        //     //无需处理的代码快，可能是第一块，这块出来头文件相关单独处理
+        //     // return;
+        // }//20201212
 
         //logger.debug(lines[index-2]);
-        if (lines[index - 1] == "{") {
+        if (index > 1 && lines[index - 1] == "{") {
             //当前代码块绝大部分可能对我们的功能没有用处，
             //如：for、if、do、while 函数实现
             let pos = lines[index - 2].lastIndexOf(';');
@@ -671,11 +673,11 @@ class AnalyseCpp extends AnalyseBase {
                 return;
             }
             
-            let method = this._getMethodDefine(element, ownname);
             
+            let method = this._getMethodDefine(element, ownname);
             if (method != false && method != []) {
                 //写入方法
-                //logger.debug(method.name);
+                // console.debug(method.name);
                 method.permission = permission;
                 node.addMethod(method);
             }
@@ -710,7 +712,7 @@ class AnalyseCpp extends AnalyseBase {
  
                     for (let i = data.length - 1; i >= 0; i--) {
                         if (isNum == 2) {
-                            //logger.debug(tmpData);
+                            // logger.debug(tmpData);
                             tmpData.push(data[i]);
                             continue;
                         }
@@ -1448,10 +1450,10 @@ class AnalyseCpp extends AnalyseBase {
                     || current.parent.ownname.type == TypeEnum.STRUCT
                     || current.parent.ownname.type == TypeEnum.ENUM)){
                     //无需处理
-                    //logger.debug(current);
+                    // console.debug(current);
                     return;     
                 }
-                //logger.debug(find_context);
+                // console.debug(find_context);
             }
 
             let domain_name = find_context;
@@ -1460,8 +1462,9 @@ class AnalyseCpp extends AnalyseBase {
                 domain_name = find_context.substr(pos);
             }
             domain_name = domain_name.trim();
-            //logger.debug("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
-            this._getDomainNameAndType(domain_name, current);
+            // console.debug("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
+            let _ret = this._getDomainNameAndType(domain_name, current);
+            
         });
     };
 
@@ -1469,7 +1472,7 @@ class AnalyseCpp extends AnalyseBase {
     _getDomainNameAndType = function(rawName, treeNode) {
         if (rawName == "" 
             && treeNode.domain_level == 0) {
-            return;
+            return true;
         }
 
         let items = rawName.split(' ');
@@ -1528,6 +1531,7 @@ class AnalyseCpp extends AnalyseBase {
         //其余的全部算到函数里面
         let data = new MateData.BaseData("", TypeEnum.AIR_IN_FUNCTION, "in function");
         Tree.setType(treeNode, data);
+        return true;
     };
 
     //存储命名空间到作用域树节点中
@@ -1777,8 +1781,18 @@ class AnalyseCpp extends AnalyseBase {
         //对分解的串进行第一次处理
         for (let i = 0; i < lines.length; i++) {
             //this.analyseLine(this.context[i], i, this.context);
+            if(/[\s]{1,10}extern[\s]{1,10}"C"[\s]{0,10}$/g.test(lines[i])
+                && i + 2 < lines.length) {
+                //c函数扩展
+                //数据给到父亲节点
+                lines[i] = lines[i] + " ; " + lines[i + 2];
+                // console.log(lines[i]);
+                this.tree.addDataToNode(this.point_domain, i);
+                i = i + 3; //往后面跳三个索引
+                continue;
+            }
+
             if (lines[i] == '{') {
-                //this.slevel.push(SymbolEnum.BEGIN);
                 //logger.debug(this.point_domain);
                 //logger.debug("domin:" + i);
                 this.tree.add(i, this.point_domain);
@@ -1787,7 +1801,6 @@ class AnalyseCpp extends AnalyseBase {
             }
 
             if (lines[i] == '}') {
-                //this.slevel.push(SymbolEnum.END);
                 //logger.debug("before getFatherDomain:" + this.point_domain);
                 //logger.mark("getFatherDomain");
                 this.point_domain = this.tree.getFatherDomain(this.point_domain);
@@ -1799,8 +1812,6 @@ class AnalyseCpp extends AnalyseBase {
             //将数据挂载到当前作用域下
             //logger.debug(i);
             this.tree.addDataToNode(this.point_domain, i);
-
-            //this.block.push(this.context[i]);
         }
     };
 };

@@ -23,9 +23,9 @@ filename = "xxxxx.proto";
 
 //测试归属找提示
 // 301 30
-let line = 1307;
-let cpos = 50;
-filename = "/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.cpp";
+let line = 64;
+let cpos = 35;
+filename = "/mmpay/mmpaymchmgr/mmpaymchmerchantsubject/mmpaymchmerchantsubjectauthorizebizaosvr/logic/BindMerchantSubject.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);
@@ -120,10 +120,10 @@ function succcallbackloadcpp(){
     //let d = CodeAnalyse.getInstace().getSignatureHelp(filename, precontext, []);
     // let d = CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, []);
     // let d = CodeAnalyse.getInstace().getIncludeDefine(filename, "mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductdaosvr/mmpaymchproductdaosvrclient.h");
-    // let d = CodeAnalyse.getInstace().getDefinePoint(filename, precontext2, linelast, []);
+    let d = CodeAnalyse.getInstace().getDefinePoint(filename, precontext2, linelast, []);
     //let d = CodeAnalyse.getInstace().searchKeyWord(filename, "mmpaymchmerchantofflinedaosvr::MERCHANT_EV", precontext);
-    let newcontext = precontext;
-    let d = CodeAnalyse.getInstace().autoFillParams(filename, newcontext, params);
+    // let newcontext = precontext;
+    // let d = CodeAnalyse.getInstace().autoFillParams(filename, newcontext, params);
     console.log(d);
 }
 

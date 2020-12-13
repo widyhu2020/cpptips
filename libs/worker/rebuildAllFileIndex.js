@@ -383,11 +383,11 @@ var RebuildFileIndex = /** @class */ (function () {
             }
             //如果是md5值不一样，则启动分析合并
             if ((hasInDb && lastMd5 != md5) || forckReolad) {
-                //logger.debug(lastMd5, md5, filepath);
+                logger.debug(lastMd5, md5, filepath);
                 //获取文件id
                 var fileinfo_2 = FileIndexStore.getInstace().getFileByFilePath(filepath);
                 if (!fileinfo_2) {
-                    //logger.debug("not find file!", filepath);
+                    logger.debug("not find file!", filepath);
                     return false;
                 }
                 var file_id = fileinfo_2.id;
@@ -435,7 +435,7 @@ var RebuildFileIndex = /** @class */ (function () {
                 var analyse = new Analyse(filecontext, filename);
                 analyse.doAnalyse();
                 var nameMap = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace(), onlaysavepublic);
-                //logger.debug(nameMap);
+                // console.log(nameMap);
                 return nameMap;
             }
             catch (error) {
@@ -533,14 +533,11 @@ if (cluster.isMaster) {
     var parasms = {
         msg_type: 2,
         data: {
-            // basepath: "/Users/widyhu/widyhu/cpptips/data/",
-            // dbpath: "/Users/widyhu/widyhu/cpptips/data/basedb.db",
-            // filepath: '/usr/local/include/google/protobuf/message_lite.h',
-            basepath: "/Users/widyhu/widyhu/cpp_project/",
-            dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
-            filepath: 'xxxxxxxx',
-            filepaths: ['xxxxxxxx',
-                'xxxxxxxx'],
+            basepath: "--",
+            dbpath: "--",
+            filepath: '--',
+            // filepaths: ['xxxxxxxx',
+            //             'xxxxxxxx'],
             issystem: 0,
             userConfig: defaultSettings
         }
@@ -553,7 +550,7 @@ if (cluster.isMaster) {
             return;
         }
         if (data.function == "scan_ing") {
-            //logger.debug("当前加载目录：", data.extdata);
+            // logger.debug("当前加载目录：", data.extdata);
             return;
         }
         if (data.function == "error") {

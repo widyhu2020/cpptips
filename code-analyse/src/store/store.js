@@ -24,6 +24,9 @@ class KeyWordStore {
         logger.info("KeyWordStore in constructor");
         this.dbname = "";
         this.db = null;
+        this.dbMemDb = null;
+        this.userfilepath = "";
+        this.dependentFileId = {};
     };
 
     connect = function (dbname, showsql = 0, memorydb = 0) {
@@ -42,27 +45,32 @@ class KeyWordStore {
         }
         logger.info("databasepath:", this.dbname);
         this.db = new Database(this.dbname, options);
-        this.initKeyWordTable();
+        this.initKeyWordTable(this.db);
         return this;
     };
 
     closeconnect = function() {
-        if (this.db == null) {
+        if (this.db) {
             //之前有过链接
-            return true;
+            this.db.close();
+            this.db = null;
         }
-        this.db.close();
-        this.db = null;
+        
+        if (this.dbMemDb) {
+            //之前有过链接
+            this.dbMemDb.close();
+            this.dbMemDb = null;
+        }
     };
 
     //创建并初始化关键字索引表
-    initKeyWordTable = function() {
+    initKeyWordTable = function(db) {
         
-        let row = this.db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
+        let row = db.prepare('SELECT count(*) as total FROM sqlite_master WHERE name=? and type=\'table\'').get('t_keyword');
         if (row.total == 0) {
             logger.error("not find t_keyword, create table now");
             //创建表/索引
-            const createtable = this.db.prepare(
+            const createtable = db.prepare(
                 'CREATE TABLE t_keyword(\
                     id INTEGER PRIMARY KEY AUTOINCREMENT,\
                     ownname  TEXT NOT NULL,\
@@ -74,24 +82,24 @@ class KeyWordStore {
                     file_id   INTEGER NOT NULL,\
                     extdata    TEXT DEFAULT \"\"\
                 );').run();
-            const createu_index_fullname = this.db.prepare('CREATE UNIQUE INDEX u_index_fullname ON t_keyword(ownname, namespace, name, type)').run();
-            const createu_i_index_ownname = this.db.prepare('CREATE INDEX i_index_ownname ON t_keyword(ownname)').run();
-            const createu_i_index_name = this.db.prepare('CREATE INDEX i_index_name ON t_keyword(name)').run();
-            const createu_i_index_namespace = this.db.prepare('CREATE INDEX i_index_namespace ON t_keyword(namespace)').run();
-            const createu_i_index_file_id = this.db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
-            const createu_i_index_type = this.db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
-            const createu_i_namelength = this.db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
-            this.db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
+            const createu_index_fullname = db.prepare('CREATE UNIQUE INDEX u_index_fullname ON t_keyword(ownname, namespace, name, type)').run();
+            const createu_i_index_ownname = db.prepare('CREATE INDEX i_index_ownname ON t_keyword(ownname)').run();
+            const createu_i_index_name = db.prepare('CREATE INDEX i_index_name ON t_keyword(name)').run();
+            const createu_i_index_namespace = db.prepare('CREATE INDEX i_index_namespace ON t_keyword(namespace)').run();
+            const createu_i_index_file_id = db.prepare('CREATE INDEX i_index_file_id ON t_keyword(file_id)').run();
+            const createu_i_index_type = db.prepare('CREATE INDEX i_index_type ON t_keyword(type)').run();
+            const createu_i_namelength = db.prepare('CREATE INDEX i_namelength ON t_keyword(namelength)').run();
+            db.prepare("UPDATE sqlite_sequence SET seq = 500000 WHERE name='t_keyword'").run();
             
 
             //https://www.sqlite.org/pragma.html
             //启动wal模式
             //this.db.pragma('encoding = UTF-8');
-            this.db.pragma('journal_mode = WAL');
-            this.db.pragma('auto_vacuum = 1');//删除数据时整理文件大小
-            this.db.pragma('synchronous = 0');//不怕丢数据，要快
+            db.pragma('journal_mode = WAL');
+            db.pragma('auto_vacuum = 1');//删除数据时整理文件大小
+            db.pragma('synchronous = 0');//不怕丢数据，要快
         }
-        this.db.pragma('cache_size = 100000');//100000*1.5k
+        db.pragma('cache_size = 100000');//100000*1.5k
         return;
     };
 
@@ -157,10 +165,10 @@ class KeyWordStore {
         }
 
         try {
-            const stmt = this.db.prepare('INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
-                VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)');
+            let sql = 'INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
+            VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)';
+            const stmt = this.db.prepare(sql);
             const info = stmt.run(data);
-            //logger.debug(info);
             return info.changes == 1;
         } catch(error) {
             logger.debug("insert faild", error);
@@ -168,16 +176,103 @@ class KeyWordStore {
         }
     };
 
-    //清楚所有的扩展数据，防止出现函数修改名称不更换问题
+    //使用关联的文件创建查找副本
+    setMemDB = function(fileids, userfilepath, currentfileid) {
+        console.log("userfilepath:", userfilepath);
+        this.dependentFileId[userfilepath] = fileids;
+        
+        if(!this.dbMemDb){
+            this.dbMemDb = new Database(':memory:', {});
+            // this.dbMemDb = new Database(':memory:', {verbose: console.log});
+            // this.dbMemDb = new Database(this.dbname + ".cached", {verbose: console.log});
+            this.initKeyWordTable(this.dbMemDb);
+        }
+
+        //复制数据到内存db
+        console.time("moveDataToMen");
+        try{
+            const stmt = this.dbMemDb.prepare("SELECT DISTINCT file_id FROM t_keyword");
+            const infos = stmt.all();
+            let inMem = new Set();
+            if (infos) {
+                infos.forEach(info => { inMem.add(info.file_id); });
+            }
+
+            // console.log("befor:", fileids);
+            fileids = fileids.filter((value, index, array)=>{ return !inMem.has(value); });
+            fileids.push(currentfileid);
+            // console.log("after:", fileids);
+            if(fileids.length <= 0) {
+                //无需移动数据
+                console.log("no data need to memdb!");
+                console.timeEnd("moveDataToMen");
+                return true;
+            }
+
+            let strfileids = fileids.join(',');
+            this.dbMemDb.prepare(`Attach DATABASE "${this.dbname}" as Tmp`).run();
+            //删除当前文件索引
+            this.dbMemDb.prepare("DELETE FROM t_keyword WHERE file_id IN (" + currentfileid + ")").run();
+            this.dbMemDb.prepare("REPLACE INTO \
+                t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM Tmp.t_keyword WHERE file_id IN (" + strfileids + ")").run();
+            this.dbMemDb.prepare('DETACH DATABASE "Tmp"').run();
+        } catch(err) {
+            console.log(err);
+        }
+        console.timeEnd("moveDataToMen");
+        return true;
+    };
+
+    //删除不必要的索引
+    removeMenDB = function(removeFilePath) {
+        if(!this.dependentFileId[removeFilePath]
+            || !this.dbMemDb) {
+            return;
+        }
+
+        let removeDependent = this.dependentFileId[removeFilePath];
+        let totalDependent = [];
+        let keys = Object.keys(this.dependentFileId);
+        for (let i = 0; i < keys.length; i++) {
+            if(keys[i] == removeFilePath){
+                continue;
+            }
+            totalDependent = totalDependent.concat(this.dependentFileId[keys[i]]);
+        }
+
+        let setDependent = new Set(totalDependent);
+        let needDelete = removeDependent.filter((item, index, array)=>{ return !setDependent.has(item); });
+        if(needDelete.length > 0){
+            let deletesql = "DELETE FROM t_keyword WHERE file_id IN (" + needDelete.join(',') + ")";
+            logger.log(deletesql);
+            this.dbMemDb.prepare(deletesql).run();//清除数据
+        }
+
+        delete this.dependentFileId[removeFilePath];
+        return;
+    };
+
+    //清除所有的扩展数据，防止出现函数修改名称不更换问题
     cleanExtData = function(fileid) {
-        const stmt_update = this.db.prepare('UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)');
+        let sql = 'UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)';
+        const stmt_update = this.db.prepare(sql);
         const info = stmt_update.run(fileid);
+        if(this.dbMemDb){
+            //更改内存db
+            this.dbMemDb.prepare(sql).run(fileid);
+        }
         return info;
     };
 
     //修改命名空间
     modifyNamespace = function (id, namespace) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET namespace=? WHERE id=?');
+        let sql = 'UPDATE t_keyword  SET namespace=? WHERE id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(namespace, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -185,7 +280,8 @@ class KeyWordStore {
 
     //修改文件id
     modifyFileId = function (id, file_id) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET file_id=? WHERE id=?');
+        let sql = 'UPDATE t_keyword  SET file_id=? WHERE id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(file_id, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -193,7 +289,8 @@ class KeyWordStore {
 
     //修改扩展数据
     modifyExdata = function (id, extdata) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE id=?');
+        let sql = 'UPDATE t_keyword  SET extdata=? WHERE id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(extdata, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -201,7 +298,8 @@ class KeyWordStore {
 
     //通过名称修改扩展数据
     modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?');
+        let sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(extdata, namespace, ownname, name, type);
         //logger.debug(info);
         return info.changes == 1;
@@ -209,7 +307,8 @@ class KeyWordStore {
 
     //修改对外权限
     modifyPermission = function (id, permission) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET permission=? WHERE id=?');
+        let sql = 'UPDATE t_keyword  SET permission=? WHERE id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(permission, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -217,7 +316,8 @@ class KeyWordStore {
 
     //修改类型
     modifyType = function (id, type) {
-        const stmt = this.db.prepare('UPDATE t_keyword  SET type=? WHERE id=?');
+        let sql = 'UPDATE t_keyword  SET type=? WHERE id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(type, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -225,7 +325,8 @@ class KeyWordStore {
 
     //删除数据
     delete = function (id) {
-        const stmt = this.db.prepare('DELETE FROM t_keyword WHERE id=? LIMIT 0,1');
+        let sql = 'DELETE FROM t_keyword WHERE id=? LIMIT 0,1';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(id);
         logger.debug(info);
         return info.changes == 1;
@@ -238,7 +339,8 @@ class KeyWordStore {
             return true;
         }
         let sqlids = ids.join(',');
-        const stmt = this.db.prepare('DELETE FROM t_keyword WHERE id IN (' + sqlids +')');
+        let sql = 'DELETE FROM t_keyword WHERE id IN (' + sqlids +')';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run();
         //logger.debug(info);
         return info.changes == 1;
@@ -246,7 +348,8 @@ class KeyWordStore {
 
     //通过文件id删除数据
     deleteByFileId = function (file_id) {
-        const stmt = this.db.prepare('DELETE FROM t_keyword WHERE file_id=?');
+        let sql = 'DELETE FROM t_keyword WHERE file_id=?';
+        const stmt = this.db.prepare(sql);
         const info = stmt.run(file_id);
         logger.debug(info);
         return info.changes == 1;
@@ -268,7 +371,7 @@ class KeyWordStore {
 
     //指定命名空间下查找
     findByNamespace = function(namespace) {
-        const stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
+        const stmt = this._getDbConnect().prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE namespace=?');
         const infos = stmt.all(namespace);
         logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -280,8 +383,17 @@ class KeyWordStore {
         return infos;
     };
 
+    //获取可用的db链接
+    _getDbConnect = function(){
+        if(this.dbMemDb) {
+            return this.dbMemDb;
+        }
+        return this.db;
+    };
+
     //前缀匹配搜索
     freezFindByPreKeyword = function (keyword, namepsaces, ownname, maxlength, permission = [], types = []) {
+        let db = this._getDbConnect();
         if (types.length == 0) {
             types = [0,1,2,3,4,5,6,7,8,9,10];
         }
@@ -312,7 +424,7 @@ class KeyWordStore {
                         AND type IN (' + sqltype + ')';
         
         //logger.debug(sql);
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -325,6 +437,7 @@ class KeyWordStore {
 
     //前缀匹配搜索
     freezFindAllByPreKeyword = function (keyword, namepsaces, ownname, maxlength) {
+        let db = this._getDbConnect();
         let sqlnamespace = namepsaces.join("','");
         //非函数和变量
         //只查找公共的定向
@@ -365,7 +478,7 @@ class KeyWordStore {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");                          
             //logger.debug(sql);
             let begintime = new Date().getTime();
-            const stmt = this.db.prepare(sql);
+            const stmt = db.prepare(sql);
             const infos = stmt.all();
             let endtime = new Date().getTime();
             if(endtime - begintime > 2000){
@@ -385,6 +498,7 @@ class KeyWordStore {
 
     //从命名空间中匹配own
     freezGetByNameAndNamespaces = function (name, namespaces, maxlength) {
+        let db = this._getDbConnect();
         let sqlnamespace = namespaces.join("','");
         let freezquer = "LIKE \'" + name + '%\' escape \'/\'';
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -395,7 +509,7 @@ class KeyWordStore {
                                 AND type IN (1,2,3,4,9)\
                                 AND namespace in (\'' + sqlnamespace + '\')';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -409,6 +523,7 @@ class KeyWordStore {
 
     //前缀匹配搜索-区分大小写
     freezFindByPreKeywordCase = function (keyword, namepsaces, ownname, maxlength, permission=[], types = []) {
+        let db = this._getDbConnect();
         if (types.length == 0) {
             types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         }
@@ -437,7 +552,7 @@ class KeyWordStore {
 
         //logger.debug(sql);
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -450,6 +565,7 @@ class KeyWordStore {
 
     //前缀匹配搜索-区分大小写
     freezFindByPreKeywordnOnOwnCase = function (keyword, namepsaces, maxlength, permission = [], types = []) {
+        let db = this._getDbConnect();
         if (types.length == 0) {
             types = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         }
@@ -477,7 +593,7 @@ class KeyWordStore {
 
         //logger.debug(sql);
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -490,6 +606,7 @@ class KeyWordStore {
 
     //通过全名获取
     getByOwnName = function (ownname, namespace, permission = []) {
+        let db = this._getDbConnect();
         let sqlpermission = "";
         if (permission.length <= 0) {
             permission = [0,1,2];
@@ -501,7 +618,7 @@ class KeyWordStore {
                                     AND namespace=? \
                                     AND permission IN (' + permission + ')';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all(ownname, namespace);
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -515,6 +632,7 @@ class KeyWordStore {
 
     //指定命名空间和owner已经公开属性查询函数
     getByOwnNameAndNs = function (ownname, namespaces) {
+        let db = this._getDbConnect();
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -523,7 +641,7 @@ class KeyWordStore {
                                     AND extdata NOT LIKE \'%"r":{"t":"void",%\'\
                                     AND permission=0 LIMIT 200';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -537,6 +655,7 @@ class KeyWordStore {
 
     //获取own下的所有指定类型的定义
     getAllInOwnNameAndNs = function(ownname, namespaces, type) {
+        let db = this._getDbConnect();
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -544,7 +663,7 @@ class KeyWordStore {
                                     AND namespace in (\'' + sqlnamespace + '\') \
                                     AND type=' + type;
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -558,6 +677,7 @@ class KeyWordStore {
 
     //通过全名获取,不能_开头，用于使用在标准头文件中通过_来决定内部方法变量等等
     getByOwnNameNotStart_ = function (ownname, namespace, permission = []) {
+        let db = this._getDbConnect();
         let sqlpermission = "";
         if (permission.length <= 0) {
             permission = [0, 1, 2];
@@ -570,7 +690,7 @@ class KeyWordStore {
                                     AND name NOT GLOB \'_*\' \
                                     AND permission IN (' + permission + ')';
         sql = sql.replace(/[\t\s]{1,100}/g, " ");
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all(ownname, namespace);
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -584,6 +704,7 @@ class KeyWordStore {
 
     //通过名称和owner获取
     getByOwnNameAndName = function (ownnames, name, namespaces) {
+        let db = this._getDbConnect();
         let owns = ownnames.join('\',\'');
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -592,7 +713,7 @@ class KeyWordStore {
                                         AND name=\'' + name + '\' \
                                         AND namespace in (\'' + sqlnamespace + '\')';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -606,6 +727,7 @@ class KeyWordStore {
 
     //通过名称和owner获取
     getByOwnNameAndNameType = function (ownnames, name, namespaces, type) {
+        let db = this._getDbConnect();
         let owns = ownnames.join('\',\'');
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
@@ -615,7 +737,7 @@ class KeyWordStore {
                                         AND namespace in (\'' + sqlnamespace + '\') \
                                         AND type=' + type;
         sql = sql.replace(/[\t\s]{1,100}/g, " ");
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -629,13 +751,14 @@ class KeyWordStore {
 
     //从命名空间中查找own
     getByNameAndNamespaces = function (name, namespaces) {
+        let db = this._getDbConnect();
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                             FROM t_keyword \
                                 WHERE name=? \
                                 AND namespace in (\'' + sqlnamespace + '\')';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all(name);
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -649,6 +772,7 @@ class KeyWordStore {
 
     //通过全名获取(无类型)
     getByFullname = function(ownname, namespace, name, types=[]) {
+        let db = this._getDbConnect();
         if(types.length == 0){
             //如果没有填类型，则查找所有类型
             types = [0,1,2,3,4,5,6,7,8,9,10];
@@ -661,7 +785,7 @@ class KeyWordStore {
                                     AND name=? \
                                     AND type IN (' + strtypes + ') LIMIT 0,100';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all(ownname, namespace, name);
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -675,6 +799,7 @@ class KeyWordStore {
 
     //通过全名获取
     getByFullnameAndType = function (ownname, namespace, name, type) {
+        let db = this._getDbConnect();
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
                                     WHERE ownname=? \
@@ -682,7 +807,7 @@ class KeyWordStore {
                                     AND name=? \
                                     AND type=? LIMIT 0,1';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all(ownname, namespace, name, type);
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {
@@ -696,6 +821,7 @@ class KeyWordStore {
 
     //通过全名获取
     getByFullnameNssAndType = function (ownname, namespaces, name, type) {
+        let db = this._getDbConnect();
         let sqlnamespace = namespaces.join("','");
         let sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
                                 FROM t_keyword \
@@ -704,7 +830,7 @@ class KeyWordStore {
                                     AND name= \'' + name +'\' \
                                     AND type= ' + type + ' LIMIT 0,1';
         sql = sql.replace(/[\t\s]{1,100}/g, " "); 
-        const stmt = this.db.prepare(sql);
+        const stmt = db.prepare(sql);
         const infos = stmt.all();
         //logger.debug(infos);
         if (!infos || infos == undefined || infos.length == 0) {

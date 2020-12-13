@@ -77,16 +77,16 @@ var AnalyseCpp = /** @class */ (function (_super) {
             });
             //logger.mark("_analyseVariable");
             //分析枚举
-            //logger.mark("_analyseVariable")
+            //logger.mark("_analyseEnum")
             this.tree.traverseBF(function (current) {
                 //logger.debug(current.domain_level, current.namespace);
                 for (var i = 0; i < current.data.length; i++) {
-                    //logger.mark("_analyseVariable:" + i)
+                    //logger.mark("_analyseEnum:" + i)
                     _this._analyseEnum(current, _this.lines, current.data[i], i);
-                    //logger.mark("_analyseVariable:" + i);
+                    //logger.mark("_analyseEnum:" + i);
                 }
             });
-            //logger.mark("_analyseVariable");
+            //logger.mark("_analyseEnum");
         };
         //分析枚举
         _this._analyseEnum = function name(node, lines, index, idataindex) {
@@ -215,13 +215,14 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 && node.namespace == node.parent.namespace) {
                 //命名空间域父区域命名空间一致，表示该区域代码里面的变量无需关注
                 //代码为 if/for/while或者函数引入
-                //logger.debug(node.namespace, " | ", node.parent.namespace);
+                //命名空间不为空
+                // console.debug(node.namespace+ "|"+ node.parent.namespace + "|");
                 return;
             }
             var line = lines[index].split(';');
             var permission = node.permission[idataindex];
             line.forEach(function (item) {
-                if (index == 0 || /(#define .+)|(#include )/ig.test(item)) {
+                if (index == 0 || /(#define)|(#include)[\s]{1,10}/ig.test(item)) {
                     //宏定义解释
                     _this._analyseIncludeAndDefine(node, item);
                 }
@@ -561,14 +562,14 @@ var AnalyseCpp = /** @class */ (function (_super) {
                     method.permission = permission;
                     node.addMethod(method);
                 }
-                return;
+                // return; //20201212
             }
-            if (index < 2) {
-                //无需处理的代码快，可能是第一块，这块出来头文件相关单独处理
-                return;
-            }
+            // if (index < 2) {//20201212
+            //     //无需处理的代码快，可能是第一块，这块出来头文件相关单独处理
+            //     // return;
+            // }//20201212
             //logger.debug(lines[index-2]);
-            if (lines[index - 1] == "{") {
+            if (index > 1 && lines[index - 1] == "{") {
                 //当前代码块绝大部分可能对我们的功能没有用处，
                 //如：for、if、do、while 函数实现
                 var pos = lines[index - 2].lastIndexOf(';');
@@ -631,7 +632,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 var method = _this._getMethodDefine(element, ownname);
                 if (method != false && method != []) {
                     //写入方法
-                    //logger.debug(method.name);
+                    // console.debug(method.name);
                     method.permission = permission;
                     node.addMethod(method);
                 }
@@ -661,7 +662,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
                         var tmpData = [];
                         for (var i_1 = data.length - 1; i_1 >= 0; i_1--) {
                             if (isNum == 2) {
-                                //logger.debug(tmpData);
+                                // logger.debug(tmpData);
                                 tmpData.push(data[i_1]);
                                 continue;
                             }
@@ -1342,10 +1343,10 @@ var AnalyseCpp = /** @class */ (function (_super) {
                             || current.parent.ownname.type == TypeEnum.STRUCT
                             || current.parent.ownname.type == TypeEnum.ENUM)) {
                         //无需处理
-                        //logger.debug(current);
+                        // console.debug(current);
                         return;
                     }
-                    //logger.debug(find_context);
+                    // console.debug(find_context);
                 }
                 var domain_name = find_context;
                 var pos = find_context.lastIndexOf(";");
@@ -1353,15 +1354,15 @@ var AnalyseCpp = /** @class */ (function (_super) {
                     domain_name = find_context.substr(pos);
                 }
                 domain_name = domain_name.trim();
-                //logger.debug("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
-                _this._getDomainNameAndType(domain_name, current);
+                // console.debug("find domain name:" + domain_name + " ;domain_level:" + current.domain_level);
+                var _ret = _this._getDomainNameAndType(domain_name, current);
             });
         };
         //获取作用域名称和类型
         _this._getDomainNameAndType = function (rawName, treeNode) {
             if (rawName == ""
                 && treeNode.domain_level == 0) {
-                return;
+                return true;
             }
             var items = rawName.split(' ');
             items = items.filter(function (value) {
@@ -1417,6 +1418,7 @@ var AnalyseCpp = /** @class */ (function (_super) {
             //其余的全部算到函数里面
             var data = new MateData.BaseData("", TypeEnum.AIR_IN_FUNCTION, "in function");
             Tree.setType(treeNode, data);
+            return true;
         };
         //存储命名空间到作用域树节点中
         _this._saveNamepaceNode = function (treeNode, items, index) {
@@ -1640,8 +1642,17 @@ var AnalyseCpp = /** @class */ (function (_super) {
             //对分解的串进行第一次处理
             for (var i = 0; i < lines.length; i++) {
                 //this.analyseLine(this.context[i], i, this.context);
+                if (/[\s]{1,10}extern[\s]{1,10}"C"[\s]{0,10}$/g.test(lines[i])
+                    && i + 2 < lines.length) {
+                    //c函数扩展
+                    //数据给到父亲节点
+                    lines[i] = lines[i] + " ; " + lines[i + 2];
+                    // console.log(lines[i]);
+                    this.tree.addDataToNode(this.point_domain, i);
+                    i = i + 3; //往后面跳三个索引
+                    continue;
+                }
                 if (lines[i] == '{') {
-                    //this.slevel.push(SymbolEnum.BEGIN);
                     //logger.debug(this.point_domain);
                     //logger.debug("domin:" + i);
                     this.tree.add(i, this.point_domain);
@@ -1649,7 +1660,6 @@ var AnalyseCpp = /** @class */ (function (_super) {
                     continue;
                 }
                 if (lines[i] == '}') {
-                    //this.slevel.push(SymbolEnum.END);
                     //logger.debug("before getFatherDomain:" + this.point_domain);
                     //logger.mark("getFatherDomain");
                     this.point_domain = this.tree.getFatherDomain(this.point_domain);
@@ -1660,7 +1670,6 @@ var AnalyseCpp = /** @class */ (function (_super) {
                 //将数据挂载到当前作用域下
                 //logger.debug(i);
                 this.tree.addDataToNode(this.point_domain, i);
-                //this.block.push(this.context[i]);
             }
         };
         //typedef

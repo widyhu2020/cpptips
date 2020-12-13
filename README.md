@@ -268,3 +268,7 @@ v0.4.6
 - 解决上个版本引入的加载对比临时文件的问题，使用过版本的可以使用一下方法清理引入的数据
 sqlit projectpath/.vscode/db/cpptips.db
 >delete from t_fileindex where filepath like "%.vscode%";
+
+v0.4.7
+- 解决修改文件无法刷新索引的问题
+- 对索引存储进行优化，优化成跟进打开的源文件动态创建内存数据库，以提高处理性能（带来的影响是，可能打开页面之后有一段时间无法使用提示）

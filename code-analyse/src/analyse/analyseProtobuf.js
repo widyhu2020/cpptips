@@ -72,6 +72,15 @@ class AnalyseProtobuf extends AnalyseBase{
             }
         });
         //logger.mark("_analyseCodeBlockProtoInterface");
+
+        //分析import
+        //logger.mark("_analyseImport")
+        this.tree.traverseBF((current) => {
+            for (let i = 0; i < current.data.length; i++) {
+                this._analyseImport(current, lines, current.data[i]);
+            }
+        });
+        //logger.mark("_analyseImport");
     };
 
     //预处理-分析作用域
@@ -473,6 +482,24 @@ class AnalyseProtobuf extends AnalyseBase{
         addMethod.isinline = 0;
         addMethod.isconst = 0;
         node.addMethod(addMethod);
+    };
+
+    //分析import 
+    _analyseImport = function(node, lines, index){
+        let item = lines[index];
+        item = item.replace(/\s[.]{1,1}\s/g, ".");
+        item = item.replace("\n", " ");
+        let rex = /import[\s]{1,10}"([\w_\d\/.]{0,1024})"[\s]{0,10};/g;
+        let result = null;
+        while((result = rex.exec(item)) != null){
+            let importPath = result[1];
+            node.addInclude(importPath);
+        }
+        node.addInclude('google/protobuf/message.h');
+        node.addInclude('google/protobuf/message_lite.h');
+        node.addInclude('google/protobuf/stubs/common.h');
+        node.addInclude('vector');
+        node.addInclude('string');
     };
 
     //单个字段分析

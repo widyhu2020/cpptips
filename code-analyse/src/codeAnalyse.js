@@ -19,7 +19,9 @@ const AutoFillParam = require('./completion/autoFillParam').AutoFillParam;
 const TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 const fs = require('fs');
 const __path = require('path');
+const { nextTick } = require('process');
 const logger = require('log4js').getLogger("cpptips");
+const Queue = require('./analyse/queue');
 
 class CodeAnalyse {
     //单例方法
@@ -35,6 +37,10 @@ class CodeAnalyse {
         this.basedir = "";
         this.dbpath = "";
         this.namespacestore = {};
+
+        //依赖分析队列
+        this.dependentQueue = new Queue();
+        this.lockqueue = false;
         
         //缓存
         this.fundefcache = null;
@@ -44,6 +50,9 @@ class CodeAnalyse {
 
         //用户配置
         this.configs = {};
+
+        //启动定时处理器
+        this.dependerTimer = this._dequeueDepend();
     }
 
     //初始化结构体
@@ -93,6 +102,7 @@ class CodeAnalyse {
         this.isinit = false;
         KeyWordStore.getInstace().closeconnect();
         FileIndexStore.getInstace().closeconnect();
+        clearInterval(this.dependerTimer);
     };
 
     //是否可以执行
@@ -100,8 +110,45 @@ class CodeAnalyse {
         return !(this.isinit);
     };
 
+    //分析队列，任何事件都进入进行排队处理
+    _dequeueDepend = function(){
+        let that = this;
+        return setInterval(()=>{
+            //看是否有任务在处理
+            if(that.lockqueue){
+                //任务未处理完
+                console.log("工作进程正则分析中，请稍后....");
+                return;
+            }
+
+            //尝试弹出
+            let task = that.dependentQueue.dequeue();
+            if(!task) {
+                //没有任务需要处理
+                return;
+            }
+
+            let filepath = task['filepath'];
+            let callback = task['callback'];
+            let isClose = task['isclose'];
+            that._getDependentByCpp(filepath, callback, isClose);
+        }, 1000);
+    };
+
     //获取cpp文件头文件依赖
-    _getDependentByCpp = function (filepath, callback = null) {
+    _getDependentByCpp = function (filepath, callback = null, isClose = false) {
+        let that = this;
+        //锁住
+        let exitTimer = null;
+        if(isClose){
+            KeyWordStore.getInstace().removeMenDB(filepath);
+            that.lockqueue = false;
+            return;
+        }
+
+        // console.log(filepath, this.basedir, this.extPath + "/data/", this.dbpath);
+        that.lockqueue = true;
+        //其他情况分析文件获取文件依赖，并初始化当前索引到内存数据库
         cluster.setupMaster({
             exec: __dirname + "/worker/makeOwnsMapByCpp.js",
             silent: false,
@@ -121,20 +168,39 @@ class CodeAnalyse {
                 let usingnamespace = data['usingnamespace'];
                 let include = data['include'];
                 let showTree = data['showTree'];
+                let fileids = data['fileids'];
+                let currentfileid = data['currentfileid'];
                 //关闭子进程
+                nextTick((fileids)=>{
+                    //将数据导入内存db
+                    KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid);
+                    if(exitTimer) {
+                        //如果有定时器，则清除定时器
+                        clearTimeout(exitTimer);
+                    }
+                    that.lockqueue = false;
+                }, fileids);
                 this.namespacestore[filepath] = usingnamespace;
                 if (callback != null) {
                     //需要回调
                     callback("success", filepath, usingnamespace, include, showTree);
                 }
             } catch (err) {
-                logger.debug(err);
+                console.debug(err);
+                if(exitTimer) {
+                    //如果有定时器，则清除定时器
+                    clearTimeout(exitTimer);
+                }
+                that.lockqueue = false;
             }
             worker.kill();
         });
+
         //退出工作进程
         worker.on('exit', (code, signal) => {
-            logger.info("获取cpp文件头文件依赖工作进程退出", code, signal);
+            console.error("获取cpp文件头文件依赖工作进程退出", code, signal);
+            //60秒自动解锁
+            exitTimer = setTimeout(()=>{ that.lockqueue = false; }, 60000);
         });
     };
 
@@ -778,15 +844,16 @@ class CodeAnalyse {
 
             if (data.function == "over") {
                 //任务完成关闭子进程
+                callback("success", 0, 0, 0);
+                that.loadindex = false;
                 worker.kill();
-                
                 return;
             }
         });
 
         worker.on('exit', (code, signal) => {
             //恢复正常功能
-            callback("success", 0, 0, 0);
+            // callback("success", 0, 0, 0);
             that.loadindex = false;
         });
     };
@@ -1022,7 +1089,8 @@ class CodeAnalyse {
         for (let i = lines.length - 1; i >= 0; i--) {
             let line = lines[i].trim();
             let pos = this._findVanamePos(line, valname);
-            if (pos == -1 ) {
+            let ragx = new RegExp(`[\\s]{1,10}[*&]{0,1}${valname}[\\s(=;,]{1,10}`, 'g');
+            if (pos == -1 || !ragx.test(line)) {
                 //未找到直接跳过
                 continue;
             }
@@ -2362,7 +2430,7 @@ class CodeAnalyse {
         }
     };
 
-    //重新加载知道文件
+    //重新加载指定文件
     reloadOneIncludeFile = function (filepath, callback = null) {
         try {
             filepath = this._filePathFormat(filepath);
@@ -2430,25 +2498,26 @@ class CodeAnalyse {
     };
 
     //获取cpp文件的依赖
-    getDependentByCpp = function (filepath, callback = null) {
+    getDependentByCpp = function (filepath, callback = null, isClose = false) {
         try {
             let that = this;
             filepath = this._filePathFormat(filepath);
-            if(this.loadindex ) {
-                //索引加载中，功能可能暂时不可用
-                //进行尝试分析，并且回调加入分析队列中，等待索引加载完成之后再分析一次
-                callback("busy", filepath, [], []);
-            }
-
             let pos = filepath.lastIndexOf('.');
             let fileExt = filepath.substring(pos);
-            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+            let includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ".proto"]);
             if (!includeExt.has(fileExt)) {
                 callback("fileerror", filepath, [], []);
                 return;
             }
-            logger.debug("dddd", this.isinit, this.loadindex);
-            return that._getDependentByCpp(filepath, callback);
+            
+            let task = {
+                filepath: filepath,
+                callback: callback,
+                isclose: isClose
+            };
+            // console.log("getDependentByCpp:", filepath);
+            that.dependentQueue.enqueue(task);
+            // return that._getDependentByCpp(filepath, callback, isClose);
         } catch (error) {
             callback("error", filepath, [], []);
             logger.debug("call getDependentByCpp faild!", error);

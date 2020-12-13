@@ -60,10 +60,6 @@ let rebuildTimeout:NodeJS.Timeout|null = null;
 let diagnostic:{[key:string]: Diagnostic[]} = {};
 
 import { configure, getLogger } from "log4js";
-import { isArray, forEach } from 'lodash';
-import { info } from 'console';
-import { ENGINE_METHOD_PKEY_ASN1_METHS } from 'constants';
-
 function getLoggerPath(){
     let logpath = "/tmp/cpptips.server.log";
     if(os.platform() == "win32"){
@@ -267,6 +263,10 @@ function reloadIncludeFileCallBack(
     if(msg == "show_file_more") {
         //showWarningMessage("你工程目录文件超过50000个，文件过多将影响索引性能，在右侧资源管理器中，选择目录右键“加入索引范围”可指定需要加入索引的目录！");
     }
+    if(msg == "success") {
+        //成功
+        process.nextTick(analyseCppFile);
+    }
     
     sendMsgToVscode("close_show_process", data);
     //重新加载文件
@@ -298,7 +298,7 @@ function getFilePath(uri:string) {
         //无需处理的文件
         //1.路径中包含.vscode
         //2.路径不是基础路径开头的
-        console.log(basepath, filepath);
+        logger.log(basepath, filepath);
         return false;
     }
     // console.log(basepath, filepath);
@@ -759,7 +759,7 @@ function processFileChange() {
     let files:string[] = [];
     mapfile.forEach((fileevent)=>{
         let filename = getFilePath(fileevent.uri);
-        if(filename == false) {
+        if(filename == false || filename.indexOf(".vscode") >= 0) {
             logger.debug("processFileChange", fileevent.uri);
             return;
         }
@@ -787,17 +787,19 @@ function processFileChange() {
         let filename: string = files[0];
         CodeAnalyse.getInstace().reloadOneIncludeFile(filename, reloadOneIncludeFileCallBack);
         //分析头文件依赖
-        process.nextTick(analyseCppFile);
+        // process.nextTick(analyseCppFile);
+        // setTimeout(analyseCppFile, 3000);
         return;
     }
 
-    if(files.length > 5) {
+    if(files.length > 50) {
         //启动全面增量分析
         logger.mark("reloadAllIncludeFile");
         CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
         logger.mark("reloadAllIncludeFile");
         //分析头文件依赖
-        process.nextTick(analyseCppFile);
+        // process.nextTick(analyseCppFile);
+        // setTimeout(analyseCppFile, 3000);
         files = [];
         return;
     }
@@ -805,7 +807,8 @@ function processFileChange() {
     //加载
     CodeAnalyse.getInstace().reloadBatchIncludeFile(files, reloadIncludeFileCallBack);
     //分析头文件依赖
-    process.nextTick(analyseCppFile);
+    // process.nextTick(analyseCppFile);
+    // setTimeout(analyseCppFile, 3000);
 };
 
 connection.onShutdown(():void => {
@@ -824,6 +827,7 @@ connection.onExit(() => {
 
 //文件变更提示
 connection.onDidChangeWatchedFiles((_change: DidChangeWatchedFilesParams) => {
+    console.log("onDidChangeWatchedFiles", JSON.stringify(_change));
     logger.debug(JSON.stringify(_change));
     let changes: FileEvent[] = _change.changes;
     
@@ -838,9 +842,6 @@ connection.onDidChangeWatchedFiles((_change: DidChangeWatchedFilesParams) => {
     } else {
         connection.window.showErrorMessage("插件正在繁忙中，索引稍后加载");
     }
-
-    //文件变动
-    //logger.debug('We received an file change event');
 });
 
 function getShowType(type: number): CompletionItemKind {
@@ -1299,11 +1300,11 @@ function getDependentByCppCallBack(msg:string, filepath:string, _usingnamepace:s
     logger.debug(msg);
     if(msg == "busy") {
         //插件正在分析索引，加入队列待会处理
-        logger.debug("插件正在分析索引，加入队列待会处理，分析完成之后重新加载");
+        console.log("插件正在分析索引，加入队列待会处理，分析完成之后重新加载");
         dependentfiles.add(filepath);
         return;
     }
-    dependentfiles.delete(filepath);
+    dependentfiles.delete(filepath);    
 };
 
 function analyseCppFile() {
@@ -1313,14 +1314,10 @@ function analyseCppFile() {
     });
 
     dependentfiles.clear();
-    //dependentfiles = new Set<string>();
-    logger.debug("xxxxxxxxxxxxxx:", JSON.stringify(dependentfiles));
+    console.log("analyseCppFile", filenames);
     for (let i = 0; i < filenames.length; i++) {
         let filename = filenames[i];
-        logger.debug("begin getDependentByCpp");
-        logger.mark("getDependentByCpp");
-        CodeAnalyse.getInstace().getDependentByCpp(filename, getDependentByCppCallBack);
-        logger.mark("getDependentByCpp");
+        CodeAnalyse.getInstace().getDependentByCpp(filename, getDependentByCppCallBack, false);
     }
 
     return;
@@ -1335,13 +1332,14 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
         logger.debug("onDidOpenTextDocument", params.textDocument.uri);
         return;
     }
+    logger.log("onDidOpenTextDocument", filepath);
     //debug: file:///data/mm64/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp 
     ///home/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp
     dependentfiles.add(filepath);
     logger.debug("debug:", params.textDocument.uri, basepath, filepath);
     //异步执行
-    //process.nextTick(analyseCppFile); file://
-    setTimeout(analyseCppFile, 3000);
+    process.nextTick(analyseCppFile); file://
+    // setTimeout(analyseCppFile, 3000);
 
     //重新计算索引
     CodeAnalyse.getInstace().reloadOneIncludeFile(filepath, reloadOneIncludeFileCallBack);
@@ -1471,73 +1469,54 @@ connection.onDidChangeTextDocument((params: DidChangeTextDocumentParams) => {
 function reloadOneIncludeFileCallBack(msg:string) {
     logger.debug("reloadOneIncludeFileCallBack:", msg);
     //showTipMessage("文件已重新加载！");
+    // console.log("reloadOneIncludeFileCallBack:xxxxxxxxx");
+    process.nextTick(analyseCppFile);
 };
 
 //关闭文档触发
 connection.onDidCloseTextDocument((params: DidCloseTextDocumentParams) => {
     //去掉全局文件内容
     openFile[params.textDocument.uri] = "";
-
+    let filepath = getFilePath(params.textDocument.uri);
+    if(filepath == false || filepath.indexOf(".vscode") >= 0) {
+        logger.debug("onDidOpenTextDocument", params.textDocument.uri);
+        return;
+    }
+    logger.log("onDidCloseTextDocument", filepath);
+    if(filepath) {
+        CodeAnalyse.getInstace().getDependentByCpp(filepath, getDependentByCppCallBack, true);
+    }
 });
 
 //保存完文档之后触发
 connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
     //重新加在文件
     let filepath = getFilePath(params.textDocument.uri);
-    if(filepath == false) {
+    if(filepath == false || filepath.indexOf(".vscode") >= 0) {
         logger.debug("onDidSaveTextDocument", params.textDocument.uri);
         return;
     }
 
+    console.log("onDidSaveTextDocument", params.textDocument.uri);
     dependentfiles.add(filepath);
-
-    logger.debug("analyseCppFile debug:", params.textDocument.uri, basepath, filepath);
+    logger.log("analyseCppFile debug:", params.textDocument.uri, basepath, filepath);
     //异步执行
-    process.nextTick(analyseCppFile);
+    // process.nextTick(analyseCppFile);
+    // setTimeout(analyseCppFile, 3000);
 
     //文件变更
-    let changes: FileEvent = {
-        uri: params.textDocument.uri,
-        type: FileChangeType.Changed
-    };
-    changefile.push(changes);
-    if(rebuildTimeout ==null) {
-        //这里启动一个定时器用于兜底
-        //若文件改动监听器无反应，则这个兜底
-        rebuildTimeout = setTimeout(processFileChange, 2000);
-    }
-
-    //刷新错误
-    //logger.debug(params.textDocument.uri, JSON.stringify(diagnostic));
-    // getDiagnosticsString();
-    //先不进行语法分析
-    return;
-    // let context = openFile[params.textDocument.uri];
-    // if(context == undefined) {
-    //     return;
+    // let changes: FileEvent = {
+    //     uri: params.textDocument.uri,
+    //     type: FileChangeType.Changed
+    // };
+    // changefile.push(changes);
+    // if(rebuildTimeout ==null) {
+    //     //这里启动一个定时器用于兜底
+    //     //若文件改动监听器无反应，则这个兜底
+    //     rebuildTimeout = setTimeout(processFileChange, 2000);
     // }
-    
-    // CodeAnalyse.getInstace().diagnostics(filepath, context, (result:string)=>{
-    //     let data = JSON.parse(result);
-    //     logger.debug(data);
-    //     let diagnosticsData = [];
-    //     if(context == undefined) {
-    //         return;
-    //     }
-    //     let doc = TextDocument.create(params.textDocument.uri, "cpp", 0, context);
-    //     for(let i = 0; i < data.length; i++) {
-    //         let begin:Position = doc.positionAt(data[i].begin);
-    //         let end:Position = doc.positionAt(data[i].end);
-    //         let range = Range.create(begin, end);
-    //         let _diagnostics = Diagnostic.create(range, "检测到这里语法错误，请确认调整！");
-    //         diagnosticsData.push(_diagnostics);
-    //     }
-    //     let diagnosticsParams = {
-    //         uri:params.textDocument.uri,
-    //         diagnostics:diagnosticsData
-    //     };
-    //     connection.sendDiagnostics(diagnosticsParams);
-    // });
+
+    return;
 });
 
 connection.onDocumentSymbol((params: DocumentSymbolParams):DocumentSymbol[]|undefined => {

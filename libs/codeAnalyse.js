@@ -18,7 +18,9 @@ var AutoFillParam = require('./completion/autoFillParam').AutoFillParam;
 var TypeEnum = require('./analyse/analyseCpp').TypeEnum;
 var fs = require('fs');
 var __path = require('path');
+var nextTick = require('process').nextTick;
 var logger = require('log4js').getLogger("cpptips");
+var Queue = require('./analyse/queue');
 var CodeAnalyse = /** @class */ (function () {
     function CodeAnalyse() {
         //初始化结构体
@@ -64,15 +66,50 @@ var CodeAnalyse = /** @class */ (function () {
             this.isinit = false;
             KeyWordStore.getInstace().closeconnect();
             FileIndexStore.getInstace().closeconnect();
+            clearInterval(this.dependerTimer);
         };
         //是否可以执行
         this.busy = function () {
             return !(this.isinit);
         };
+        //分析队列，任何事件都进入进行排队处理
+        this._dequeueDepend = function () {
+            var that = this;
+            return setInterval(function () {
+                //看是否有任务在处理
+                if (that.lockqueue) {
+                    //任务未处理完
+                    console.log("工作进程正则分析中，请稍后....");
+                    return;
+                }
+                //尝试弹出
+                var task = that.dependentQueue.dequeue();
+                if (!task) {
+                    //没有任务需要处理
+                    return;
+                }
+                var filepath = task['filepath'];
+                var callback = task['callback'];
+                var isClose = task['isclose'];
+                that._getDependentByCpp(filepath, callback, isClose);
+            }, 1000);
+        };
         //获取cpp文件头文件依赖
-        this._getDependentByCpp = function (filepath, callback) {
+        this._getDependentByCpp = function (filepath, callback, isClose) {
             var _this = this;
             if (callback === void 0) { callback = null; }
+            if (isClose === void 0) { isClose = false; }
+            var that = this;
+            //锁住
+            var exitTimer = null;
+            if (isClose) {
+                KeyWordStore.getInstace().removeMenDB(filepath);
+                that.lockqueue = false;
+                return;
+            }
+            // console.log(filepath, this.basedir, this.extPath + "/data/", this.dbpath);
+            that.lockqueue = true;
+            //其他情况分析文件获取文件依赖，并初始化当前索引到内存数据库
             cluster.setupMaster({
                 exec: __dirname + "/worker/makeOwnsMapByCpp.js",
                 silent: false,
@@ -92,7 +129,18 @@ var CodeAnalyse = /** @class */ (function () {
                     var usingnamespace = data['usingnamespace'];
                     var include = data['include'];
                     var showTree = data['showTree'];
+                    var fileids = data['fileids'];
+                    var currentfileid_1 = data['currentfileid'];
                     //关闭子进程
+                    nextTick(function (fileids) {
+                        //将数据导入内存db
+                        KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid_1);
+                        if (exitTimer) {
+                            //如果有定时器，则清除定时器
+                            clearTimeout(exitTimer);
+                        }
+                        that.lockqueue = false;
+                    }, fileids);
                     _this.namespacestore[filepath] = usingnamespace;
                     if (callback != null) {
                         //需要回调
@@ -100,13 +148,20 @@ var CodeAnalyse = /** @class */ (function () {
                     }
                 }
                 catch (err) {
-                    logger.debug(err);
+                    console.debug(err);
+                    if (exitTimer) {
+                        //如果有定时器，则清除定时器
+                        clearTimeout(exitTimer);
+                    }
+                    that.lockqueue = false;
                 }
                 worker.kill();
             });
             //退出工作进程
             worker.on('exit', function (code, signal) {
-                logger.info("获取cpp文件头文件依赖工作进程退出", code, signal);
+                console.error("获取cpp文件头文件依赖工作进程退出", code, signal);
+                //60秒自动解锁
+                exitTimer = setTimeout(function () { that.lockqueue = false; }, 60000);
             });
         };
         //构造搜索树
@@ -683,13 +738,15 @@ var CodeAnalyse = /** @class */ (function () {
                 }
                 if (data.function == "over") {
                     //任务完成关闭子进程
+                    callback("success", 0, 0, 0);
+                    that.loadindex = false;
                     worker.kill();
                     return;
                 }
             });
             worker.on('exit', function (code, signal) {
                 //恢复正常功能
-                callback("success", 0, 0, 0);
+                // callback("success", 0, 0, 0);
                 that.loadindex = false;
             });
         };
@@ -912,7 +969,8 @@ var CodeAnalyse = /** @class */ (function () {
             for (var i = lines.length - 1; i >= 0; i--) {
                 var line = lines[i].trim();
                 var pos = this._findVanamePos(line, valname);
-                if (pos == -1) {
+                var ragx = new RegExp("[\\s]{1,10}[*&]{0,1}" + valname + "[\\s(=;,]{1,10}", 'g');
+                if (pos == -1 || !ragx.test(line)) {
                     //未找到直接跳过
                     continue;
                 }
@@ -2133,7 +2191,7 @@ var CodeAnalyse = /** @class */ (function () {
                 return [];
             }
         };
-        //重新加载知道文件
+        //重新加载指定文件
         this.reloadOneIncludeFile = function (filepath, callback) {
             if (callback === void 0) { callback = null; }
             try {
@@ -2204,25 +2262,27 @@ var CodeAnalyse = /** @class */ (function () {
             }
         };
         //获取cpp文件的依赖
-        this.getDependentByCpp = function (filepath, callback) {
+        this.getDependentByCpp = function (filepath, callback, isClose) {
             if (callback === void 0) { callback = null; }
+            if (isClose === void 0) { isClose = false; }
             try {
                 var that = this;
                 filepath = this._filePathFormat(filepath);
-                if (this.loadindex) {
-                    //索引加载中，功能可能暂时不可用
-                    //进行尝试分析，并且回调加入分析队列中，等待索引加载完成之后再分析一次
-                    callback("busy", filepath, [], []);
-                }
                 var pos = filepath.lastIndexOf('.');
                 var fileExt = filepath.substring(pos);
-                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c"]);
+                var includeExt = new Set(['.h', '.hpp', ".cpp", ".c", ".proto"]);
                 if (!includeExt.has(fileExt)) {
                     callback("fileerror", filepath, [], []);
                     return;
                 }
-                logger.debug("dddd", this.isinit, this.loadindex);
-                return that._getDependentByCpp(filepath, callback);
+                var task = {
+                    filepath: filepath,
+                    callback: callback,
+                    isclose: isClose
+                };
+                // console.log("getDependentByCpp:", filepath);
+                that.dependentQueue.enqueue(task);
+                // return that._getDependentByCpp(filepath, callback, isClose);
             }
             catch (error) {
                 callback("error", filepath, [], []);
@@ -2423,12 +2483,17 @@ var CodeAnalyse = /** @class */ (function () {
         this.basedir = "";
         this.dbpath = "";
         this.namespacestore = {};
+        //依赖分析队列
+        this.dependentQueue = new Queue();
+        this.lockqueue = false;
         //缓存
         this.fundefcache = null;
         //loadindex
         this.loadindex = false;
         //用户配置
         this.configs = {};
+        //启动定时处理器
+        this.dependerTimer = this._dequeueDepend();
     }
     //单例方法
     CodeAnalyse.getInstace = function () {
