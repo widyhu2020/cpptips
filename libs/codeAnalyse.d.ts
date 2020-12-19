@@ -73,7 +73,7 @@ declare interface FunctionHelpInfo {
 
 declare class CodeAnalyse {
 	constructor(basepath:string);
-	getDependentByCpp(cppfilename: string, hander: GetDependentCallBack<string, string, string[],string[], string>|null , isClose: boolean|false):void;
+	getDependentByCpp(cppfilename: string, hander: GetDependentCallBack<string, string, string[],string[], string>|null , isClose: boolean|false, isSave: boolean|false):void;
 	searchKeyWord(filepath: string, keyword: string, context: string, usingnamepace: string[] | null): NodeItem[];
 	getShowTips(filepath: string, name: NodeItem): ShowItem | false;
 	getAllNameByObj(filepath: string, context: string, usingnamepace: string[] | null): NodeItem[];

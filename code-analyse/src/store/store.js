@@ -167,7 +167,7 @@ class KeyWordStore {
         try {
             let sql = 'INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
             VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)';
-            const stmt = this.db.prepare(sql);
+            const stmt = this._getDbConnect().prepare(sql);
             const info = stmt.run(data);
             return info.changes == 1;
         } catch(error) {
@@ -176,10 +176,35 @@ class KeyWordStore {
         }
     };
 
+    //获取依赖的头文件
+    getPreSaveFileIds = function(filepath){
+        if(!this.dependentFileId[filepath]){
+            return [];
+        }
+        return this.dependentFileId[filepath];
+    };
+
+    getAllSaveFileIds = function(){
+        let allids = [];
+        let keys = Object.keys(this.dependentFileId);
+        for(let i = 0; i < keys.length; i++){
+            allids = allids.concat(this.dependentFileId[keys[i]])
+        }
+        
+        return Array.from(new Set(allids));
+    };
+
+    saveFileToMemDB = function(fileid, filepath){
+        return this.setMemDB([], filepath, fileid, false);
+    };
+
     //使用关联的文件创建查找副本
-    setMemDB = function(fileids, userfilepath, currentfileid) {
-        console.log("userfilepath:", userfilepath);
-        this.dependentFileId[userfilepath] = fileids;
+    setMemDB = function(fileids, userfilepath, currentfileid, addInclude = false) {
+        if(!addInclude || !this.dependentFileId[userfilepath]){
+            this.dependentFileId[userfilepath] = fileids;
+        } else {
+            this.dependentFileId[userfilepath] = this.dependentFileId[userfilepath].concat(fileids);
+        }
         
         if(!this.dbMemDb){
             this.dbMemDb = new Database(':memory:', {});
@@ -228,6 +253,38 @@ class KeyWordStore {
         return true;
     };
 
+    //将memdb中的数据移到实际db中
+    saveMemToDB = function(fileids, filepath, beginIds){
+        if(!this.dependentFileId[filepath] || !this.dbMemDb){
+            return false;
+        }
+        delete this.dependentFileId[filepath];
+        
+        try{
+            let strfileids = beginIds.join(',');
+            this.dbMemDb.prepare(`Attach DATABASE "${this.dbname}" as Tmp`).run();
+            this.dbMemDb.prepare("REPLACE INTO \
+                Tmp.t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM t_keyword WHERE id IN (" + strfileids + ") AND file_id=" + fileids).run();
+            this.dbMemDb.prepare("REPLACE INTO \
+                Tmp.t_keyword(\
+                    ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM t_keyword WHERE id NOT IN (" + strfileids + ") AND file_id=" + fileids).run();
+            this.dbMemDb.prepare('DETACH DATABASE "Tmp"').run();
+        } catch(err) {
+            console.log(err);
+        }
+
+        return true;
+    };
+
     //删除不必要的索引
     removeMenDB = function(removeFilePath) {
         if(!this.dependentFileId[removeFilePath]
@@ -260,7 +317,7 @@ class KeyWordStore {
     //清除所有的扩展数据，防止出现函数修改名称不更换问题
     cleanExtData = function(fileid) {
         let sql = 'UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)';
-        const stmt_update = this.db.prepare(sql);
+        const stmt_update = this._getDbConnect().prepare(sql);
         const info = stmt_update.run(fileid);
         if(this.dbMemDb){
             //更改内存db
@@ -272,7 +329,7 @@ class KeyWordStore {
     //修改命名空间
     modifyNamespace = function (id, namespace) {
         let sql = 'UPDATE t_keyword  SET namespace=? WHERE id=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(namespace, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -281,7 +338,7 @@ class KeyWordStore {
     //修改文件id
     modifyFileId = function (id, file_id) {
         let sql = 'UPDATE t_keyword  SET file_id=? WHERE id=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(file_id, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -290,7 +347,7 @@ class KeyWordStore {
     //修改扩展数据
     modifyExdata = function (id, extdata) {
         let sql = 'UPDATE t_keyword  SET extdata=? WHERE id=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(extdata, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -299,7 +356,7 @@ class KeyWordStore {
     //通过名称修改扩展数据
     modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
         let sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(extdata, namespace, ownname, name, type);
         //logger.debug(info);
         return info.changes == 1;
@@ -308,7 +365,7 @@ class KeyWordStore {
     //修改对外权限
     modifyPermission = function (id, permission) {
         let sql = 'UPDATE t_keyword  SET permission=? WHERE id=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(permission, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -317,7 +374,7 @@ class KeyWordStore {
     //修改类型
     modifyType = function (id, type) {
         let sql = 'UPDATE t_keyword  SET type=? WHERE id=?';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
         const info = stmt.run(type, id);
         //logger.debug(info);
         return info.changes == 1;
@@ -357,7 +414,7 @@ class KeyWordStore {
 
     //通过文件id获取所有的定义
     getAllByFileId = function (file_id) {
-        const stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
+        const stmt = this._getDbConnect().prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
         const infos = stmt.all(file_id);
         //logger.debug(infos);
         if (!infos || infos == undefined) {
@@ -367,6 +424,24 @@ class KeyWordStore {
         }
 
         return infos;
+    };
+
+    //通过文件获取id
+    getIdsByFileId = function(file_id){
+        const stmt = this._getDbConnect().prepare('SELECT id FROM t_keyword WHERE file_id=?');
+        const infos = stmt.all(file_id);
+        //logger.debug(infos);
+        if (!infos || infos == undefined) {
+            //未查询到结果
+            logger.error("not find result. namespace:", namespace);
+            return [];
+        }
+
+        let ids = [];
+        for(let i = 0; i < infos.length; i++){
+            ids.push(infos[i].id);
+        }
+        return ids;
     };
 
     //指定命名空间下查找
@@ -1289,6 +1364,29 @@ class FileIndexStore {
         return infos;
     };
 
+    getAllIncludeFileInfo = function() {
+        const stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex where type in (0,1)');
+        const infos = stmt.all();
+        //logger.info(infos);
+        if (!infos || infos == undefined || infos.length == 0) {
+            //未查询到结果
+            logger.error("get all data faild!");
+            return [];
+        }
+
+        //规范化路径
+        for(let i = 0; i < infos.length; i++) {
+            let fileinfos = infos[i];
+            if(os.platform() == "win32" 
+                && fileinfos.filepath.indexOf("\\") != -1) {
+                //windows系统，需要规范化路径
+                fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                infos[i] = fileinfos;
+            }
+        }
+        return infos;
+    };
+
     //统计表的行数(为了性能)
     checkHasRowData = function() {
         const stmt = this.db.prepare('SELECT count(id) as total FROM t_fileindex LIMIT 0,10');
@@ -1489,6 +1587,17 @@ class Store{
         }
 
         info['filepath'] = files.filepath;
+        return info;
+    };
+
+    //通过全名称获取， 不需要路径
+    getByFullnameNoPath = function (ownname, namespace, name, type) {
+        //获取定义详情
+        let info = KeyWordStore.getInstace().getByFullnameAndType(ownname, namespace, name, type);
+        if(!info) {
+            //如果未找到定义
+            return false;
+        }
         return info;
     };
 };

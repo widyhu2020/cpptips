@@ -91,14 +91,16 @@ var CodeAnalyse = /** @class */ (function () {
                 var filepath = task['filepath'];
                 var callback = task['callback'];
                 var isClose = task['isclose'];
-                that._getDependentByCpp(filepath, callback, isClose);
+                var isSave = task['issave'];
+                that._getDependentByCpp(filepath, callback, isClose, isSave);
             }, 1000);
         };
         //获取cpp文件头文件依赖
-        this._getDependentByCpp = function (filepath, callback, isClose) {
+        this._getDependentByCpp = function (filepath, callback, isClose, isSave) {
             var _this = this;
             if (callback === void 0) { callback = null; }
             if (isClose === void 0) { isClose = false; }
+            if (isSave === void 0) { isSave = false; }
             var that = this;
             //锁住
             var exitTimer = null;
@@ -107,7 +109,6 @@ var CodeAnalyse = /** @class */ (function () {
                 that.lockqueue = false;
                 return;
             }
-            // console.log(filepath, this.basedir, this.extPath + "/data/", this.dbpath);
             that.lockqueue = true;
             //其他情况分析文件获取文件依赖，并初始化当前索引到内存数据库
             cluster.setupMaster({
@@ -116,11 +117,14 @@ var CodeAnalyse = /** @class */ (function () {
                 windowsHide: true
             });
             var worker = cluster.fork();
+            var dependent = KeyWordStore.getInstace().getPreSaveFileIds(filepath);
             var parasms = {
                 basedir: this.basedir,
                 sysdir: this.extPath + "/data/",
                 cppfilename: filepath,
-                dbpath: this.dbpath
+                dbpath: this.dbpath,
+                needrecursion: isSave ? 0 : 1,
+                dependent: dependent
             };
             //发送指令
             worker.send(parasms);
@@ -134,7 +138,15 @@ var CodeAnalyse = /** @class */ (function () {
                     //关闭子进程
                     nextTick(function (fileids) {
                         //将数据导入内存db
-                        KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid_1);
+                        if (isSave == true) {
+                            //排除上次已经加载过的数据
+                            var setFiles_1 = new Set(dependent);
+                            var needSaveFile = fileids.filter(function (value, index, array) { return !setFiles_1.has(value); });
+                            needSaveFile.push(currentfileid_1);
+                            logger.log("save fileids:", isSave, needSaveFile);
+                            fileids = needSaveFile;
+                        }
+                        KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid_1, isSave);
                         if (exitTimer) {
                             //如果有定时器，则清除定时器
                             clearTimeout(exitTimer);
@@ -969,10 +981,18 @@ var CodeAnalyse = /** @class */ (function () {
             for (var i = lines.length - 1; i >= 0; i--) {
                 var line = lines[i].trim();
                 var pos = this._findVanamePos(line, valname);
-                var ragx = new RegExp("[\\s]{1,10}[*&]{0,1}" + valname + "[\\s(=;,]{1,10}", 'g');
+                var ragx = new RegExp("[\\s]{1,10}[*&]{0,1}" + valname + "[\\s()=;,]{1,10}", 'g');
                 if (pos == -1 || !ragx.test(line)) {
                     //未找到直接跳过
-                    continue;
+                    if (pos != -1) {
+                        var ragx_1 = new RegExp("[\\s]{1,10}[*&]{0,1}" + valname + "[\\s]{0,10}$", 'g');
+                        if (!ragx_1.test(line)) {
+                            continue;
+                        }
+                    }
+                    else {
+                        continue;
+                    }
                 }
                 var _sourceline = lines[i];
                 var sourctline = line;
@@ -2262,9 +2282,10 @@ var CodeAnalyse = /** @class */ (function () {
             }
         };
         //获取cpp文件的依赖
-        this.getDependentByCpp = function (filepath, callback, isClose) {
+        this.getDependentByCpp = function (filepath, callback, isClose, isSave) {
             if (callback === void 0) { callback = null; }
             if (isClose === void 0) { isClose = false; }
+            if (isSave === void 0) { isSave = false; }
             try {
                 var that = this;
                 filepath = this._filePathFormat(filepath);
@@ -2278,11 +2299,10 @@ var CodeAnalyse = /** @class */ (function () {
                 var task = {
                     filepath: filepath,
                     callback: callback,
-                    isclose: isClose
+                    isclose: isClose,
+                    issave: isSave
                 };
-                // console.log("getDependentByCpp:", filepath);
                 that.dependentQueue.enqueue(task);
-                // return that._getDependentByCpp(filepath, callback, isClose);
             }
             catch (error) {
                 callback("error", filepath, [], []);

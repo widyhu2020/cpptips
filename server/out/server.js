@@ -5,15 +5,13 @@ const path = require('path');
 const codeAnalyse_1 = require("../../libs/codeAnalyse");
 const fs = require("fs");
 const os = require("os");
-const timers_1 = require("timers");
 const files_1 = require("vscode-languageserver/lib/files");
 let basepath = "/";
 let openFile = {};
-let treeData = {};
+let needSave = {};
 let changefile = [];
 let dependentfiles = new Set();
 let extpath = "";
-let rebuildTimeout = null;
 let diagnostic = {};
 const log4js_1 = require("log4js");
 function getLoggerPath() {
@@ -188,7 +186,7 @@ function reloadIncludeFileCallBack(msg, showprocess, total, nowIndex, extdata) {
     }
     if (msg == "success") {
         //成功
-        process.nextTick(analyseCppFile);
+        process.nextTick(analyseCppFile, true);
     }
     sendMsgToVscode("close_show_process", data);
     //重新加载文件
@@ -523,11 +521,17 @@ connection.onInitialize((params) => {
     return {
         capabilities: {
             //增量更新
-            textDocumentSync: vscode_languageserver_1.TextDocumentSyncKind.Incremental,
+            textDocumentSync: {
+                openClose: true,
+                change: vscode_languageserver_1.TextDocumentSyncKind.Incremental,
+                save: {
+                    includeText: false
+                }
+            },
             completionProvider: {
                 //提示注册
                 resolveProvider: true,
-                triggerCharacters: ['.', '>', ':', '/', ' ']
+                triggerCharacters: ['.', '>', ':', '/', ' ', '\n']
             },
             documentOnTypeFormattingProvider: {
                 firstTriggerCharacter: '}',
@@ -564,15 +568,9 @@ connection.onInitialized(() => {
             userConfig: config
         };
         //代码分析器
-        logger.debug("begin init");
-        logger.mark("init");
         codeAnalyse_1.CodeAnalyse.getInstace().init(_config);
-        logger.mark("init");
         //重新加载配置
-        logger.debug("begin reloadAllIncludeFile");
-        logger.mark("reloadAllIncludeFile");
         codeAnalyse_1.CodeAnalyse.getInstace().reloadAllIncludeFile(reloadIncludeFileCallBack);
-        logger.mark("reloadAllIncludeFile");
         //更新检查
         // logger.debug("begin updateCheck");
         // logger.mark("updateCheck");
@@ -614,7 +612,7 @@ function processFileChange() {
     let mapfile = new Set();
     while (true) {
         let file = changefile.pop();
-        if (file == undefined) {
+        if (file == undefined || !file) {
             //处理完了
             break;
         }
@@ -624,11 +622,6 @@ function processFileChange() {
         }
         setfilename.add(file.uri);
         mapfile.add(file);
-    }
-    //清除定时器
-    if (rebuildTimeout != null) {
-        timers_1.clearTimeout(rebuildTimeout);
-        rebuildTimeout = null;
     }
     logger.info(setfilename);
     let files = [];
@@ -695,21 +688,24 @@ connection.onExit(() => {
 });
 //文件变更提示
 connection.onDidChangeWatchedFiles((_change) => {
-    console.log("onDidChangeWatchedFiles", JSON.stringify(_change));
-    logger.debug(JSON.stringify(_change));
+    logger.log("onDidChangeWatchedFiles", JSON.stringify(_change));
+    // logger.debug(JSON.stringify(_change));
     let changes = _change.changes;
-    changefile = changefile.concat(changes);
-    if (!codeAnalyse_1.CodeAnalyse.getInstace().busy()) {
-        //清除定时器
-        if (rebuildTimeout != null) {
-            timers_1.clearTimeout(rebuildTimeout);
-            rebuildTimeout = null;
+    let needProcess = [];
+    needProcess = changes.filter((value, index, array) => {
+        let uri = value.uri;
+        if (uri.indexOf(".vscode") >= 0) {
+            //对比目录的不用
+            return false;
         }
-        processFileChange();
-    }
-    else {
-        connection.window.showErrorMessage("插件正在繁忙中，索引稍后加载");
-    }
+        if (!openFile[uri] || openFile[uri] == "") {
+            //如果是打开的，则跳过
+            return true;
+        }
+        return false;
+    });
+    changefile = changefile.concat(needProcess);
+    processFileChange();
 });
 function getShowType(type) {
     switch (type) {
@@ -807,6 +803,37 @@ connection.onCompletion((_textDocumentPosition) => {
         nowline++;
     }
     ;
+    //判断是否继承上行继续操作
+    if (linecode.trim() == "") {
+        let preLineBegin = context.lastIndexOf("\n", pos - 1);
+        let preLine = context.substring(preLineBegin, pos).trim();
+        // console.log(preLine);
+        //oGetMerchantReq.set_merchant_id(objReq.merchant().merchant_id());
+        let _posOwn = preLine.indexOf(".");
+        let _posPoint = preLine.indexOf("->");
+        let _pos = _posPoint > _posOwn ? _posOwn : _posPoint;
+        if (_posOwn == -1 && _posPoint == -1) {
+            //无效的
+            return null;
+        }
+        else if (_posOwn == -1 && _posPoint > 0) {
+            _pos = _posPoint;
+        }
+        else if (_posOwn > 0 && _posPoint == -1) {
+            _pos = _posOwn;
+        }
+        let _dats = preLine.substring(0, _pos);
+        // console.log("xxxxx:", _dats, _pos, _posOwn, _posPoint);
+        let item = {
+            "label": _dats,
+            "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
+            "insertText": _dats,
+            "kind": vscode_languageserver_1.CompletionItemKind.Variable,
+            "data": "{}"
+        };
+        return vscode_languageserver_1.CompletionList.create([item], true);
+        ;
+    }
     //判断是否自动填参数分析
     let autoFillReg = /\([\s]{0,4}(([a-z0-9_\(\)\[\].: \->]{1,128},){0,10})[\s\t]{0,10} $/ig;
     let autoResult = autoFillReg.exec(linecode);
@@ -814,13 +841,8 @@ connection.onCompletion((_textDocumentPosition) => {
         && testCloseMark(autoResult[1], '(', ')')) {
         logger.debug(autoResult);
         let preKey = autoResult[0];
-        //context = context.substring(0, context.length - preKey.length);
-        logger.debug("begin autoFillParams");
-        logger.mark("autoFillParams");
         let list = autoFillParams(cpos, line, context, pos, filename, preKey);
-        logger.mark("autoFillParams");
         return vscode_languageserver_1.CompletionList.create(list, true);
-        ;
     }
     linecode = linecode.trim();
     //判断是否为针对类的提醒
@@ -830,7 +852,6 @@ connection.onCompletion((_textDocumentPosition) => {
         let symbol = _result[1];
         let preKey = _result[2];
         cpos = cpos - preKey.length;
-        //context = context.substring(0, context.length - preKey.length);
         if (symbol == ".") {
             logger.debug("begin findWithOwner");
             logger.mark("findWithOwner");
@@ -960,6 +981,7 @@ function findWithNamespace(cpos, context, pos, filename, symbol) {
     logger.debug("命名空间或者静态方法");
     let precontext = context.substr(0, pos + cpos - 1);
     let lastcontext = context.substr(pos + cpos + symbol.length + 2, 100).trim();
+    let lastchar = context[pos + cpos + symbol.length + 1];
     let hasParams = false;
     if (lastcontext[0] == "(") {
         hasParams = true;
@@ -975,7 +997,7 @@ function findWithNamespace(cpos, context, pos, filename, symbol) {
         let item = {
             "label": result[i].s,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i], hasParams),
+            "insertText": getSelectItemInsertCode(result[i], hasParams, lastchar),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -984,21 +1006,24 @@ function findWithNamespace(cpos, context, pos, filename, symbol) {
     return showlist;
 }
 ;
-function getSelectItemInsertCode(item, useName) {
-    //logger.info(item);
+function getSelectItemInsertCode(item, useName, lastChar) {
+    let last = "";
+    if (lastChar == "\n") {
+        last = ";";
+    }
     if (useName) {
         //强制私有提示的值
-        return item.s;
+        return item.s + last;
     }
     if (item.c === undefined) {
         //未明确设置插入字符
-        return item.s;
+        return item.s + last;
     }
     if (item.c == "") {
         //设置字符未空
-        return item.s;
+        return item.s + last;
     }
-    return item.c;
+    return item.c + last;
 }
 ;
 function preKeyWordSearch(context, pos, cpos, linecode, filename) {
@@ -1025,7 +1050,7 @@ function preKeyWordSearch(context, pos, cpos, linecode, filename) {
         let item = {
             "label": result[i].s,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i], false),
+            "insertText": getSelectItemInsertCode(result[i], false, ''),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -1041,11 +1066,12 @@ function findWithPoint(cpos, context, pos, filename, symbol) {
     logger.debug("指针访问提示", cpos);
     let precontext = context.substr(0, pos + cpos - 1);
     let lastcontext = context.substr(pos + cpos + symbol.length + 2, 100).trim();
+    let lastchar = context[pos + cpos + symbol.length + 1];
     let hasParams = false;
     if (lastcontext[0] == "(") {
         hasParams = true;
     }
-    //logger.debug(precontext);
+    // console.debug(lastcontext, lastchar);
     logger.debug("begin getAllNameByObj");
     logger.mark("getAllNameByObj");
     let result = codeAnalyse_1.CodeAnalyse.getInstace().getAllNameByObj(filename, precontext, null);
@@ -1055,7 +1081,7 @@ function findWithPoint(cpos, context, pos, filename, symbol) {
         let item = {
             "label": result[i].s,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i], hasParams),
+            "insertText": getSelectItemInsertCode(result[i], hasParams, lastchar),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -1078,7 +1104,7 @@ function autoFillParams(cpos, line, context, pos, filename, keyword) {
     }
     let showlist = [];
     for (let i = 0; i < result.length; i++) {
-        let data = getSelectItemInsertCode(result[i], hasParams);
+        let data = getSelectItemInsertCode(result[i], hasParams, '');
         let item = {
             "label": result[i].s,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
@@ -1105,7 +1131,9 @@ function autoFillParams(cpos, line, context, pos, filename, keyword) {
 function findWithOwner(cpos, context, pos, filename, symbol) {
     logger.debug("xxx通过归属找提醒", cpos);
     let precontext = context.substr(0, pos + cpos);
-    let lastcontext = context.substr(pos + cpos + symbol.length + 1, 100).trim();
+    let tmplastcontext = context.substr(pos + cpos + symbol.length + 1, 100);
+    let lastcontext = tmplastcontext.trim();
+    let lastchar = context[pos + cpos + symbol.length + 1];
     let hasParams = false;
     if (lastcontext[0] == "(") {
         hasParams = true;
@@ -1116,7 +1144,7 @@ function findWithOwner(cpos, context, pos, filename, symbol) {
         let item = {
             "label": result[i].s,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
-            "insertText": getSelectItemInsertCode(result[i], hasParams),
+            "insertText": getSelectItemInsertCode(result[i], hasParams, lastchar),
             "kind": getShowType(result[i].t),
             "data": JSON.stringify(result[i])
         };
@@ -1137,7 +1165,8 @@ function getDependentByCppCallBack(msg, filepath, _usingnamepace, _include, _sho
     dependentfiles.delete(filepath);
 }
 ;
-function analyseCppFile() {
+//分析文件索引
+function analyseCppFile(isSave) {
     let filenames = [];
     dependentfiles.forEach((filename) => {
         filenames.push(filename);
@@ -1146,31 +1175,25 @@ function analyseCppFile() {
     console.log("analyseCppFile", filenames);
     for (let i = 0; i < filenames.length; i++) {
         let filename = filenames[i];
-        codeAnalyse_1.CodeAnalyse.getInstace().getDependentByCpp(filename, getDependentByCppCallBack, false);
+        codeAnalyse_1.CodeAnalyse.getInstace().getDependentByCpp(filename, getDependentByCppCallBack, false, isSave);
     }
     return;
 }
 ;
 //打开文件触发
 connection.onDidOpenTextDocument((params) => {
-    openFile[params.textDocument.uri] = params.textDocument.text;
     let filepath = getFilePath(params.textDocument.uri);
     if (filepath == false || filepath.indexOf(".vscode") >= 0) {
         logger.debug("onDidOpenTextDocument", params.textDocument.uri);
         return;
     }
+    openFile[params.textDocument.uri] = params.textDocument.text;
+    needSave[params.textDocument.uri] = 2;
     logger.log("onDidOpenTextDocument", filepath);
-    //debug: file:///data/mm64/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp 
-    ///home/chaodong/QQMail/mmtenpay/mmpaybasic/mmappsvr2.0/mmappsvrlogic/payflowctrllogic/duplicatepaywarnchecker.cpp
     dependentfiles.add(filepath);
     logger.debug("debug:", params.textDocument.uri, basepath, filepath);
     //异步执行
-    process.nextTick(analyseCppFile);
-    file: //
-     
-    // setTimeout(analyseCppFile, 3000);
-    //重新计算索引
-    codeAnalyse_1.CodeAnalyse.getInstace().reloadOneIncludeFile(filepath, reloadOneIncludeFileCallBack);
+    setTimeout(analyseCppFile, 500, false);
 });
 function updateDiagnostic(uri, change, context, newContext) {
     let _path = files_1.uriToFilePath(uri);
@@ -1275,6 +1298,7 @@ connection.onDidChangeTextDocument((params) => {
         let tmpstr = context.slice(0, replaceStart + 1) + text + context.slice(replaceEnd + 1);
         updateDiagnostic(params.textDocument.uri, e, context, tmpstr);
         openFile[params.textDocument.uri] = tmpstr;
+        needSave[params.textDocument.uri] = 1;
     }
     let _path = files_1.uriToFilePath(params.textDocument.uri);
     if (_path && diagnostic[_path]) {
@@ -1285,24 +1309,29 @@ connection.onDidChangeTextDocument((params) => {
 //加载单个文件回调
 function reloadOneIncludeFileCallBack(msg) {
     logger.debug("reloadOneIncludeFileCallBack:", msg);
-    //showTipMessage("文件已重新加载！");
-    // console.log("reloadOneIncludeFileCallBack:xxxxxxxxx");
-    process.nextTick(analyseCppFile);
+    process.nextTick(analyseCppFile, true);
+}
+;
+//加载单个文件回调，非增量触发报错
+function reloadOneIncludeFileCallBackOpen(msg) {
+    logger.debug("reloadOneIncludeFileCallBack:", msg);
+    console.log("xxxxxxxxxxxx", msg);
+    process.nextTick(analyseCppFile, false);
 }
 ;
 //关闭文档触发
 connection.onDidCloseTextDocument((params) => {
     //去掉全局文件内容
-    openFile[params.textDocument.uri] = "";
+    delete openFile[params.textDocument.uri];
     let filepath = getFilePath(params.textDocument.uri);
     if (filepath == false || filepath.indexOf(".vscode") >= 0) {
         logger.debug("onDidOpenTextDocument", params.textDocument.uri);
         return;
     }
+    openFile[params.textDocument.uri] = "";
+    needSave[params.textDocument.uri] = 2;
     logger.log("onDidCloseTextDocument", filepath);
-    if (filepath) {
-        codeAnalyse_1.CodeAnalyse.getInstace().getDependentByCpp(filepath, getDependentByCppCallBack, true);
-    }
+    codeAnalyse_1.CodeAnalyse.getInstace().getDependentByCpp(filepath, getDependentByCppCallBack, true, false);
 });
 //保存完文档之后触发
 connection.onDidSaveTextDocument((params) => {
@@ -1312,23 +1341,15 @@ connection.onDidSaveTextDocument((params) => {
         logger.debug("onDidSaveTextDocument", params.textDocument.uri);
         return;
     }
-    console.log("onDidSaveTextDocument", params.textDocument.uri);
+    if (!needSave[params.textDocument.uri]
+        || needSave[params.textDocument.uri] == 2) {
+        console.log("context no change!");
+        return;
+    }
+    needSave[params.textDocument.uri] = 2;
+    // console.log("onDidSaveTextDocument", params.textDocument.uri, needSave);
     dependentfiles.add(filepath);
-    logger.log("analyseCppFile debug:", params.textDocument.uri, basepath, filepath);
-    //异步执行
-    // process.nextTick(analyseCppFile);
-    // setTimeout(analyseCppFile, 3000);
-    //文件变更
-    // let changes: FileEvent = {
-    //     uri: params.textDocument.uri,
-    //     type: FileChangeType.Changed
-    // };
-    // changefile.push(changes);
-    // if(rebuildTimeout ==null) {
-    //     //这里启动一个定时器用于兜底
-    //     //若文件改动监听器无反应，则这个兜底
-    //     rebuildTimeout = setTimeout(processFileChange, 2000);
-    // }
+    codeAnalyse_1.CodeAnalyse.getInstace().reloadOneIncludeFile(filepath, reloadOneIncludeFileCallBack);
     return;
 });
 connection.onDocumentSymbol((params) => {

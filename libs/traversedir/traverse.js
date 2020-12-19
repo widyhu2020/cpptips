@@ -5,15 +5,31 @@
  *      Author: widyhu
  *
  * ------------------------------------------------------------------------------------------ */
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 var fs = require('fs');
 var path = require('path');
 var FileIndexStore = require('../store/store').FileIndexStore;
+var Filetype = require('../traversedir/filetype').Filetype;
 var FileType = require('../store/store').FileType;
 var logger = require('log4js').getLogger("cpptips");
-var Traverse = /** @class */ (function () {
+var Traverse = /** @class */ (function (_super) {
+    __extends(Traverse, _super);
     function Traverse(basedir, userConfig, isAnlyseSystemDir, analyseIncludeCallBack, analyseSourceCallBack) {
+        var _this = _super.call(this) || this;
         //加载目录所有文件
-        this.scanDirFile = function (resolve) {
+        _this.scanDirFile = function (resolve) {
             var that = this;
             //处理文件
             this.uniqueDir = new Set([]);
@@ -23,7 +39,7 @@ var Traverse = /** @class */ (function () {
             setTimeout(this.analyseConsumer, 3000, that, resolve);
         };
         //batch添加文件分析任务
-        this.addAnalyseFileTasl = function (files, resolve) {
+        _this.addAnalyseFileTasl = function (files, resolve) {
             var that = this;
             for (var i = 0; i < files.length; i++) {
                 //判断是否需要忽略的文件夹
@@ -37,7 +53,7 @@ var Traverse = /** @class */ (function () {
             setTimeout(this.analyseConsumer, 1, that, resolve);
         };
         //消费者
-        this.analyseConsumer = function (that, resolve) {
+        _this.analyseConsumer = function (that, resolve) {
             var needEmptyTime = 0;
             var timer = null;
             timer = setInterval(function () {
@@ -74,14 +90,14 @@ var Traverse = /** @class */ (function () {
             }, 1);
         };
         //获取，目录下需要处理文件的数量
-        this.getFileNumInDir = function (callbackshow) {
+        _this.getFileNumInDir = function (callbackshow) {
             var taskTotal = 0;
             this.uniqueDir = new Set([]);
             taskTotal = this._readDirForTotalFile(this.basedir, callbackshow);
             return taskTotal;
         };
         //遍历文件
-        this.traverseFilesDelNotExists = function (callback) {
+        _this.traverseFilesDelNotExists = function (callback) {
             var types = [
                 FileType.INCLUDE_FILE,
                 FileType.PROTOBUF_FILE,
@@ -131,7 +147,7 @@ var Traverse = /** @class */ (function () {
             }
         };
         //遍历原文件-暂时废弃
-        this.traverseSource = function (callback, callbackprocess) {
+        _this.traverseSource = function (callback, callbackprocess) {
             var types = [FileType.SOURCE_FILE];
             var totalNum = this.fis.getFileTotalWhithType(types);
             logger.debug("begin traverseSource... totalNum:", totalNum);
@@ -159,50 +175,7 @@ var Traverse = /** @class */ (function () {
                 beginIndex = endIndex;
             }
         };
-        //判断文件类型：返回1为头文件；2为源文件，其他无需处理
-        this.judgeFileType = function (filepath) {
-            var pos = filepath.lastIndexOf(".");
-            if (pos == -1) {
-                //文件名称不以后缀结尾
-                return FileType.OTHER_FILE;
-            }
-            var ext = filepath.substr(pos);
-            if (!this.includeExt.has(ext) && !this.sourceExt.has(ext)) {
-                //不符合条件的文件
-                return FileType.OTHER_FILE;
-            }
-            if (this.includeExt.has(ext) || this._checkIsSystem(filepath)) {
-                //usr下所有的文件全部当头文件处理
-                if (ext == ".tcc") {
-                    //.tcc文件不要处理
-                    return FileType.OTHER_FILE;
-                }
-                if (ext == ".proto") {
-                    return FileType.PROTOBUF_FILE;
-                }
-                return FileType.INCLUDE_FILE;
-            }
-            if (this.sourceExt.has(ext)) {
-                return FileType.SOURCE_FILE;
-            }
-            return FileType.OTHER_FILE;
-        };
-        //判断是否系统库函数
-        this._checkIsSystem = function (filepath) {
-            // /usr/local/
-            // /google/protobuf/
-            if (filepath.indexOf("/.vscode/") != -1 || filepath.indexOf("\\.vscode\\") != -1
-                || filepath.indexOf("/usr/local/") != -1 || filepath.indexOf("\\usr\\local\\") != -1
-                || filepath.indexOf("/usr/include/") != -1 || filepath.indexOf("\\usr\\include\\") != -1
-                || filepath.indexOf("/google/protobuf/") != -1 || filepath.indexOf("\\google\\protobuf\\") != -1
-                || /.*\.tcc$/g.test(filepath)) {
-                //如果不是usr系统目录
-                //protobuf库里面已经加载过，这里直接pass
-                return true;
-            }
-            return false;
-        };
-        this._judgeFileTypeAndSave = function (filepath) {
+        _this._judgeFileTypeAndSave = function (filepath) {
             var pos = filepath.lastIndexOf(".");
             if (pos == -1
                 && !this._checkIsSystem(filepath)) {
@@ -231,7 +204,7 @@ var Traverse = /** @class */ (function () {
             }
         };
         //判断是否在忽略的文件假名单中
-        this._checkIsIgnorDir = function (filepath) {
+        _this._checkIsIgnorDir = function (filepath) {
             //目录处理
             var _filepath = filepath;
             if (filepath[filepath.length - 1] != "/") {
@@ -281,7 +254,7 @@ var Traverse = /** @class */ (function () {
             return 0;
         };
         //统计任务数量
-        this._readDirForTotalFile = function (dirfather, callbackshow) {
+        _this._readDirForTotalFile = function (dirfather, callbackshow) {
             var total = 0;
             var that = this;
             var dirf = fs.readdirSync(dirfather, { 'encoding': 'utf8', 'withFileTypes': false });
@@ -384,7 +357,7 @@ var Traverse = /** @class */ (function () {
             return total;
         };
         //扫描目录文件并分析
-        this._readDir = function (dirfather) {
+        _this._readDir = function (dirfather) {
             var that = this;
             var dirf = fs.readdirSync(dirfather, { 'encoding': 'utf8', 'withFileTypes': false });
             // 这个data数组中装的是当前文件夹下所有的文件名(包括文件夹)
@@ -469,72 +442,71 @@ var Traverse = /** @class */ (function () {
                 }
             });
         };
-        this.basedir = basedir;
-        this.analyseIncludeCallBack = analyseIncludeCallBack;
-        this.analyseSourceCallBack = analyseSourceCallBack;
-        this.isAnlyseSystemDir = isAnlyseSystemDir;
+        _this.basedir = basedir;
+        _this.analyseIncludeCallBack = analyseIncludeCallBack;
+        _this.analyseSourceCallBack = analyseSourceCallBack;
+        _this.isAnlyseSystemDir = isAnlyseSystemDir;
         //防重检查
-        this.uniqueDir = new Set([]);
+        _this.uniqueDir = new Set([]);
         //queue
-        this.includefiles = [];
-        this.sourcefiles = [];
-        this.includeExt = new Set(['.h', '.hpp', ".proto"]);
-        this.sourceExt = new Set(['.c', '.cc', '.cpp']);
-        this.fis = FileIndexStore.getInstace();
-        this.userConfig = userConfig;
-        this.needStop = false;
-        this.analyseLinkDir = new Set([]);
-        if (this.userConfig.needLoadLinkDir
-            && this.userConfig.needLoadLinkDir instanceof Array) {
-            this.analyseLinkDir = new Set(this.userConfig.needLoadLinkDir);
+        _this.includefiles = [];
+        _this.sourcefiles = [];
+        _this.fis = FileIndexStore.getInstace();
+        _this.userConfig = userConfig;
+        _this.needStop = false;
+        _this.analyseLinkDir = new Set([]);
+        if (_this.userConfig.needLoadLinkDir
+            && _this.userConfig.needLoadLinkDir instanceof Array) {
+            _this.analyseLinkDir = new Set(_this.userConfig.needLoadLinkDir);
         }
         //需要忽略的文件或者文件的匹配
         logger.debug("Traverse:", JSON.stringify(userConfig));
         logger.debug("isAnlyseSystemDir:", JSON.stringify(isAnlyseSystemDir));
         var regex = [];
-        this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
-        if (this.userConfig.ignoreFileAndDir
-            && this.userConfig.ignoreFileAndDir instanceof Array) {
-            regex = this.userConfig.ignoreFileAndDir;
-            this.regexStr = "(" + regex.join(")|(") + ")";
-            logger.debug("user regex:", this.regexStr);
+        _this.regexStr = "^[\\/]{1,1}[.~]{1,1}[0-9a-z]{1,128}$";
+        if (_this.userConfig.ignoreFileAndDir
+            && _this.userConfig.ignoreFileAndDir instanceof Array) {
+            regex = _this.userConfig.ignoreFileAndDir;
+            _this.regexStr = "(" + regex.join(")|(") + ")";
+            logger.debug("user regex:", _this.regexStr);
         }
         ;
         //需要忽略的目录，不支持匹配
-        this.ignorDir = [];
-        if (this.userConfig.ignorDir
-            && this.userConfig.ignorDir instanceof Array) {
-            this.ignorDir = this.userConfig.ignorDir;
+        _this.ignorDir = [];
+        if (_this.userConfig.ignorDir
+            && _this.userConfig.ignorDir instanceof Array) {
+            _this.ignorDir = _this.userConfig.ignorDir;
         }
-        logger.debug("ignorDir:", JSON.stringify(this.ignorDir));
+        logger.debug("ignorDir:", JSON.stringify(_this.ignorDir));
         //需要加载的目录，不支持匹配
-        this.needLoadDir = [];
-        if (this.userConfig.needLoadDir
-            && this.userConfig.needLoadDir instanceof Array) {
-            this.needLoadDir = this.userConfig.needLoadDir;
+        _this.needLoadDir = [];
+        if (_this.userConfig.needLoadDir
+            && _this.userConfig.needLoadDir instanceof Array) {
+            _this.needLoadDir = _this.userConfig.needLoadDir;
         }
         //needLoadDir是否有软连接，如果有加入this.analyseLinkDir
-        for (var i = 0; i < this.needLoadDir.length; i++) {
-            var path_1 = this.needLoadDir[i];
+        for (var i = 0; i < _this.needLoadDir.length; i++) {
+            var path_1 = _this.needLoadDir[i];
             try {
-                var fileStat = fs.lstatSync(this.basedir + path_1);
+                var fileStat = fs.lstatSync(_this.basedir + path_1);
                 if (fileStat.isSymbolicLink()) {
-                    this.analyseLinkDir.add(path_1);
+                    _this.analyseLinkDir.add(path_1);
                 }
             }
             catch (error) {
             }
         }
         //链接全部加入索引计算范围
-        for (var i = 0; this.userConfig.needLoadLinkDir && i < this.userConfig.needLoadLinkDir.length; i++) {
-            var path_2 = this.userConfig.needLoadLinkDir[i];
-            this.needLoadDir.push(path_2);
+        for (var i = 0; _this.userConfig.needLoadLinkDir && i < _this.userConfig.needLoadLinkDir.length; i++) {
+            var path_2 = _this.userConfig.needLoadLinkDir[i];
+            _this.needLoadDir.push(path_2);
         }
-        logger.debug("needLoadDir:", JSON.stringify(this.needLoadDir));
+        logger.debug("needLoadDir:", JSON.stringify(_this.needLoadDir));
+        return _this;
     }
     ;
     return Traverse;
-}());
+}(Filetype));
 ;
 module.exports = {
     Traverse: Traverse

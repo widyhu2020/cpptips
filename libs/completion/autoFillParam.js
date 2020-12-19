@@ -55,15 +55,25 @@ var AutoFillParam = /** @class */ (function (_super) {
                     break;
                 }
             }
+            //获取当前定义变量
             var nameMap = this._getAllVarDefine(objName, this.filecontext, namespaces);
             logger.debug(JSON.stringify(nameMap));
             var selectList = [];
             for (var i = 0; i < paramsType.length; i++) {
                 var type = paramsType[i].t;
                 type = type.replace(/[\s*\s]{1,10}/g, "* ");
+                if (type.indexOf("::") < 0) {
+                    type = this.getClassFullName(type, namespaces);
+                }
                 if (nameMap[type]) {
                     //匹配到类型
                     selectList = selectList.concat(nameMap[type]);
+                }
+                else {
+                    //同名
+                    if (nameMap[objName]) {
+                        selectList = selectList.concat(nameMap[objName]);
+                    }
                 }
             }
             //构造返回数据
@@ -119,10 +129,6 @@ var AutoFillParam = /** @class */ (function (_super) {
                 var name_1 = getResult[7];
                 if (keyword.has(type)) {
                     //命中关键字
-                    continue;
-                }
-                if (type == objName) {
-                    //找到的需要赋值的本身对象
                     continue;
                 }
                 typeMap = this._getObjectFunction(typeMap, false, name_1, type, namespaces, 0);
@@ -314,7 +320,11 @@ var AutoFillParam = /** @class */ (function (_super) {
                 //获取继承的父亲
                 for (var i = 0; i < jsonData.i.length; i++) {
                     var _tmpName = jsonData.i[i].n.replace(/\<[\w,]{2,256}\>/, "");
-                    ownnames.push(_tmpName);
+                    var _pos_1 = _tmpName.lastIndexOf("::");
+                    var _tmpClassName = _tmpName.substring(_pos_1 + 2);
+                    var _tmpnamespace = _tmpName.substring(0, _pos_1);
+                    namespaces.push(_tmpnamespace);
+                    ownnames.push(_tmpClassName);
                 }
                 var infos = KeyWordStore.getInstace().getByOwnNameAndName(ownnames, this.functionName, namespaces);
                 if (infos.length <= 0) {

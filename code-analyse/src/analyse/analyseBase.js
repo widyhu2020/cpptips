@@ -52,6 +52,8 @@ class AnalyseBase {
         //函数原定义
         this.methodDefine = {};
         this.newDefine = {};
+
+        this.inDBData = [];
     };
 
     //执行分析，父类不实现
@@ -70,6 +72,9 @@ class AnalyseBase {
             return false;
         }
         let fileid = fileinfo.id;
+        //初始化fileid
+        this.keyworddb.saveFileToMemDB(fileid, this.filename);
+        let beginIds = this.keyworddb.getIdsByFileId(fileid);
 
         //清空该文件所有的扩展数据,防止出现不修改名称的问题
         //keyworddb.cleanExtData(fileid);
@@ -83,6 +88,8 @@ class AnalyseBase {
         
         //去掉无用的定义
         this._removeNoUserFunction();
+        
+        this.keyworddb.saveMemToDB(fileid, this.filename, beginIds);
         return nameMap;
     };
 
@@ -829,8 +836,6 @@ class AnalyseBase {
             let vals = _keys[i].split("|");
             this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
         }
-
-        //logger.debug("resave over!");
     };
 
     //拼接key，拼接的key用于构造返回数据

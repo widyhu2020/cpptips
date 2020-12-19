@@ -131,12 +131,13 @@ class CodeAnalyse {
             let filepath = task['filepath'];
             let callback = task['callback'];
             let isClose = task['isclose'];
-            that._getDependentByCpp(filepath, callback, isClose);
+            let isSave = task['issave'];
+            that._getDependentByCpp(filepath, callback, isClose, isSave);
         }, 1000);
     };
 
     //获取cpp文件头文件依赖
-    _getDependentByCpp = function (filepath, callback = null, isClose = false) {
+    _getDependentByCpp = function (filepath, callback = null, isClose = false, isSave = false) {
         let that = this;
         //锁住
         let exitTimer = null;
@@ -146,7 +147,6 @@ class CodeAnalyse {
             return;
         }
 
-        // console.log(filepath, this.basedir, this.extPath + "/data/", this.dbpath);
         that.lockqueue = true;
         //其他情况分析文件获取文件依赖，并初始化当前索引到内存数据库
         cluster.setupMaster({
@@ -154,12 +154,16 @@ class CodeAnalyse {
             silent: false,
             windowsHide: true
         });
+        
         const worker = cluster.fork();
+        let dependent = KeyWordStore.getInstace().getPreSaveFileIds(filepath);
         let parasms = {
             basedir: this.basedir,
             sysdir: this.extPath + "/data/",
             cppfilename: filepath,
-            dbpath: this.dbpath
+            dbpath: this.dbpath,
+            needrecursion: isSave ? 0 : 1,
+            dependent: dependent
         }
         //发送指令
         worker.send(parasms);
@@ -173,7 +177,15 @@ class CodeAnalyse {
                 //关闭子进程
                 nextTick((fileids)=>{
                     //将数据导入内存db
-                    KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid);
+                    if(isSave == true){
+                        //排除上次已经加载过的数据
+                        let setFiles = new Set(dependent);
+                        let needSaveFile = fileids.filter((value, index, array)=>{ return !setFiles.has(value); });
+                        needSaveFile.push(currentfileid);
+                        logger.log("save fileids:", isSave, needSaveFile);
+                        fileids = needSaveFile;
+                    }
+                    KeyWordStore.getInstace().setMemDB(fileids, filepath, currentfileid, isSave);
                     if(exitTimer) {
                         //如果有定时器，则清除定时器
                         clearTimeout(exitTimer);
@@ -1089,10 +1101,17 @@ class CodeAnalyse {
         for (let i = lines.length - 1; i >= 0; i--) {
             let line = lines[i].trim();
             let pos = this._findVanamePos(line, valname);
-            let ragx = new RegExp(`[\\s]{1,10}[*&]{0,1}${valname}[\\s(=;,]{1,10}`, 'g');
+            let ragx = new RegExp(`[\\s]{1,10}[*&]{0,1}${valname}[\\s()=;,]{1,10}`, 'g');
             if (pos == -1 || !ragx.test(line)) {
                 //未找到直接跳过
-                continue;
+                if(pos != -1){
+                    let ragx = new RegExp(`[\\s]{1,10}[*&]{0,1}${valname}[\\s]{0,10}$`, 'g');
+                    if(!ragx.test(line)){
+                        continue;
+                    }
+                } else{
+                    continue;
+                }
             }
             
             let _sourceline = lines[i];
@@ -2498,7 +2517,7 @@ class CodeAnalyse {
     };
 
     //获取cpp文件的依赖
-    getDependentByCpp = function (filepath, callback = null, isClose = false) {
+    getDependentByCpp = function (filepath, callback = null, isClose = false, isSave = false) {
         try {
             let that = this;
             filepath = this._filePathFormat(filepath);
@@ -2513,11 +2532,10 @@ class CodeAnalyse {
             let task = {
                 filepath: filepath,
                 callback: callback,
-                isclose: isClose
+                isclose: isClose,
+                issave : isSave
             };
-            // console.log("getDependentByCpp:", filepath);
             that.dependentQueue.enqueue(task);
-            // return that._getDependentByCpp(filepath, callback, isClose);
         } catch (error) {
             callback("error", filepath, [], []);
             logger.debug("call getDependentByCpp faild!", error);

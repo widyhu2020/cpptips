@@ -14,12 +14,15 @@ var FileIndexStore = require('../store/store').FileIndexStore;
 var KeyWordStore = require('../store/store').KeyWordStore;
 var cluster = require('cluster');
 var os = require('os');
+var Filetype = require('../traversedir/filetype').Filetype;
 var MakeOwnsMapByCpp = /** @class */ (function () {
-    function MakeOwnsMapByCpp(basedir, dbpath, sysdir) {
-        //目录匹配
-        this._initFileDir = function () {
-            var infos = FileIndexStore.getInstace().getAllFileInfo();
+    function MakeOwnsMapByCpp(basedir, dbpath, sysdir, needrecursion, dependent) {
+        this._getAllFileInfo = function () {
+            console.time("_getAllFileInfo");
+            var infos = FileIndexStore.getInstace().getAllIncludeFileInfo();
             var filemap = {};
+            console.timeEnd("_getAllFileInfo");
+            console.time("_getAllFileInfo.2");
             for (var i = 0; i < infos.length; i++) {
                 var info = infos[i];
                 filemap[info.filepath] = info;
@@ -29,6 +32,7 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
                 }
                 this.fileNameMap[info.filename].push(info.filepath);
             }
+            console.timeEnd("_getAllFileInfo.2");
             return filemap;
         };
         //获取两个目录的相似度
@@ -80,20 +84,49 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             //logger.debug("return source failename:", inputfilename, filename);
             return inputfilename;
         };
-        //获取cpp文件头文件依赖
-        this.makeSearchTreeByCpp = function (cppfilename) {
-            //在文件存储
-            this.filename = cppfilename;
+        this._anaylyseDependentFile = function (filepath) {
+            var maker = new RebuildFileIndex(this.basedir, this.dbpath, false);
+            maker.setUserConfig({});
+            maker.forkReloadKeywordBySignleFile(filepath);
+            maker.disconstructor();
+        };
+        this._getFileInfo = function (filepath) {
+            filepath = filepath.replace(/["'<>]{1,1}/g, "");
+            var pathinfo = path.parse(filepath);
+            var filename = pathinfo.base;
             var that = this;
-            //加载头文件
-            console.time("_initFileDir");
-            // let filemap = this._initFileDir();
-            var filemap = {};
-            console.timeEnd("_initFileDir");
-            var filepath = that.basedir + cppfilename;
+            if (!this.fileNameMap[filename]) {
+                var filenames = FileIndexStore.getInstace().getFileByFileName(filename);
+                return filenames;
+            }
+            var filepaths = this.fileNameMap[filename];
+            var result = [];
+            filepaths.forEach(function (value, index, array) {
+                var _pos = value.lastIndexOf(filepath);
+                if (_pos < 0
+                    || _pos + filepath.length != value.length) {
+                    //可能匹配到其他同名文件
+                    return;
+                }
+                if (!that.filemap[value]) {
+                    //文件不存
+                    return;
+                }
+                result.push(that.filemap[value]);
+            });
+            return result;
+        };
+        this._readFileContext = function (cppfilename) {
+            var filepath = this.basedir + cppfilename;
             if (!fs.existsSync(filepath)) {
                 //如果文件不存在，则尝试使用系统目录
-                filepath = that.sysdir + cppfilename;
+                filepath = this.sysdir + cppfilename;
+                if (!fs.existsSync(filepath)) {
+                    //如果文件不存在，报错
+                    var includefile_1 = [];
+                    var namespaces_1 = [];
+                    return { includefile: includefile_1, namespaces: namespaces_1 };
+                }
             }
             var fd = fs.openSync(filepath, 'r');
             var buffer = Buffer.alloc(1024 * 1024 * 2);
@@ -105,18 +138,17 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             var fshash = crypto.createHash("md5");
             fshash.update(filecontext);
             var md5 = fshash.digest('hex');
-            var pos = cppfilename.lastIndexOf("/");
-            var filename = cppfilename.substr(pos + 1);
+            var pos = filepath.lastIndexOf("/");
+            var filename = filepath.substr(pos + 1);
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
-            // logger.debug("getFileByFilePath");
+            var filetype = new Filetype();
             var fileinfo = FileIndexStore.getInstace().getFileByFilePath(cppfilename);
-            // logger.debug("getFileByFilePath");
             if (fileinfo == false) {
                 var data = {
                     filename: filename,
                     filepath: cppfilename,
                     md5: md5,
-                    type: 0,
+                    type: filetype.judgeFileType(cppfilename),
                     updatetime: updatetime,
                     extdata: ''
                 };
@@ -128,131 +160,88 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
             fileinfo = FileIndexStore.getInstace().getFileByFilePath(cppfilename);
             if (fileinfo == false) {
                 //获取当前文件索引失败
-                return;
+                var includefile_2 = [];
+                var namespaces_2 = [];
+                return { includefile: includefile_2, namespaces: namespaces_2 };
             }
             this.own_file_id = fileinfo.id;
             //执行分析
+            console.time("Analyse");
             var analyse = new Analyse.Analyse(filecontext, cppfilename);
             analyse.doAnalyse();
             var sourceTree = analyse.getResult(FileIndexStore.getInstace(), KeyWordStore.getInstace());
+            console.timeEnd("Analyse");
             this.showTree = analyse.getDocumentStruct();
             var includefile = sourceTree.__file_inlcude;
             var namespaces = sourceTree.__file_usingnamespace;
-            var queue = new Queue();
-            var processInclude = new Set();
-            var processFileId = new Set();
-            if (includefile === undefined || typeof includefile == Array) {
+            if (!includefile) {
                 includefile = [];
             }
-            if (namespaces === undefined || typeof namespaces == Array) {
+            if (!namespaces) {
                 namespaces = [];
             }
-            var _loop_1 = function (i) {
-                includefile[i] = includefile[i].replace(/["'<>]{1,1}/g, "");
-                var pathinfo = path.parse(includefile[i]);
-                var protoFile = pathinfo.base;
-                var filedivpath = pathinfo.dir;
-                var filenames = FileIndexStore.getInstace().getFileByFileName(protoFile);
-                if (filenames && filenames.length > 0) {
-                    filenames.forEach(function (filename) {
-                        if (filename.filepath.indexOf(filedivpath) == -1) {
-                            //未匹配路径
-                            return;
-                        }
-                        if (!processInclude.has(filename.filepath)) {
-                            queue.enqueue(filename.filepath);
-                            filemap[filename.filepath] = filename;
-                            processInclude.add(filename.filepath);
-                            processFileId.add(filename.id);
-                        }
-                    });
+            return { includefile: includefile, namespaces: namespaces };
+        };
+        this._pushATask = function (fileinfo) {
+            if (!this.processInclude.has(fileinfo.filepath)) {
+                if (this.needrecursion == 0
+                    && this.dependent.has(fileinfo.id)) {
+                    //如果不需要递归
+                    //且该文件已经之前引入过，则跳过
+                    return;
                 }
-                else {
-                    queue.enqueue(protoFile);
-                }
-            };
-            for (var i = 0; i < includefile.length; i++) {
-                _loop_1(i);
+                this.queue.enqueue(fileinfo.filepath);
+                this.processInclude.add(fileinfo.filepath);
+                this.processFileId.add(fileinfo.id);
             }
-            var __inlcudefile = queue.dequeue();
+            return;
+        };
+        //获取cpp文件头文件依赖
+        this.makeSearchTreeByCpp = function (cppfilename) {
+            //在文件存储
+            this.filename = cppfilename;
+            this.filemap = this._getAllFileInfo();
+            var that = this;
+            var _a = this._readFileContext(cppfilename), includefile = _a.includefile, namespaces = _a.namespaces;
+            for (var i = 0; i < includefile.length; i++) {
+                //proto处理
+                this._changeProtoToCpp(includefile[i]);
+                var filenames = this._getFileInfo(includefile[i]);
+                filenames.forEach(function (filename) {
+                    that._pushATask(filename);
+                });
+            }
+            var __inlcudefile = this.queue.dequeue();
             while (__inlcudefile) {
-                if (/client\.h$/.test(__inlcudefile) || /\.pb\.h$/.test(__inlcudefile)) {
-                    //使用proto的client
-                    var pathinfo = path.parse(__inlcudefile);
-                    var protoFile = pathinfo.base;
-                    if (protoFile.indexOf(".pb.h") > 0) {
-                        protoFile = protoFile.replace(".pb.h", ".proto");
-                    }
-                    else {
-                        protoFile = protoFile.replace("client.h", ".proto");
-                    }
-                    var filenames = FileIndexStore.getInstace().getFileByFileName(protoFile);
-                    if (filenames && filenames.length > 0) {
-                        filenames.forEach(function (filename) {
-                            if (!processInclude.has(filename.filepath)) {
-                                queue.enqueue(filename.filepath);
-                                filemap[filename.filepath] = filename;
-                                processInclude.add(filename.filepath);
-                                processFileId.add(filename.id);
-                            }
-                        });
-                    }
-                    else {
-                        queue.enqueue(protoFile);
-                    }
-                }
-                if (filemap[__inlcudefile] && !processInclude.has(__inlcudefile)) {
-                    //当前文件纳入
-                    processInclude.add(filemap[__inlcudefile].filepath);
-                    processFileId.add(filemap[__inlcudefile].id);
-                }
-                if (!filemap[__inlcudefile] || filemap[__inlcudefile].extdata == "") {
+                if (!that.filemap[__inlcudefile]
+                    || that.filemap[__inlcudefile].extdata == "") {
                     //没有收录该头文件
-                    __inlcudefile = queue.dequeue();
+                    //或者该头文件没有包含头文件
+                    __inlcudefile = that.queue.dequeue();
                     continue;
                 }
-                var extJson = JSON.parse(filemap[__inlcudefile].extdata);
+                var extJson = JSON.parse(that.filemap[__inlcudefile].extdata);
                 var includefiles = extJson.i;
                 var usingnamespace = extJson.u;
                 namespaces = namespaces.concat(usingnamespace);
-                var _loop_2 = function (i) {
-                    includefiles[i] = includefiles[i].replace(/["'<>]{1,1}/g, "");
-                    var pathinfo = path.parse(includefiles[i]);
-                    var protoFile = pathinfo.base;
-                    var filedivpath = pathinfo.dir.replace(/[.]{1,2}\//m, "");
-                    var filenames = FileIndexStore.getInstace().getFileByFileName(protoFile);
-                    if (filenames && filenames.length > 0) {
-                        filenames.forEach(function (filename) {
-                            if (filename.filepath.indexOf(filedivpath) == -1) {
-                                //未匹配路径
-                                return;
-                            }
-                            if (!processInclude.has(filename.filepath)) {
-                                queue.enqueue(filename.filepath);
-                                filemap[filename.filepath] = filename;
-                                processInclude.add(filename.filepath);
-                                processFileId.add(filename.id);
-                            }
-                        });
-                    }
-                    else {
-                        // if(__inlcudefile.indexOf("mmpaymchmerchantsubjectauthorizebizaosvr") > 0)console.log(__inlcudefile, protoFile);
-                        queue.enqueue(protoFile);
-                    }
-                };
                 for (var i = 0; i < includefiles.length; i++) {
-                    _loop_2(i);
+                    //proto处理
+                    that._changeProtoToCpp(includefiles[i]);
+                    var filenames = this._getFileInfo(includefiles[i]);
+                    filenames.forEach(function (filename) {
+                        that._pushATask(filename);
+                    });
                 }
-                __inlcudefile = queue.dequeue();
+                __inlcudefile = this.queue.dequeue();
             }
             ;
             //命名空间合并
             var duplicate = new Set(namespaces);
             that._usingnamespace = Array.from(duplicate);
             //头文件关联
-            that.include = Array.from(processInclude);
+            that.include = Array.from(that.processInclude);
             //获取文件id
-            that.file_id = Array.from(processFileId);
+            that.file_id = Array.from(that.processFileId);
             return;
         };
         this.disconstructor = function () {
@@ -262,7 +251,9 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
         };
         this.getData = function () {
             console.log("头文件依赖总数：", this.file_id.length);
-            // logger.debug(this.file_id.join(","));
+            if (this.file_id.length < 20) {
+                console.log(this.include);
+            }
             return {
                 'usingnamespace': this._usingnamespace,
                 'include': this.include,
@@ -272,6 +263,7 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
         };
         this.basedir = basedir;
         this.sysdir = sysdir;
+        this.needrecursion = needrecursion;
         FileIndexStore.getInstace().connect(dbpath, 0);
         KeyWordStore.getInstace().connect(dbpath, 0);
         this.fileNameMap = {};
@@ -280,7 +272,33 @@ var MakeOwnsMapByCpp = /** @class */ (function () {
         this.file_id = [];
         this.own_file_id = 0;
         this.showTree = {};
+        this.dependent = new Set(dependent);
+        this.queue = new Queue();
+        this.processInclude = new Set();
+        this.processFileId = new Set();
+        this.filemap = {};
     }
+    MakeOwnsMapByCpp.prototype._changeProtoToCpp = function (filepath) {
+        if (/client\.h$/.test(filepath) || /\.pb\.h$/.test(filepath)) {
+            //使用proto的client
+            var that_1 = this;
+            var pathinfo = path.parse(filepath);
+            var protoFile = pathinfo.base;
+            if (protoFile.indexOf(".pb.h") > 0) {
+                protoFile = protoFile.replace(".pb.h", ".proto");
+            }
+            else {
+                protoFile = protoFile.replace("client.h", ".proto");
+            }
+            // console.log(protoFile);
+            var filenames = this._getFileInfo(protoFile);
+            filenames.forEach(function (filename) {
+                that_1._pushATask(filename);
+            });
+        }
+        return;
+    };
+    ;
     return MakeOwnsMapByCpp;
 }());
 ;
@@ -288,10 +306,12 @@ if (cluster.isMaster) {
     //测试代码
     var worker_1 = cluster.fork();
     var parasms = {
-        basedir: "---",
+        basedir: "/Users/widyhu/widyhu/cpp_project/",
         sysdir: "---",
-        cppfilename: "---",
-        dbpath: "--/.vscode/db/cpptips.db"
+        cppfilename: "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantaosvr/logic/Merchant.cpp",
+        dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
+        needrecursion: 0,
+        dependent: [12904]
     };
     worker_1.send(parasms);
     worker_1.on('message', function (data) {
@@ -307,7 +327,7 @@ else if (cluster.isWorker) {
             // logger.debug(parasms.basedir, parasms.dbpath, parasms.cppfilename);
             //创建索引
             console.time("makeSearchTreeByCpp");
-            var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir);
+            var maker = new MakeOwnsMapByCpp(parasms.basedir, parasms.dbpath, parasms.sysdir, parasms.needrecursion, parasms.dependent);
             maker.makeSearchTreeByCpp(parasms.cppfilename);
             console.timeEnd("makeSearchTreeByCpp");
             //释放链接
@@ -317,6 +337,7 @@ else if (cluster.isWorker) {
             process.send(result);
         }
         catch (err) {
+            console.log(err);
             process.kill(process.pid);
         }
     });

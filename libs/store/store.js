@@ -140,7 +140,7 @@ var KeyWordStore = /** @class */ (function () {
             try {
                 var sql = 'INSERT INTO t_keyword (ownname, name, namespace, type, permission, namelength, file_id, extdata) \
             VALUES (@ownname, @name, @namespace, @type, @permission, @namelength, @file_id, @extdata)';
-                var stmt = this.db.prepare(sql);
+                var stmt = this._getDbConnect().prepare(sql);
                 var info_1 = stmt.run(data);
                 return info_1.changes == 1;
             }
@@ -149,10 +149,33 @@ var KeyWordStore = /** @class */ (function () {
                 return false;
             }
         };
+        //获取依赖的头文件
+        this.getPreSaveFileIds = function (filepath) {
+            if (!this.dependentFileId[filepath]) {
+                return [];
+            }
+            return this.dependentFileId[filepath];
+        };
+        this.getAllSaveFileIds = function () {
+            var allids = [];
+            var keys = Object.keys(this.dependentFileId);
+            for (var i = 0; i < keys.length; i++) {
+                allids = allids.concat(this.dependentFileId[keys[i]]);
+            }
+            return Array.from(new Set(allids));
+        };
+        this.saveFileToMemDB = function (fileid, filepath) {
+            return this.setMemDB([], filepath, fileid, false);
+        };
         //使用关联的文件创建查找副本
-        this.setMemDB = function (fileids, userfilepath, currentfileid) {
-            console.log("userfilepath:", userfilepath);
-            this.dependentFileId[userfilepath] = fileids;
+        this.setMemDB = function (fileids, userfilepath, currentfileid, addInclude) {
+            if (addInclude === void 0) { addInclude = false; }
+            if (!addInclude || !this.dependentFileId[userfilepath]) {
+                this.dependentFileId[userfilepath] = fileids;
+            }
+            else {
+                this.dependentFileId[userfilepath] = this.dependentFileId[userfilepath].concat(fileids);
+            }
             if (!this.dbMemDb) {
                 this.dbMemDb = new Database(':memory:', {});
                 // this.dbMemDb = new Database(':memory:', {verbose: console.log});
@@ -197,6 +220,36 @@ var KeyWordStore = /** @class */ (function () {
             console.timeEnd("moveDataToMen");
             return true;
         };
+        //将memdb中的数据移到实际db中
+        this.saveMemToDB = function (fileids, filepath, beginIds) {
+            if (!this.dependentFileId[filepath] || !this.dbMemDb) {
+                return false;
+            }
+            delete this.dependentFileId[filepath];
+            try {
+                var strfileids = beginIds.join(',');
+                this.dbMemDb.prepare("Attach DATABASE \"" + this.dbname + "\" as Tmp").run();
+                this.dbMemDb.prepare("REPLACE INTO \
+                Tmp.t_keyword(\
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    id,ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM t_keyword WHERE id IN (" + strfileids + ") AND file_id=" + fileids).run();
+                this.dbMemDb.prepare("REPLACE INTO \
+                Tmp.t_keyword(\
+                    ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                ) \
+                SELECT \
+                    ownname,name,namespace,type,permission,namelength,file_id,extdata \
+                FROM t_keyword WHERE id NOT IN (" + strfileids + ") AND file_id=" + fileids).run();
+                this.dbMemDb.prepare('DETACH DATABASE "Tmp"').run();
+            }
+            catch (err) {
+                console.log(err);
+            }
+            return true;
+        };
         //删除不必要的索引
         this.removeMenDB = function (removeFilePath) {
             if (!this.dependentFileId[removeFilePath]
@@ -225,7 +278,7 @@ var KeyWordStore = /** @class */ (function () {
         //清除所有的扩展数据，防止出现函数修改名称不更换问题
         this.cleanExtData = function (fileid) {
             var sql = 'UPDATE t_keyword  SET extdata=\'\' WHERE file_id=? AND type in (2, 7, 8)';
-            var stmt_update = this.db.prepare(sql);
+            var stmt_update = this._getDbConnect().prepare(sql);
             var info = stmt_update.run(fileid);
             if (this.dbMemDb) {
                 //更改内存db
@@ -236,7 +289,7 @@ var KeyWordStore = /** @class */ (function () {
         //修改命名空间
         this.modifyNamespace = function (id, namespace) {
             var sql = 'UPDATE t_keyword  SET namespace=? WHERE id=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(namespace, id);
             //logger.debug(info);
             return info.changes == 1;
@@ -244,7 +297,7 @@ var KeyWordStore = /** @class */ (function () {
         //修改文件id
         this.modifyFileId = function (id, file_id) {
             var sql = 'UPDATE t_keyword  SET file_id=? WHERE id=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(file_id, id);
             //logger.debug(info);
             return info.changes == 1;
@@ -252,7 +305,7 @@ var KeyWordStore = /** @class */ (function () {
         //修改扩展数据
         this.modifyExdata = function (id, extdata) {
             var sql = 'UPDATE t_keyword  SET extdata=? WHERE id=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(extdata, id);
             //logger.debug(info);
             return info.changes == 1;
@@ -260,7 +313,7 @@ var KeyWordStore = /** @class */ (function () {
         //通过名称修改扩展数据
         this.modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
             var sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(extdata, namespace, ownname, name, type);
             //logger.debug(info);
             return info.changes == 1;
@@ -268,7 +321,7 @@ var KeyWordStore = /** @class */ (function () {
         //修改对外权限
         this.modifyPermission = function (id, permission) {
             var sql = 'UPDATE t_keyword  SET permission=? WHERE id=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(permission, id);
             //logger.debug(info);
             return info.changes == 1;
@@ -276,7 +329,7 @@ var KeyWordStore = /** @class */ (function () {
         //修改类型
         this.modifyType = function (id, type) {
             var sql = 'UPDATE t_keyword  SET type=? WHERE id=?';
-            var stmt = this.db.prepare(sql);
+            var stmt = this._getDbConnect().prepare(sql);
             var info = stmt.run(type, id);
             //logger.debug(info);
             return info.changes == 1;
@@ -312,7 +365,7 @@ var KeyWordStore = /** @class */ (function () {
         };
         //通过文件id获取所有的定义
         this.getAllByFileId = function (file_id) {
-            var stmt = this.db.prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
+            var stmt = this._getDbConnect().prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
             var infos = stmt.all(file_id);
             //logger.debug(infos);
             if (!infos || infos == undefined) {
@@ -321,6 +374,22 @@ var KeyWordStore = /** @class */ (function () {
                 return [];
             }
             return infos;
+        };
+        //通过文件获取id
+        this.getIdsByFileId = function (file_id) {
+            var stmt = this._getDbConnect().prepare('SELECT id FROM t_keyword WHERE file_id=?');
+            var infos = stmt.all(file_id);
+            //logger.debug(infos);
+            if (!infos || infos == undefined) {
+                //未查询到结果
+                logger.error("not find result. namespace:", namespace);
+                return [];
+            }
+            var ids = [];
+            for (var i = 0; i < infos.length; i++) {
+                ids.push(infos[i].id);
+            }
+            return ids;
         };
         //指定命名空间下查找
         this.findByNamespace = function (namespace) {
@@ -1182,6 +1251,27 @@ var FileIndexStore = /** @class */ (function () {
             }
             return infos;
         };
+        this.getAllIncludeFileInfo = function () {
+            var stmt = this.db.prepare('SELECT id, filepath, filename, md5, updatetime, type, state, systeminclude, extdata FROM t_fileindex where type in (0,1)');
+            var infos = stmt.all();
+            //logger.info(infos);
+            if (!infos || infos == undefined || infos.length == 0) {
+                //未查询到结果
+                logger.error("get all data faild!");
+                return [];
+            }
+            //规范化路径
+            for (var i = 0; i < infos.length; i++) {
+                var fileinfos = infos[i];
+                if (os.platform() == "win32"
+                    && fileinfos.filepath.indexOf("\\") != -1) {
+                    //windows系统，需要规范化路径
+                    fileinfos.filepath = fileinfos.filepath.replace("\\", "/");
+                    infos[i] = fileinfos;
+                }
+            }
+            return infos;
+        };
         //统计表的行数(为了性能)
         this.checkHasRowData = function () {
             var stmt = this.db.prepare('SELECT count(id) as total FROM t_fileindex LIMIT 0,10');
@@ -1372,6 +1462,16 @@ var Store = /** @class */ (function () {
                 info['filepath'] = '';
             }
             info['filepath'] = files.filepath;
+            return info;
+        };
+        //通过全名称获取， 不需要路径
+        this.getByFullnameNoPath = function (ownname, namespace, name, type) {
+            //获取定义详情
+            var info = KeyWordStore.getInstace().getByFullnameAndType(ownname, namespace, name, type);
+            if (!info) {
+                //如果未找到定义
+                return false;
+            }
             return info;
         };
     }

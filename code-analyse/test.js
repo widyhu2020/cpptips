@@ -23,9 +23,9 @@ filename = "xxxxx.proto";
 
 //测试归属找提示
 // 301 30
-let line = 64;
-let cpos = 35;
-filename = "/mmpay/mmpaymchmgr/mmpaymchmerchantsubject/mmpaymchmerchantsubjectauthorizebizaosvr/logic/BindMerchantSubject.cpp";
+let line = 277;
+let cpos = 63;
+filename = "/mmpay/mmpaymchmgr/mmpaymchmgrmerchant/mmpaymchmgrmerchantaosvr/logic/Merchant.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);
@@ -123,7 +123,9 @@ function succcallbackloadcpp(){
     let d = CodeAnalyse.getInstace().getDefinePoint(filename, precontext2, linelast, []);
     //let d = CodeAnalyse.getInstace().searchKeyWord(filename, "mmpaymchmerchantofflinedaosvr::MERCHANT_EV", precontext);
     // let newcontext = precontext;
+    // console.time("autoFillParams");
     // let d = CodeAnalyse.getInstace().autoFillParams(filename, newcontext, params);
+    // console.timeEnd("autoFillParams");
     console.log(d);
 }
 

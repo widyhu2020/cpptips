@@ -51,6 +51,9 @@ var AnalyseBase = /** @class */ (function () {
                 return false;
             }
             var fileid = fileinfo.id;
+            //初始化fileid
+            this.keyworddb.saveFileToMemDB(fileid, this.filename);
+            var beginIds = this.keyworddb.getIdsByFileId(fileid);
             //清空该文件所有的扩展数据,防止出现不修改名称的问题
             //keyworddb.cleanExtData(fileid);
             //变量所有区域
@@ -62,6 +65,7 @@ var AnalyseBase = /** @class */ (function () {
             });
             //去掉无用的定义
             this._removeNoUserFunction();
+            this.keyworddb.saveMemToDB(fileid, this.filename, beginIds);
             return nameMap;
         };
         //构造树结构体
@@ -743,7 +747,6 @@ var AnalyseBase = /** @class */ (function () {
                 var vals = _keys[i].split("|");
                 this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
             }
-            //logger.debug("resave over!");
         };
         //拼接key，拼接的key用于构造返回数据
         this._getKey = function (namespace, ownname, samplename, other) {
@@ -766,6 +769,7 @@ var AnalyseBase = /** @class */ (function () {
         //函数原定义
         this.methodDefine = {};
         this.newDefine = {};
+        this.inDBData = [];
     }
     ;
     return AnalyseBase;
