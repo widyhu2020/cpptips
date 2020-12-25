@@ -447,6 +447,9 @@ var Completion = /** @class */ (function () {
                         index++;
                     }
                     insertCode = insertCode + ")";
+                    if (index > 1) {
+                        insertCode = insertCode + ";";
+                    }
                 }
                 if (info.type == TypeEnum.DEFINE
                     && extJson.p.length > 0) {
@@ -462,6 +465,9 @@ var Completion = /** @class */ (function () {
                         index++;
                     }
                     insertCode = insertCode + ")";
+                    if (index > 1) {
+                        insertCode = insertCode + ";";
+                    }
                 }
             }
             var extData = JSON.stringify({ n: info.name, s: info.namespace, o: info.ownname, f: info.file_id, t: info.type });

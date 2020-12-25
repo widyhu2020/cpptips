@@ -531,7 +531,7 @@ connection.onInitialize((params) => {
             completionProvider: {
                 //提示注册
                 resolveProvider: true,
-                triggerCharacters: ['.', '>', ':', '/', ' ', '\n']
+                triggerCharacters: ['.', '>', ':', '/', ' ']
             },
             documentOnTypeFormattingProvider: {
                 firstTriggerCharacter: '}',
@@ -768,7 +768,6 @@ function testCloseMark(str, left, right) {
     return true;
 }
 connection.onCompletion((_textDocumentPosition) => {
-    //logger.debug(_textDocumentPosition);
     if (!_textDocumentPosition.position
         || !_textDocumentPosition.position.line
         || !_textDocumentPosition.position.character) {
@@ -804,32 +803,43 @@ connection.onCompletion((_textDocumentPosition) => {
     }
     ;
     //判断是否继承上行继续操作
-    if (linecode.trim() == "") {
+    let _last = context.indexOf("\n", pos + 1);
+    let _choose = context.substring(pos, _last).trim();
+    if (linecode.trim() == "" && _choose == "") {
+        let _dats = "";
         let preLineBegin = context.lastIndexOf("\n", pos - 1);
         let preLine = context.substring(preLineBegin, pos).trim();
-        // console.log(preLine);
-        //oGetMerchantReq.set_merchant_id(objReq.merchant().merchant_id());
-        let _posOwn = preLine.indexOf(".");
-        let _posPoint = preLine.indexOf("->");
-        let _pos = _posPoint > _posOwn ? _posOwn : _posPoint;
-        if (_posOwn == -1 && _posPoint == -1) {
-            //无效的
-            return null;
+        if (/^[\w_:<>]{1,256}[\s]{1,10}[\w_]{1,128};$/.test(preLine.trim())) {
+            preLine = preLine.trim().replace(/[\s]{2,10}/g, " ");
+            let _pos = preLine.lastIndexOf(" ");
+            if (_pos != 1) {
+                _dats = preLine.substring(_pos + 1, preLine.length - 1);
+            }
         }
-        else if (_posOwn == -1 && _posPoint > 0) {
-            _pos = _posPoint;
+        else {
+            let _posOwn = preLine.indexOf(".");
+            let _posPoint = preLine.indexOf("->");
+            let _pos = _posPoint > _posOwn ? _posOwn : _posPoint;
+            if (_posOwn == -1 && _posPoint == -1) {
+                //无效的
+                return null;
+            }
+            else if (_posOwn == -1 && _posPoint > 0) {
+                _pos = _posPoint;
+            }
+            else if (_posOwn > 0 && _posPoint == -1) {
+                _pos = _posOwn;
+            }
+            _dats = preLine.substring(0, _pos);
         }
-        else if (_posOwn > 0 && _posPoint == -1) {
-            _pos = _posOwn;
-        }
-        let _dats = preLine.substring(0, _pos);
-        // console.log("xxxxx:", _dats, _pos, _posOwn, _posPoint);
+        let range = vscode_languageserver_1.Range.create(nowline, linecode.length - 1, nowline, linecode.length);
         let item = {
             "label": _dats,
             "insertTextFormat": vscode_languageserver_1.InsertTextFormat.Snippet,
             "insertText": _dats,
             "kind": vscode_languageserver_1.CompletionItemKind.Variable,
-            "data": "{}"
+            "data": "{}",
+            "textEdit": vscode_languageserver_1.TextEdit.replace(range, _dats)
         };
         return vscode_languageserver_1.CompletionList.create([item], true);
         ;
@@ -1007,23 +1017,19 @@ function findWithNamespace(cpos, context, pos, filename, symbol) {
 }
 ;
 function getSelectItemInsertCode(item, useName, lastChar) {
-    let last = "";
-    if (lastChar == "\n") {
-        last = ";";
-    }
     if (useName) {
         //强制私有提示的值
-        return item.s + last;
+        return item.s;
     }
     if (item.c === undefined) {
         //未明确设置插入字符
-        return item.s + last;
+        return item.s;
     }
     if (item.c == "") {
         //设置字符未空
-        return item.s + last;
+        return item.s;
     }
-    return item.c + last;
+    return item.c;
 }
 ;
 function preKeyWordSearch(context, pos, cpos, linecode, filename) {

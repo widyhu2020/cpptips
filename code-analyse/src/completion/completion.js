@@ -490,6 +490,9 @@ class Completion {
                     index++;
                 }
                 insertCode = insertCode + ")";
+                if(index > 1){
+                    insertCode = insertCode + ";"; 
+                }
             }
             if (info.type == TypeEnum.DEFINE
                 && extJson.p.length > 0){
@@ -505,6 +508,9 @@ class Completion {
                     index++;
                 }
                 insertCode = insertCode + ")";
+                if(index > 1){
+                    insertCode = insertCode + ";"; 
+                }
             }
         }
         
