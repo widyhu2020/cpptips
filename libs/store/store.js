@@ -310,6 +310,14 @@ var KeyWordStore = /** @class */ (function () {
             //logger.debug(info);
             return info.changes == 1;
         };
+        //修改扩展数据
+        this.modifyExdataNoMem = function (id, extdata) {
+            var sql = 'UPDATE t_keyword  SET extdata=? WHERE id=?';
+            var stmt = this._getDbConnect(true).prepare(sql);
+            var info = stmt.run(extdata, id);
+            //logger.debug(info);
+            return info.changes == 1;
+        };
         //通过名称修改扩展数据
         this.modifyExdataWithName = function (namespace, ownname, name, type, extdata) {
             var sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
@@ -404,7 +412,12 @@ var KeyWordStore = /** @class */ (function () {
             return infos;
         };
         //获取可用的db链接
-        this._getDbConnect = function () {
+        this._getDbConnect = function (user_file) {
+            if (user_file === void 0) { user_file = false; }
+            if (user_file) {
+                //强制使用文件db
+                return this.db;
+            }
             if (this.dbMemDb) {
                 return this.dbMemDb;
             }
@@ -829,7 +842,28 @@ var KeyWordStore = /** @class */ (function () {
             sql = sql.replace(/[\t\s]{1,100}/g, " ");
             var stmt = db.prepare(sql);
             var infos = stmt.all();
-            //logger.debug(infos);
+            // logger.debug(infos);
+            if (!infos || infos == undefined || infos.length == 0) {
+                //未查询到结果
+                //logger.error("not find result. namespace:", ownname, namespace, name);
+                return false;
+            }
+            return infos;
+        };
+        //通过全名获取
+        this.getByFullnameNssAndTypeNoMem = function (ownname, namespaces, name, type) {
+            var db = this._getDbConnect(true);
+            var sqlnamespace = namespaces.join("','");
+            var sql = 'SELECT id, ownname, name, namespace, type, permission, file_id, extdata \
+                                FROM t_keyword \
+                                    WHERE ownname= \'' + ownname + '\' \
+                                    AND namespace in (\'' + sqlnamespace + '\') \
+                                    AND name= \'' + name + '\' \
+                                    AND type= ' + type + ' LIMIT 0,1';
+            sql = sql.replace(/[\t\s]{1,100}/g, " ");
+            var stmt = db.prepare(sql);
+            var infos = stmt.all();
+            // logger.debug(infos);
             if (!infos || infos == undefined || infos.length == 0) {
                 //未查询到结果
                 //logger.error("not find result. namespace:", ownname, namespace, name);

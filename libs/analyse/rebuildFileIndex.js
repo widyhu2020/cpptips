@@ -272,7 +272,6 @@ var RebuildFileIndex = /** @class */ (function () {
             var updatetime = Math.floor(fstat.mtimeMs / 1000);
             if (!forckReolad && hasInDb && Math.floor(updatetime) == Math.floor(fileinfo.updatetime)) {
                 //文件未更新，无需重新加载
-                // console.info("this file not modify!");
                 fs.closeSync(fd);
                 return;
             }

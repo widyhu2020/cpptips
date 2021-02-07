@@ -315,7 +315,7 @@ class AnalyseBase {
 
         //logger.debug(retResult);
         return retResult;
-   }
+    };
 
     _getAreaNamespace = function(current) {
         if (current.ownname
@@ -456,12 +456,12 @@ class AnalyseBase {
         });
         
         //获取db中的数据
-        let infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
-        //logger.debug(infos);
+        let infos = this.keyworddb.getByFullnameNssAndTypeNoMem(samplename, namespaces, name, TypeEnum.FUNCTION);
         if(!infos || infos.length > 1) {
             //两个以上定义，理论上是有异常的
             return false;
         }
+
         let info = infos[0];
         if(info && info.extdata && info.extdata.length > 0) {
             //库中有数据，需要合并
@@ -471,6 +471,7 @@ class AnalyseBase {
                 for (let j = 0; j < dbExtJson[i].i.length; j++) {
                     _key = _key + "|" + dbExtJson[i].i[j].t;
                 }
+
                 if(_key == key) {
                     //找到数据
                     if(dbExtJson[i].a
@@ -479,7 +480,7 @@ class AnalyseBase {
                         break;
                     }
                     dbExtJson[i].a = fileid;
-                    this.keyworddb.modifyExdata(info.id, JSON.stringify(dbExtJson));
+                    this.keyworddb.modifyExdataNoMem(info.id, JSON.stringify(dbExtJson));
                 }
             }
         }

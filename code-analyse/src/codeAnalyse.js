@@ -1854,15 +1854,29 @@ class CodeAnalyse {
                 _endpos = line.lastIndexOf(")", _endpos);
             }
             let _type = line.substring(_beginpos + 1, _endpos).trim();
-            let _names = this._getValName(_type);
-            names = names.concat(_names);
-            if (names.length <= 0) {
-                //未找到合适的名字
-                return [];
+            if(_type.indexOf("::") >= 0){
+                //可能不是对下， A::FUNC();
+                let _ownBegin = _type.indexOf("::");
+                valetype = _type.substring(0, _ownBegin);
+                let _lastNames = _type.substring(_ownBegin + 2);
+                let _names = this._getValName(_lastNames);
+                names = names.concat(_names);
+                if (names.length <= 0) {
+                    //未找到合适的名字
+                    return [];
+                }
+            } else {
+                
+                let _names = this._getValName(_type);
+                names = names.concat(_names);
+                if (names.length <= 0) {
+                    //未找到合适的名字
+                    return [];
+                }
+                let name = names.pop();
+                _valetype = this._getValDefineOwn(lines, name.n);
+                valetype = _valetype.t;
             }
-            let name = names.pop();
-            _valetype = this._getValDefineOwn(lines, name.n);
-            valetype = _valetype.t;
         }
         
         if (valetype != "" && names.length == 0) {

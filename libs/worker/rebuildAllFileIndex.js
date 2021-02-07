@@ -38,7 +38,7 @@ if (cluster.isMaster) {
         data: {
             basepath: "/Users/widyhu/widyhu/cpp_project/",
             dbpath: "/Users/widyhu/widyhu/cpp_project/.vscode/db/cpptips.db",
-            filepath: '/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.h',
+            filepath: '/mmpay/mmpaymchmgr/mmpaymchproduct/mmpaymchproductaosvr/logic/MerchantProduct.cpp',
             // filepaths: ['xxxxxxxx',
             //             'xxxxxxxx'],
             issystem: 0,

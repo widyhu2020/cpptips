@@ -404,8 +404,7 @@ var AnalyseBase = /** @class */ (function () {
                 key = key + "|" + _this._getRealName(ep.type);
             });
             //获取db中的数据
-            var infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
-            //logger.debug(infos);
+            var infos = this.keyworddb.getByFullnameNssAndTypeNoMem(samplename, namespaces, name, TypeEnum.FUNCTION);
             if (!infos || infos.length > 1) {
                 //两个以上定义，理论上是有异常的
                 return false;
@@ -427,7 +426,7 @@ var AnalyseBase = /** @class */ (function () {
                             break;
                         }
                         dbExtJson[i].a = fileid;
-                        this.keyworddb.modifyExdata(info.id, JSON.stringify(dbExtJson));
+                        this.keyworddb.modifyExdataNoMem(info.id, JSON.stringify(dbExtJson));
                     }
                 }
             }
