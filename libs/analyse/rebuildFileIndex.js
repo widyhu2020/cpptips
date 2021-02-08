@@ -311,13 +311,14 @@ var RebuildFileIndex = /** @class */ (function () {
                 }
                 var file_id = fileinfo_1.id;
                 //通过文件id获取全部的定义
-                var oldinfos = KeyWordStore.getInstace().getAllByFileId(file_id);
+                var oldinfos = KeyWordStore.getInstace().getAllByFileIdNoMem(file_id);
                 //分析文件，去掉类、函数等定义
                 var newinfo = this._readSourceFile(filepath, filecontext);
                 //获取需呀删除的id
                 var delids = this._findNeedDeleteIds(oldinfos, newinfo);
                 //删除
                 KeyWordStore.getInstace().deleteByIds(delids);
+                KeyWordStore.getInstace().deleteByIdsNoMem(delids);
                 //更新文件的md5值
                 FileIndexStore.getInstace().modifyMd5(file_id, md5, updatetime);
                 return;
@@ -387,13 +388,14 @@ var RebuildFileIndex = /** @class */ (function () {
                 }
                 var file_id = fileinfo_2.id;
                 //通过文件id获取全部的定义
-                var oldinfos = KeyWordStore.getInstace().getAllByFileId(file_id);
+                var oldinfos = KeyWordStore.getInstace().getAllByFileIdNoMem(file_id);
                 //分析文件，去掉类、函数等定义
                 var newinfo = that._readIncludeFile(filepath, filecontext);
                 //获取需呀删除的id
                 var delids = this._findNeedDeleteIds(oldinfos, newinfo);
                 //删除
                 KeyWordStore.getInstace().deleteByIds(delids);
+                KeyWordStore.getInstace().deleteByIdsNoMem(delids);
                 //更新文件的md5值
                 FileIndexStore.getInstace().modifyMd5(file_id, md5, updatetime);
                 return;

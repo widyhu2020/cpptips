@@ -2,7 +2,7 @@
 	"name": "cpptips",
 	"displayName": "cpptips",
 	"description": "一款c++编程辅助工具，可直接基于protobuf建立索引，无需生成c++头文件。",
-	"version": "0.4.10",
+	"version": "0.4.11",
 	"repository": {
 		"url": "https://github.com/widyhu2020/cpptips"
 	},
@@ -19,7 +19,7 @@
 	"activationEvents": [
 		"onLanguage:cpp",
 		"onLanguage:c",
-		"onLanguage:payprotobuf",
+		"onLanguage:proto3",
 		"onLanguage:protobuf"
 	],
 	"main": "./client/out/extension.js",
@@ -141,7 +141,7 @@
 		],
 		"languages": [
 			{
-				"id": "payprotobuf",
+				"id": "proto3",
 				"extensions": [
 					".proto"
 				],
@@ -191,7 +191,7 @@
 					"group": "1_modification@4"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.reflushAllIdex",
 					"alt": "cpp.reflushAllIdex",
 					"group": "z_commands@2"
@@ -209,31 +209,31 @@
 					"group": "1_modification@3"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.reflushOneIdex",
 					"alt": "cpp.reflushOneIdex",
 					"group": "z_commands@1"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.build",
 					"alt": "cpp.build",
 					"group": "z_commands@1"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.buildfordocker",
 					"alt": "cpp.buildfordocker",
 					"group": "z_commands@1"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.buildconfig",
 					"alt": "cpp.buildconfig",
 					"group": "z_commands@2"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.showWebConfig",
 					"alt": "cpp.showWebConfig",
 					"group": "z_commands@2"
@@ -259,7 +259,7 @@
 					"group": "2_workspace@5"
 				},
 				{
-					"when": "resourceLangId == cpp || resourceLangId == payprotobuf",
+					"when": "resourceLangId == cpp || resourceLangId == proto3",
 					"command": "cpp.reflushOneIdex",
 					"alt": "cpp.reflushOneIdex",
 					"group": "2_workspace@3"

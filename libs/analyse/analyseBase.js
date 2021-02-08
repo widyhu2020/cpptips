@@ -54,8 +54,6 @@ var AnalyseBase = /** @class */ (function () {
             //初始化fileid
             this.keyworddb.saveFileToMemDB(fileid, this.filename);
             var beginIds = this.keyworddb.getIdsByFileId(fileid);
-            //清空该文件所有的扩展数据,防止出现不修改名称的问题
-            //keyworddb.cleanExtData(fileid);
             //变量所有区域
             var nameMap = {};
             this.tree.traverseBF(function (current) {
@@ -407,7 +405,10 @@ var AnalyseBase = /** @class */ (function () {
             var infos = this.keyworddb.getByFullnameNssAndTypeNoMem(samplename, namespaces, name, TypeEnum.FUNCTION);
             if (!infos || infos.length > 1) {
                 //两个以上定义，理论上是有异常的
-                return false;
+                infos = this.keyworddb.getByFullnameNssAndType(samplename, namespaces, name, TypeEnum.FUNCTION);
+                if (!infos || infos.length > 1) {
+                    return false;
+                }
             }
             var info = infos[0];
             if (info && info.extdata && info.extdata.length > 0) {
@@ -427,6 +428,7 @@ var AnalyseBase = /** @class */ (function () {
                         }
                         dbExtJson[i].a = fileid;
                         this.keyworddb.modifyExdataNoMem(info.id, JSON.stringify(dbExtJson));
+                        this.keyworddb.modifyExdata(info.id, JSON.stringify(dbExtJson));
                     }
                 }
             }
@@ -745,6 +747,7 @@ var AnalyseBase = /** @class */ (function () {
                 var jsonExt = JSON.stringify(this.newDefine[_keys[i]]);
                 var vals = _keys[i].split("|");
                 this.keyworddb.modifyExdataWithName(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
+                this.keyworddb.modifyExdataWithNameNoMem(vals[0], vals[1], vals[2], TypeEnum.FUNCTION, jsonExt);
             }
         };
         //拼接key，拼接的key用于构造返回数据

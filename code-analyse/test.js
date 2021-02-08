@@ -23,9 +23,9 @@ filename = "xxxxx.proto";
 
 //测试归属找提示
 // 301 30
-let line = 89;
-let cpos = 27;
-filename = "/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffbizaosvr/logic/CheckIsFollow.cpp";
+let line = 173;
+let cpos = 40;
+filename = "/mmpay/mmpaymchpl/mmpaymchplstaff/mmpaymchplstaffbizaosvr/utils/mmpaymchplstaffbizao_util.cpp";
 let fd = fs.openSync(basedir + filename, 'r');
 const buffer = Buffer.alloc(1024 * 1024);
 let bytesRead = fs.readSync(fd, buffer, 0, 1024 * 1024);

@@ -371,6 +371,15 @@ class KeyWordStore {
         return info.changes == 1;
     };
 
+    //通过名称修改扩展数据
+    modifyExdataWithNameNoMem = function (namespace, ownname, name, type, extdata) {
+        let sql = 'UPDATE t_keyword  SET extdata=? WHERE namespace=? AND ownname=? AND name=? AND type=?';
+        const stmt = this._getDbConnect(true).prepare(sql);
+        const info = stmt.run(extdata, namespace, ownname, name, type);
+        //logger.debug(info);
+        return info.changes == 1;
+    };
+
     //修改对外权限
     modifyPermission = function (id, permission) {
         let sql = 'UPDATE t_keyword  SET permission=? WHERE id=?';
@@ -406,7 +415,21 @@ class KeyWordStore {
         }
         let sqlids = ids.join(',');
         let sql = 'DELETE FROM t_keyword WHERE id IN (' + sqlids +')';
-        const stmt = this.db.prepare(sql);
+        const stmt = this._getDbConnect().prepare(sql);
+        const info = stmt.run();
+        //logger.debug(info);
+        return info.changes == 1;
+    };
+
+    //批量删除数据
+    deleteByIdsNoMem = function (ids) {
+        if(ids.length <= 0) {
+            //没有输入ids，直接成功
+            return true;
+        }
+        let sqlids = ids.join(',');
+        let sql = 'DELETE FROM t_keyword WHERE id IN (' + sqlids +')';
+        const stmt = this._getDbConnect(true).prepare(sql);
         const info = stmt.run();
         //logger.debug(info);
         return info.changes == 1;
@@ -424,6 +447,20 @@ class KeyWordStore {
     //通过文件id获取所有的定义
     getAllByFileId = function (file_id) {
         const stmt = this._getDbConnect().prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
+        const infos = stmt.all(file_id);
+        //logger.debug(infos);
+        if (!infos || infos == undefined) {
+            //未查询到结果
+            logger.error("not find result. namespace:", namespace);
+            return [];
+        }
+
+        return infos;
+    };
+
+    //通过文件id获取所有的定义
+    getAllByFileIdNoMem = function (file_id) {
+        const stmt = this._getDbConnect(true).prepare('SELECT id, ownname, name, namespace, type, permission, file_id, extdata FROM t_keyword WHERE file_id=?');
         const infos = stmt.all(file_id);
         //logger.debug(infos);
         if (!infos || infos == undefined) {

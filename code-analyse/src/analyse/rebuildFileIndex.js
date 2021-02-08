@@ -368,7 +368,7 @@ class RebuildFileIndex {
             let file_id = fileinfo.id;
 
             //通过文件id获取全部的定义
-            let oldinfos = KeyWordStore.getInstace().getAllByFileId(file_id);
+            let oldinfos = KeyWordStore.getInstace().getAllByFileIdNoMem(file_id);
 
             //分析文件，去掉类、函数等定义
             let newinfo = this._readSourceFile(filepath, filecontext);
@@ -378,6 +378,7 @@ class RebuildFileIndex {
 
             //删除
             KeyWordStore.getInstace().deleteByIds(delids);
+            KeyWordStore.getInstace().deleteByIdsNoMem(delids);
 
             //更新文件的md5值
             FileIndexStore.getInstace().modifyMd5(file_id, md5, updatetime);
@@ -456,7 +457,7 @@ class RebuildFileIndex {
             let file_id = fileinfo.id;
 
             //通过文件id获取全部的定义
-            let oldinfos = KeyWordStore.getInstace().getAllByFileId(file_id);
+            let oldinfos = KeyWordStore.getInstace().getAllByFileIdNoMem(file_id);
 
             //分析文件，去掉类、函数等定义
             let newinfo = that._readIncludeFile(filepath, filecontext);
@@ -466,6 +467,7 @@ class RebuildFileIndex {
 
             //删除
             KeyWordStore.getInstace().deleteByIds(delids);
+            KeyWordStore.getInstace().deleteByIdsNoMem(delids);
 
             //更新文件的md5值
             

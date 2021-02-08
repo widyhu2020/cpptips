@@ -372,7 +372,7 @@ export function GetBuildCmd(context: ExtensionContext, isCommd = true) {
 						}
 					).then(function (msg) {
 						if(!msg) { return; }
-						if(msg.label.indexOf("指定目录") == -1) {
+						if(msg.label.indexOf("指定目录") == -1 && msg.label.indexOf("指定机器") == -1) {
 							cmd = msg.detail;
 							logger.debug("cmd:" + cmd + " ;buildpath:" + buildpath);
 							runBuild(buildpath, cmd);
