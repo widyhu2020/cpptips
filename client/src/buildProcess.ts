@@ -30,6 +30,58 @@ interface BuildTaskDefinition extends TaskDefinition {
 }
 
 function runBuild(path:string, command:string){
+	let buildName = [];
+	let selectItem:QuickPickItem[] = [];
+	if(!fs.existsSync(path + "/BUILD")
+		|| command.indexOf(":") == -1){
+		return runBuildReal(path, command);
+	}
+
+	//如果是build文件编译，分析build文件，获取里面的二进制
+	let _data = fs.readFileSync(path + "/BUILD", {encoding:"utf8"});
+	let lines = _data.split(/[\n]{1,1}/);
+	for(let i = 0; i < lines.length; i++){
+		let line = lines[i].trim();
+		if(line == "cc_binary(" && i + 1 < lines.length) {
+			let nextLine = lines[i + 1].trim();
+			let kv = nextLine.split('=');
+			if(kv.length == 2 && kv[0].trim() == "name") {
+				let _value = kv[1].trim().replace(/["',\s\t]{1,1}/ig, "");
+				buildName.push(_value);
+				let _command = command.replace(/:[a-zA-Z_]{3,128} /g, ":" + _value + " ");
+				let _item = {
+					label: _value,
+					description: "",
+					detail:_command
+				};
+				selectItem.push(_item);
+			}
+		}
+	}
+
+	if(buildName.length <= 1){
+		//无需选择
+		return runBuildReal(path, command);
+	}
+	
+	window.showQuickPick(
+		// 这个对象中所有参数都是可选参数
+		selectItem,{
+			canPickMany: false,
+			ignoreFocusOut: true,
+			matchOnDescription: true,
+			matchOnDetail: true,
+			placeHolder: '请选择编译二进制，按esc健取消！'
+		}
+	).then(function (msg) {
+		if(!msg) { return; }
+		let buildBinary = msg.label;
+		command = command.replace(/:[a-zA-Z_]{3,128} /g, ":" + buildBinary + " ");
+		return runBuildReal(path, command);
+	});
+}
+
+function runBuildReal(path:string, command:string){
 	let taskName = "提交编译";
 	let kind: BuildTaskDefinition = {
 		type: 'build',
@@ -361,6 +413,7 @@ export function GetBuildCmd(context: ExtensionContext, isCommd = true) {
 						};
 						selectItem.push(_item);
 					});
+					
 					window.showQuickPick(
 						// 这个对象中所有参数都是可选参数
 						selectItem,{
